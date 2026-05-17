@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace NETManager.Shared.Models;
@@ -5,11 +6,14 @@ namespace NETManager.Shared.Models;
 public class ChatPayload
 {
     [JsonPropertyName("sender")]
+    [Required]
     public string Sender { get; set; } = string.Empty;
 
     [JsonPropertyName("receiver")]
+    [Required]
     public string Receiver { get; set; } = string.Empty;
 
     [JsonPropertyName("message")]
+    [Required]
     public string Message { get; set; } = string.Empty;
 }

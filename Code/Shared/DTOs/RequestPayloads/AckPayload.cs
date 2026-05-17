@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace NETManager.Shared.Models;
@@ -5,12 +6,15 @@ namespace NETManager.Shared.Models;
 public class AckPayload
 {
     [JsonPropertyName("machineId")]
+    [Required]
     public string MachineId { get; set; } = string.Empty;
 
     [JsonPropertyName("ackFor")]
+    [Required]
     public string AckFor { get; set; } = string.Empty;
 
     [JsonPropertyName("status")]
+    [Required]
     public string Status { get; set; } = string.Empty;
 
     [JsonPropertyName("message")]

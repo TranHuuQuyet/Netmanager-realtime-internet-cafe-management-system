@@ -1,4 +1,4 @@
-namespace NETManager.Shared.Models;
+namespace NETManager.Shared.Enums;
 
 public enum CommandType
 {

@@ -2,7 +2,7 @@ using NETManager.Shared.Enums;
 using NETManager.Shared.DTOs.RequestPayloads;
 using NETManager.Shared.DTOs.CommandPayloads;
 using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.Models;
+using NETManager.Shared.DTOs.Bidrectional;
 
 namespace NETManager.Shared.Packets;
 

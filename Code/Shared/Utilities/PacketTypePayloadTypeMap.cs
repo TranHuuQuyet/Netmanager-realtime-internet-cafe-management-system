@@ -1,34 +1,24 @@
 using System.Collections.Concurrent;
 using NETManager.Shared.Enums;
+using NETManager.Shared.DTOs.RequestPayloads;
+using NETManager.Shared.DTOs.CommandPayloads;
+using NETManager.Shared.DTOs.ResponsePayloads;
+using NETManager.Shared.DTOs.Bidrectional;
 
 namespace NETManager.Shared.Utilities;
 
-/// <summary>
-/// Central lookup that maps a <see cref="PacketType"/> value to the concrete
-/// payload <see cref="System.Type"/> that should be used when constructing a
-/// <see cref="Packet{T}"/> for that packet type.
-///
-/// This is the only place the router needs to know about type relationships;
-/// the rest of the serializer and the dispatcher code never contains switch/if
-/// chains over packet types.
-///
-/// Usage in the two-pass deserializer:
-///   type  = JsonHelper.DeserializePacketType(rawBytes)
-///   t     = PacketTypePayloadTypeMap.GetPayloadType(type)
-///   packet = JsonHelper.Deserialize<Packet<T>>(rawBytes)
-/// </summary>
 public static class PacketTypePayloadTypeMap
 {
     private static readonly ConcurrentDictionary<PacketType, Type> _map = new()
     {
-        [PacketType.LOGIN]        = typeof(LoginPayload),
-        [PacketType.STATUS]       = typeof(StatusPayload),
-        [PacketType.LOCK]         = typeof(LockPayload),
-        [PacketType.UNLOCK]       = typeof(UnlockPayload),
-        [PacketType.ACK]          = typeof(AckPayload),
+        [PacketType.LOGIN] = typeof(LoginPayload),
+        [PacketType.STATUS] = typeof(StatusPayload),
+        [PacketType.LOCK] = typeof(LockPayload),
+        [PacketType.UNLOCK] = typeof(UnlockPayload),
+        [PacketType.ACK] = typeof(AckPayload),
         [PacketType.NOTIFICATION] = typeof(NotificationPayload),
-        [PacketType.TIMER]        = typeof(TimerPayload),
-        [PacketType.CHAT]         = typeof(ChatPayload)
+        [PacketType.TIMER] = typeof(TimerPayload),
+        [PacketType.CHAT] = typeof(ChatPayload)
     };
 
     /// <summary>Return the payload <see cref="System.Type"/> registered for the given <paramref name="type"/>.</summary>

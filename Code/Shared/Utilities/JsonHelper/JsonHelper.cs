@@ -30,8 +30,13 @@
 using System.Text.Json;
 using NETManager.Shared.Enums;
 using NETManager.Shared.Models;
+using NETManager.Shared.DTOs.CommandPayloads;
+using NETManager.Shared.Packets;
+using System.IO;
+using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.Utilities;
+
+namespace NETManager.Shared.Utilities.JsonHelper;
 
 public static class JsonHelper
 {

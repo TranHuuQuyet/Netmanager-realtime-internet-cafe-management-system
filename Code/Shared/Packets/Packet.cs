@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.Models;
+namespace NETManager.Shared.Packets;
 
 public abstract class Packet
 {

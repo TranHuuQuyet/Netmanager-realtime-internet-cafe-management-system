@@ -16,7 +16,8 @@ Current reality:
 - Phase 0 da hoan thanh va duoc dong bo trong docs
 - leader flow da duoc lam lai
 - role docs da duoc dong bo
-- chua co runtime implementation bat dau day du
+- `Code/` da co folder skeleton, nhung chua co `.sln`, `.csproj`, hoac runtime implementation day du
+- Week 1 phai chuyen du an tu documentation-first sang runnable skeleton
 - deadline hien tai la 8 tuan
 - project uu tien demo chay on dinh truoc
 
@@ -82,6 +83,9 @@ These tasks must be done next:
 - [ ] Confirm auth/session response contract with Member 5.
 - [ ] Confirm local multi-instance test assumption with Member 2 and Member 6.
 - [ ] Prepare first networking/auth skeleton handoff.
+- [ ] Create `Code/NetManager.sln`, `ServerApp`, `ClientApp`, and `Shared` project files.
+- [ ] Confirm `ServerApp` and `ClientApp` reference `Shared`.
+- [ ] Prove one TCP JSON-line packet round trip before deep UI work.
 
 ## 4. This Week Priority
 
@@ -92,12 +96,14 @@ These tasks must be done next:
 - [x] Freeze stack and identity assumptions.
 - [x] Freeze first-week tasks and announce owners.
 - [ ] Review `API.md` with Member 2 and Member 5.
-- [ ] Keep `LEADER_FLOW.md`, `TASKS.md`, and `BUGS.md` aligned.
+- [ ] Keep `LEADER_FLOW.md`, `TASKS.md`, `BUGS.md`, `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` aligned.
+- [ ] Approve Week 1 runnable skeleton before the team moves past Gate B.
 
 ### Member 2
 
 - [ ] Finalize packet envelope and packet type baseline.
 - [ ] Draft serializer/parser rules.
+- [ ] Create or support `Shared` packet models needed for packet round trip.
 - [ ] Create networking skeleton for server/client communication.
 - [ ] Prove first connect/send/receive flow.
 - [ ] Draft local multi-instance launch assumptions.
@@ -128,11 +134,12 @@ These tasks must be done next:
 
 ### Member 6
 
-- [ ] Create bug report template.
-- [ ] Create test matrix template.
-- [ ] Create first checklist for contract and connection tests.
+- [x] Create bug report template.
+- [x] Create test matrix template.
+- [x] Create first checklist for contract and connection tests.
 - [ ] Review docs for contradictions.
-- [ ] Create separate checklists for real LAN and local multi-instance demo.
+- [x] Create separate checklists for real LAN and local multi-instance demo.
+- [ ] Keep `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` updated as code appears.
 
 ## 5. Week-by-Week Delivery Targets
 
@@ -140,19 +147,25 @@ These tasks must be done next:
 
 Target:
 
-- scope, contract baseline, ownership, and skeleton start are stable
+- scope, contract baseline, ownership, and runnable skeleton start are stable
 
 Must be visible by end of week:
 
 - `API.md` baseline
 - source folder structure
+- `NetManager.sln`
+- `ServerApp`, `ClientApp`, and `Shared` project files
+- `ServerApp` and `ClientApp` reference `Shared`
 - chosen stack
 - identity rule
 - networking skeleton
+- one JSON-line packet round trip
 - auth skeleton
 - server shell
 - client shell
-- bug/test templates
+- `RUN_GUIDE.md`
+- `TEST_MATRIX.md`
+- `DEMO_CHECKLIST.md`
 
 ### Week 2
 
@@ -293,8 +306,11 @@ Each member should report in this shape:
 
 Before moving beyond `Gate B`, Member 1 should verify:
 
+- [ ] solution builds successfully.
 - [ ] server and client can connect successfully.
 - [ ] at least one packet can be exchanged.
+- [ ] invalid packet does not crash the receiver.
+- [ ] two local client instances can connect or the blocker is documented.
 - [ ] receive loop does not freeze UI.
 - [ ] local multi-instance test works.
 - [ ] networking handoff does not conflict with auth ownership.

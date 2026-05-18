@@ -4,7 +4,7 @@ All project documentation now lives in `DOCS/`.
 
 Current project status:
 
-- documentation-first
+- documentation-first, moving into runnable skeleton
 
 - target delivery baseline: `8 weeks`
 
@@ -14,6 +14,10 @@ Current project status:
 - [API Contract](./DOCS/API.md)
 - [Task Tracker](./DOCS/TASKS.md)
 - [Leader Flow](./DOCS/LEADER_FLOW.md)
+- [Run Guide](./DOCS/RUN_GUIDE.md)
+- [Test Matrix](./DOCS/TEST_MATRIX.md)
+- [Demo Checklist](./DOCS/DEMO_CHECKLIST.md)
+- [Decision Log](./DOCS/DECISIONS.md)
 
 ## Supporting Docs
 

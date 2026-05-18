@@ -32,20 +32,25 @@ DOCS/
 |-- TASKS.md
 |-- LEADER_FLOW.md
 |-- BUGS.md
+|-- RUN_GUIDE.md
+|-- TEST_MATRIX.md
+|-- DEMO_CHECKLIST.md
+|-- DECISIONS.md
 `-- members/
 ```
 
 ## What We Build First
 
 1. Scope, stack, identity rule, and contract freeze.
-2. `Shared` contract and packet helpers.
-3. TCP connect / send / receive loop.
-4. Login and auth/session flow with `machineId` validation.
-5. `STATUS` heartbeat plus state change sync.
-6. `LOCK` / `UNLOCK` with client ACK handling.
-7. `NOTIFICATION`, timer, and minimal 1-1 chat.
-8. WinForms shell wiring and integration.
-9. Reconnect, disconnect, invalid packet handling, and demo-mode validation.
+2. Solution and project scaffold under `Code/`.
+3. `Shared` contract and packet helpers.
+4. TCP connect / send / receive loop.
+5. Login and auth/session flow with `machineId` validation.
+6. `STATUS` heartbeat plus state change sync.
+7. `LOCK` / `UNLOCK` with client ACK handling.
+8. `NOTIFICATION`, timer, and minimal 1-1 chat.
+9. WinForms shell wiring and integration.
+10. Reconnect, disconnect, invalid packet handling, and demo-mode validation.
 
 ## Ownership Summary
 
@@ -87,11 +92,18 @@ DOCS/
 - `API.md`: packet, auth, and session contract
 - `TASKS.md`: current execution status and next actions
 - `BUGS.md`: risks, unresolved issues, and runtime bugs
+- `RUN_GUIDE.md`: build, run, local mode, real LAN mode, and seed account guide
+- `TEST_MATRIX.md`: gate-based test cases and current test status
+- `DEMO_CHECKLIST.md`: core demo path, secondary demo path, and fallback scope
+- `DECISIONS.md`: accepted and pending implementation decisions
 
 ## First Week Goal
 
+- A `.sln` and the three project files are created.
+- `ServerApp` and `ClientApp` reference `Shared`.
 - A client can connect.
-- A login packet can round-trip.
+- At least one JSON-line packet can round-trip.
+- A login packet shape is implemented or stubbed through the agreed shared model.
 - The server can see one client status.
 - The client can receive one server command.
 - The UI stays responsive.
@@ -100,6 +112,7 @@ DOCS/
 ## Definition of Done Before Coding Deeply
 
 - `Code/` structure is in place.
+- planned solution and project generation path is clear.
 - stack is frozen
 - `API.md` baseline is accepted
 - account-to-`machineId` rule is accepted

@@ -132,8 +132,10 @@ Ban phai biet cac dependency chinh sau:
 ### Week 1
 
 - chot MVP, scope, ownership, branch rule, commit rule
-- dong bo `LEADER_FLOW.md`, `API.md`, `TASKS.md`
+- dong bo `LEADER_FLOW.md`, `API.md`, `TASKS.md`, `RUN_GUIDE.md`, `TEST_MATRIX.md`, va `DEMO_CHECKLIST.md`
 - giao task dau tien cho tung member
+- dam bao `Code/NetManager.sln`, `ServerApp`, `ClientApp`, va `Shared` project files duoc tao
+- xac nhan Week 1 ket thuc bang runnable skeleton va mot TCP JSON-line packet round trip
 
 ### Week 2
 

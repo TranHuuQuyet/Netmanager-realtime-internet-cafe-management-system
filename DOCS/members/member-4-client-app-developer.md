@@ -54,7 +54,7 @@ Ban khong nen sua:
 - [x] Da xac nhan client login phai dung `username + password + machineId` va phai hien loi ro khi sai `machineId`.
 - [x] Da xac nhan chat scope chi la 1-1 text toi thieu, khong emoji, khong history, khong file/image.
 - [x] Da xac nhan client phai ho tro ca `Mode A - Real LAN Demo` va `Mode B - Local Multi-Instance Demo`.
-- [x] Da xac nhan Phase 0 khong yeu cau runtime implementation; Week 1/Phase 4 moi bat dau client shell.
+- [x] Da xac nhan Phase 0 khong yeu cau runtime implementation; Week 1 bat dau client shell trong runnable skeleton, Phase 4 se hoan thien skeleton theo service/interface.
 
 #### Bao cao Phase 0 cua Member 4
 
@@ -122,6 +122,8 @@ Ket luan cua Member 4: Phase 0 da hoan thanh sau khi xac nhan lai client scope, 
 - create login shell
 - create main shell
 - create lock screen shell
+- dam bao client shell mo duoc trong runnable skeleton
+- client UI chi goi service/interface hoac placeholder, khong parse packet truc tiep trong form
 
 ### Week 2
 

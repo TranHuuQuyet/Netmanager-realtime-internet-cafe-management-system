@@ -8,12 +8,14 @@ The workspace is locked for a 3-project implementation shape:
 - `Shared`
 
 Project generation is still pending.
-This structure only locks folder boundaries, ownership, and source placement.
+Week 1 must turn this folder skeleton into a buildable solution.
+This structure locks folder boundaries, ownership, and source placement.
 
 ## Planned Structure
 
 ```text
 Code/
+|-- NetManager.sln
 |-- ServerApp/
 |   |-- Forms/
 |   |-- Networking/
@@ -41,6 +43,7 @@ The following are not part of the intended source tree:
 
 ## Ownership Guide
 
+- `NetManager.sln` and project wiring are coordinated by Member 1 with support from the runtime owners.
 - `ServerApp/` is mainly for Member 3.
 - `ClientApp/` is mainly for Member 4.
 - `Shared/` is mainly for Member 2.
@@ -66,3 +69,4 @@ The following are not part of the intended source tree:
 - `Shared` will become a class library.
 - Both apps will reference `Shared`.
 - No separate `ServerApp.Data` project is planned for v1.
+- The first runnable milestone is a TCP JSON-line packet round trip between `ServerApp` and `ClientApp`.

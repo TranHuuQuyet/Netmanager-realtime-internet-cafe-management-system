@@ -103,8 +103,10 @@ Ban khong nen sua:
 ### Week 1
 
 - draft packet contract
+- tao hoac ho tro `Shared` packet model baseline
 - tao networking skeleton
 - tao connect/send/receive proof
+- ghi ro local multi-instance connection assumption trong docs
 
 ### Week 2
 

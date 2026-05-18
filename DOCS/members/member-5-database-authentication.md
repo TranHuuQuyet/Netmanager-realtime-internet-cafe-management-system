@@ -108,6 +108,8 @@ Ban khong nen sua:
 - draft auth result model
 - draft session model
 - create auth service skeleton
+- chot demo seed account baseline voi Member 1 va Member 6
+- cung cap interface du de Member 2 noi login path trong Week 2
 
 ### Week 2
 

@@ -98,6 +98,10 @@ Ban khong nen sua runtime code tru khi dang verify bug va da duoc owner giao.
 - tao bug report template
 - tao test matrix template
 - tao connection/contract checklist
+- tao `RUN_GUIDE.md`
+- tao `DEMO_CHECKLIST.md`
+- tao `DECISIONS.md` baseline
+- xac nhan checklist co the dung de verify runnable skeleton cuoi Week 1
 
 ### Week 2
 

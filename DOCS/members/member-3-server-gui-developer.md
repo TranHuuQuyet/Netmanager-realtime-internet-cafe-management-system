@@ -108,6 +108,8 @@ Phase 0 completion note:
 - create server login shell
 - create dashboard shell
 - create machine list stub
+- dam bao server shell mo duoc trong runnable skeleton
+- chi bind UI qua service/interface hoac placeholder, khong parse packet truc tiep trong form
 
 ### Week 2
 

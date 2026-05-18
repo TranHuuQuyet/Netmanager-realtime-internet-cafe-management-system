@@ -300,14 +300,16 @@ This is the only safe implementation order for the project:
 
 1. Scope freeze
 2. Contract freeze
-3. Networking foundation
-4. Authentication and persistence
-5. GUI skeletons
-6. End-to-end integration
-7. Feature completion
-8. Stabilization
-9. Release candidate
-10. Final demo and archive
+3. Solution and project scaffold
+4. Shared packet baseline
+5. Networking foundation
+6. Authentication and persistence
+7. GUI skeletons
+8. End-to-end integration
+9. Feature completion
+10. Stabilization
+11. Release candidate
+12. Final demo and archive
 
 ## 9. Phase-Based Execution Flow
 
@@ -683,14 +685,15 @@ Conflict control:
 
 ## 10. Week-by-Week Production Plan
 
-### Week 1 - Kickoff, Scope, Contract, and Tech Freeze
+### Week 1 - Kickoff, Contract, Scaffold, and First Round Trip
 
 Main weekly goal:
 
 - freeze scope
 - freeze contract baseline
 - freeze technical direction
-- start skeleton work without overlap
+- create the real solution/project scaffold
+- prove the first TCP JSON-line packet round trip
 
 Member 1:
 
@@ -701,13 +704,17 @@ Member 1:
 - publish first weekly task map
 - freeze stack choice: `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`
 - freeze client identity rule and supported demo modes
+- approve `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` as Week 1 operating docs
+- verify that Week 1 ends with a runnable skeleton, not only planning docs
 
 Member 2:
 
 - define packet envelope and packet types
+- create or support `Shared` packet model baseline
 - create networking skeleton
 - create serializer/parser draft
 - create first connect/send/receive proof
+- document local multi-instance connection assumptions
 
 Member 3:
 
@@ -736,12 +743,20 @@ Member 6:
 - create test matrix template
 - create first checklist for contract and connection tests
 - create separate checklist for `Mode A` and `Mode B`
+- create run guide and demo checklist baseline
 
 Week 1 completion target:
 
 - no one is waiting on basic role clarity
 - contract and ownership are stable enough to continue
 - stack and identity assumptions are frozen
+- `Code/NetManager.sln` exists
+- `ServerApp`, `ClientApp`, and `Shared` project files exist
+- `ServerApp` and `ClientApp` reference `Shared`
+- solution builds
+- one TCP JSON-line packet can round-trip between server and client
+- UI shells can open without blocking on network work
+- `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` exist
 
 ### Week 2 - Network Core, Auth Core, and App Skeleton Completion
 
@@ -1124,10 +1139,14 @@ Pass conditions:
 
 Pass conditions:
 
+- solution builds successfully
 - server and client connect successfully
-- packets are exchanged
+- at least one valid JSON-line packet is exchanged
+- invalid packet input fails gracefully
+- two local client instances can connect, or a documented blocker exists
 - UI is not blocked
 - local multi-instance test works
+- no GUI form owns packet parsing that belongs in networking or shared services
 
 ### Gate C - Auth Gate
 
@@ -1166,6 +1185,9 @@ Pass conditions:
 - no known high-severity demo blocker remains
 - real LAN smoke test passes
 - local multi-instance fallback passes
+- `RUN_GUIDE.md` can be followed on a clean Windows machine
+- `DEMO_CHECKLIST.md` core path passes
+- `TEST_MATRIX.md` shows no unaccepted high-severity failure
 
 ## 14. Leader Operating Routine
 
@@ -1185,7 +1207,8 @@ Every week, Member 1 must:
 3. Compare docs against real implementation status.
 4. Review bug severity and risk level.
 5. Check whether both demo modes are still supported.
-6. Announce the next week's priorities clearly.
+6. Confirm the weekly runnable build exists.
+7. Announce the next week's priorities clearly.
 
 Before release, Member 1 must:
 

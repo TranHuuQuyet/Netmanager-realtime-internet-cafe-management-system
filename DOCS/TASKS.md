@@ -101,7 +101,7 @@ These tasks must be done next:
 
 ### Member 2
 
-- [ ] Finalize packet envelope and packet type baseline.
+- [X] Finalize packet envelope and packet type baseline.
 - [ ] Draft serializer/parser rules.
 - [ ] Create or support `Shared` packet models needed for packet round trip.
 - [ ] Create networking skeleton for server/client communication.

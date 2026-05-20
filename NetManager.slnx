@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="ClientApp/ClientApp.csproj" />
-  <Project Path="ServerApp/ServerApp.csproj" />
-  <Project Path="Shared/Shared.csproj" />
-</Solution>

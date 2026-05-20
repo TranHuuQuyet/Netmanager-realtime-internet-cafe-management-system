@@ -16,7 +16,9 @@ Current reality:
 - Phase 0 da hoan thanh va duoc dong bo trong docs
 - leader flow da duoc lam lai
 - role docs da duoc dong bo
-- `Code/` da co folder skeleton, nhung chua co `.sln`, `.csproj`, hoac runtime implementation day du
+- `Code/` da co `NetManager.sln`, `ServerApp`, `ClientApp`, va `Shared` project files
+- `ServerApp` da co GUI skeleton cho login va main dashboard cua Member 3
+- runtime implementation day du van chua co: networking, auth/database, va real end-to-end flow con pending
 - Week 1 phai chuyen du an tu documentation-first sang runnable skeleton
 - deadline hien tai la 8 tuan
 - project uu tien demo chay on dinh truoc
@@ -83,8 +85,8 @@ These tasks must be done next:
 - [ ] Confirm auth/session response contract with Member 5.
 - [ ] Confirm local multi-instance test assumption with Member 2 and Member 6.
 - [ ] Prepare first networking/auth skeleton handoff.
-- [ ] Create `Code/NetManager.sln`, `ServerApp`, `ClientApp`, and `Shared` project files.
-- [ ] Confirm `ServerApp` and `ClientApp` reference `Shared`.
+- [x] Create `Code/NetManager.sln`, `ServerApp`, `ClientApp`, and `Shared` project files.
+- [x] Confirm `ServerApp` and `ClientApp` reference `Shared`.
 - [ ] Prove one TCP JSON-line packet round trip before deep UI work.
 
 ## 4. This Week Priority
@@ -110,10 +112,10 @@ These tasks must be done next:
 
 ### Member 3
 
-- [ ] Create server login shell.
-- [ ] Create dashboard shell.
-- [ ] Create stub machine list and control area.
-- [ ] Bind server UI to service interfaces or placeholders only.
+- [x] Create server login shell.
+- [x] Create dashboard shell.
+- [x] Create stub machine list and control area.
+- [x] Bind server UI to service interfaces or placeholders only.
 - [ ] Prepare admin login view for `username + password + machineId`.
 
 ### Member 4

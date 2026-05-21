@@ -492,7 +492,7 @@ partial class MainForm
         lblPhone.Name = "lblPhone";
         lblPhone.Size = new Size(88, 34);
         lblPhone.TabIndex = 6;
-        lblPhone.Text = "SDT";
+        lblPhone.Text = "SĐT";
         lblPhone.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtPhone
@@ -611,6 +611,7 @@ partial class MainForm
         txtPassword.Dock = DockStyle.Fill;
         txtPassword.Location = new Point(123, 84);
         txtPassword.Name = "txtPassword";
+        txtPassword.PasswordChar = '*';
         txtPassword.Size = new Size(222, 23);
         txtPassword.TabIndex = 4;
         // 
@@ -671,7 +672,7 @@ partial class MainForm
         // 
         // PhoneColumn
         // 
-        PhoneColumn.HeaderText = "SDT";
+        PhoneColumn.HeaderText = "SĐT";
         PhoneColumn.Name = "PhoneColumn";
         PhoneColumn.ReadOnly = true;
         // 

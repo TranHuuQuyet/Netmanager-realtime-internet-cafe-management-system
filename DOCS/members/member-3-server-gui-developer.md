@@ -70,10 +70,12 @@ Phase 0 completion note:
 
 ### Phase 4
 
-- build login form
-- build dashboard shell
-- build machine list stub
-- build control panel
+- [x] build login form
+- [x] build dashboard shell
+- [x] build machine list stub
+- [x] build control panel
+- [ ] prepare admin login view for `username + password + machineId`
+- [x] clean visible Vietnamese text/encoding in the forms
 
 ### Phase 5
 
@@ -105,11 +107,14 @@ Phase 0 completion note:
 
 ### Week 1
 
-- create server login shell
-- create dashboard shell
-- create machine list stub
-- dam bao server shell mo duoc trong runnable skeleton
-- chi bind UI qua service/interface hoac placeholder, khong parse packet truc tiep trong form
+- [x] create server login shell
+- [x] create dashboard shell
+- [x] create machine list stub
+- [x] dam bao server shell mo duoc trong runnable skeleton
+- [x] chi bind UI qua service/interface hoac placeholder, khong parse packet truc tiep trong form
+- [ ] add missing `machineId` input if leader keeps it required for admin login view
+- [x] remove temporary login textbox test values
+- [x] fix mojibake/encoding in visible UI strings
 
 ### Week 2
 

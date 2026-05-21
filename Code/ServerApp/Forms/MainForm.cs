@@ -115,14 +115,13 @@ public partial class MainForm : Form
 
     private void MachineCard_Click(object? sender, EventArgs e)
     {
-        Control? control = sender as Control;
-
-        while (control is not null && control.Tag is not string)
+        if (sender is PictureBox pictureBox && pictureBox.Parent?.Tag is string parentMachineName)
         {
-            control = control.Parent;
+            SelectMachine(parentMachineName);
+            return;
         }
 
-        if (control?.Tag is string machineName)
+        if (sender is Control control && control.Tag is string machineName)
         {
             SelectMachine(machineName);
         }

@@ -52,7 +52,7 @@ partial class LoginForm
         loginPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         loginPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
         loginPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
-        loginPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        loginPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
         loginPanel.Size = new Size(376, 202);
         loginPanel.TabIndex = 0;
         // 
@@ -87,7 +87,7 @@ partial class LoginForm
         txtUsername.Name = "txtUsername";
         txtUsername.Size = new Size(250, 23);
         txtUsername.TabIndex = 2;
-        txtUsername.Text = "dd";
+        txtUsername.Text = "";
         // 
         // lblPassword
         // 
@@ -109,7 +109,7 @@ partial class LoginForm
         txtPassword.PasswordChar = '*';
         txtPassword.Size = new Size(250, 23);
         txtPassword.TabIndex = 4;
-        txtPassword.Text = "đ";
+        txtPassword.Text = "";
         // 
         // buttonPanel
         // 
@@ -163,7 +163,7 @@ partial class LoginForm
         AutoScaleDimensions = new SizeF(7F, 15F);
         AutoScaleMode = AutoScaleMode.Font;
         CancelButton = btnExit;
-        ClientSize = new Size(424, 250);
+        ClientSize = new Size(424, 276);
         Controls.Add(loginPanel);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;

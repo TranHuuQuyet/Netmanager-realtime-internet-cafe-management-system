@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.Models;
+namespace NETManager.Shared.DTOs.RequestPayloads;
 
 public class AckPayload
 {

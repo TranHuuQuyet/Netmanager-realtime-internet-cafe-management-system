@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="LoginTitle" xml:space="preserve">
+    <value>ĐĂNG NHẬP MÁY CHỦ</value>
+  </data>
+  <data name="LoginUsernameLabel" xml:space="preserve">
+    <value>Tài khoản</value>
+  </data>
+  <data name="LoginPasswordLabel" xml:space="preserve">
+    <value>Mật khẩu</value>
+  </data>
+  <data name="LoginMachineIdLabel" xml:space="preserve">
+    <value>Mã máy</value>
+  </data>
+  <data name="LoginButtonText" xml:space="preserve">
+    <value>Đăng nhập</value>
+  </data>
+  <data name="ExitButtonText" xml:space="preserve">
+    <value>Thoát</value>
+  </data>
+  <data name="LoginFormTitle" xml:space="preserve">
+    <value>Đăng nhập</value>
+  </data>
+  <data name="MainTabMachines" xml:space="preserve">
+    <value>Quản lý máy</value>
+  </data>
+  <data name="MainMachineTitle" xml:space="preserve">
+    <value>DANH SÁCH MÁY</value>
+  </data>
+  <data name="MainLockMachine" xml:space="preserve">
+    <value>Khóa máy</value>
+  </data>
+  <data name="MainUnlockMachine" xml:space="preserve">
+    <value>Mở khóa</value>
+  </data>
+  <data name="MainShutdownMachine" xml:space="preserve">
+    <value>Tắt máy</value>
+  </data>
+  <data name="MainChatGroup" xml:space="preserve">
+    <value>Chat máy</value>
+  </data>
+  <data name="MainChatSelectedClientDefault" xml:space="preserve">
+    <value>Chat với PC01</value>
+  </data>
+  <data name="MainTabCustomers" xml:space="preserve">
+    <value>Quản lý khách hàng</value>
+  </data>
+  <data name="MainCustomerIdLabel" xml:space="preserve">
+    <value>Mã KH</value>
+  </data>
+  <data name="MainFirstNameLabel" xml:space="preserve">
+    <value>Họ</value>
+  </data>
+  <data name="MainLastNameLabel" xml:space="preserve">
+    <value>Tên</value>
+  </data>
+  <data name="MainPhoneLabel" xml:space="preserve">
+    <value>SĐT</value>
+  </data>
+  <data name="MainIdentityLabel" xml:space="preserve">
+    <value>Số CMND</value>
+  </data>
+  <data name="MainBirthdayLabel" xml:space="preserve">
+    <value>Ngày sinh</value>
+  </data>
+  <data name="MainLoginTitle" xml:space="preserve">
+    <value>THÔNG TIN ĐĂNG NHẬP</value>
+  </data>
+  <data name="MainUsernameLabel" xml:space="preserve">
+    <value>Tên đăng nhập</value>
+  </data>
+  <data name="MainPasswordLabel" xml:space="preserve">
+    <value>Mật khẩu</value>
+  </data>
+  <data name="MainAccountBalanceLabel" xml:space="preserve">
+    <value>Tài khoản</value>
+  </data>
+  <data name="MainMachineColumn" xml:space="preserve">
+    <value>Mã máy</value>
+  </data>
+  <data name="MainSeatColumn" xml:space="preserve">
+    <value>Số máy</value>
+  </data>
+  <data name="MainStatusColumn" xml:space="preserve">
+    <value>Tình trạng</value>
+  </data>
+  <data name="MainCustomerIdColumn" xml:space="preserve">
+    <value>Mã KH</value>
+  </data>
+  <data name="MainCustomerFirstNameColumn" xml:space="preserve">
+    <value>Tên KH</value>
+  </data>
+  <data name="MainCustomerLastNameColumn" xml:space="preserve">
+    <value>Họ KH</value>
+  </data>
+  <data name="MainCustomerPhoneColumn" xml:space="preserve">
+    <value>SĐT</value>
+  </data>
+  <data name="MainCustomerIdentityColumn" xml:space="preserve">
+    <value>Số CMND</value>
+  </data>
+  <data name="MainCustomerBirthdayColumn" xml:space="preserve">
+    <value>Ngày sinh</value>
+  </data>
+  <data name="MainCustomerUsernameColumn" xml:space="preserve">
+    <value>Tên đăng nhập</value>
+  </data>
+  <data name="MainCustomerPasswordColumn" xml:space="preserve">
+    <value>Mật khẩu</value>
+  </data>
+  <data name="MainCustomerAccountColumn" xml:space="preserve">
+    <value>Tài khoản</value>
+  </data>
+  <data name="MainAddCustomerButton" xml:space="preserve">
+    <value>Thêm</value>
+  </data>
+  <data name="MainEditCustomerButton" xml:space="preserve">
+    <value>Sửa</value>
+  </data>
+  <data name="MainDeleteCustomerButton" xml:space="preserve">
+    <value>Xóa</value>
+  </data>
+  <data name="MainCancelCustomerButton" xml:space="preserve">
+    <value>Hủy</value>
+  </data>
+  <data name="MainServerStatus" xml:space="preserve">
+    <value>Máy chủ: đang thiết kế giao diện mẫu</value>
+  </data>
+  <data name="MainFormTitle" xml:space="preserve">
+    <value>MÁY CHỦ</value>
+  </data>
+  <data name="MainChatPlaceholder" xml:space="preserve">
+    <value>Nhập tin nhắn...</value>
+  </data>
+  <data name="MainSendButton" xml:space="preserve">
+    <value>Gửi</value>
+  </data>
+  <data name="ChatWithMachineTemplate" xml:space="preserve">
+    <value>Chat với máy {0}</value>
+  </data>
+  <data name="ChatHistoryTemplate" xml:space="preserve">
+    <value>[{0}] Sẵn sàng nhận tin nhắn từ máy chủ.</value>
+  </data>
+  <data name="ServerPrefix" xml:space="preserve">
+    <value>Máy chủ</value>
+  </data>
+</root>

@@ -137,8 +137,8 @@ public partial class MainForm : Form
 
     private void SelectMachine(string machineName)
     {
-        lblSelectedClient.Text = $"Chat với {machineName}";
-        txtChatHistory.Text = $"[{machineName}] Sẵn sàng nhận tin nhắn từ máy chủ.";
+        lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
+        txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, machineName);
 
         foreach (DataGridViewRow row in dgvMachines.Rows)
         {
@@ -160,7 +160,7 @@ public partial class MainForm : Form
             return;
         }
 
-        txtChatHistory.AppendText($"{Environment.NewLine}Máy chủ: {message}");
+        txtChatHistory.AppendText($"{Environment.NewLine}{UiStrings.ServerPrefix}: {message}");
         txtChatMessage.Clear();
         txtChatMessage.Focus();
     }
@@ -169,10 +169,10 @@ public partial class MainForm : Form
     {
         dgvCustomers.Rows.Clear();
 
-        dgvCustomers.Rows.Add(1, "Chi", "Nguyen", "0128475621", "264493270", "4/16/1996", "Chi123", "123456", "10000");
-        dgvCustomers.Rows.Add(2, "Thanh", "Nguyen", "0902548345", "025351810", "12/12/1995", "Thanh123", "123456", "20000");
-        dgvCustomers.Rows.Add(3, "Ha", "Tran", "012038950", "025351818", "2/3/1990", "Ha", "123456", "10000");
-        dgvCustomers.Rows.Add(4, "Chau", "Tran", "0919512120", "025609999", "8/3/1990", "Chaubc", "123456", "5000");
-        dgvCustomers.Rows.Add(5, "Linh", "Vo", "01212239011", "025607777", "4/30/1990", "PkLanh", "123456", "20000");
+        dgvCustomers.Rows.Add(1, "Chi", "Nguyễn", "0128475621", "264493270", "16/04/1996", "Chi123", "123456", "10000");
+        dgvCustomers.Rows.Add(2, "Thanh", "Nguyễn", "0902548345", "025351810", "12/12/1995", "Thanh123", "123456", "20000");
+        dgvCustomers.Rows.Add(3, "Hà", "Trần", "012038950", "025351818", "03/02/1990", "Ha", "123456", "10000");
+        dgvCustomers.Rows.Add(4, "Châu", "Trần", "0919512120", "025609999", "03/08/1990", "Chaubc", "123456", "5000");
+        dgvCustomers.Rows.Add(5, "Linh", "Võ", "01212239011", "025607777", "30/04/1990", "PkLanh", "123456", "20000");
     }
 }

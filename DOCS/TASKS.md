@@ -18,6 +18,7 @@ Current reality:
 - role docs da duoc dong bo
 - `Code/` da co `NetManager.sln`, `ServerApp`, `ClientApp`, va `Shared` project files
 - `ServerApp` da co GUI skeleton cho login va main dashboard cua Member 3
+- Member 3 da hoan thanh UI-only follow-up cho `ServerApp/Forms`, bao gom `machineId` input, tab order cleanup, visible Vietnamese text cleanup, va resource-backed UI strings
 - runtime implementation day du van chua co: networking, auth/database, va real end-to-end flow con pending
 - Week 1 phai chuyen du an tu documentation-first sang runnable skeleton
 - deadline hien tai la 8 tuan
@@ -116,7 +117,8 @@ These tasks must be done next:
 - [x] Create dashboard shell.
 - [x] Create stub machine list and control area.
 - [x] Bind server UI to service interfaces or placeholders only.
-- [ ] Prepare admin login view for `username + password + machineId`.
+- [x] Prepare admin login view for `username + password + machineId`.
+- [x] Move visible UI strings into a reusable resource-backed helper for `ServerApp/Forms`.
 
 ### Member 4
 

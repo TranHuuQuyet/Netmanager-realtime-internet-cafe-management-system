@@ -202,4 +202,28 @@
   <data name="ServerPrefix" xml:space="preserve">
     <value>Máy chủ</value>
   </data>
+  <data name="LoginUsernameRequired" xml:space="preserve">
+    <value>Vui lòng nhập tài khoản.</value>
+  </data>
+  <data name="LoginPasswordRequired" xml:space="preserve">
+    <value>Vui lòng nhập mật khẩu.</value>
+  </data>
+  <data name="LoginMachineIdRequired" xml:space="preserve">
+    <value>Vui lòng nhập mã máy.</value>
+  </data>
+  <data name="MainSelectedMachineStatusTemplate" xml:space="preserve">
+    <value>Đang chọn máy {0}.</value>
+  </data>
+  <data name="MainNoMachineSelectedStatus" xml:space="preserve">
+    <value>Vui lòng chọn một máy trước.</value>
+  </data>
+  <data name="MainActionPendingTemplate" xml:space="preserve">
+    <value>{0} cho {1}: đang chờ backend.</value>
+  </data>
+  <data name="MainCustomerActionPendingTemplate" xml:space="preserve">
+    <value>{0} khách hàng: đang chờ backend.</value>
+  </data>
+  <data name="MainPendingAction" xml:space="preserve">
+    <value>Thao tác</value>
+  </data>
 </root>

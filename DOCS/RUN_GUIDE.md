@@ -4,9 +4,10 @@ This guide defines how the team should build, run, and verify the project during
 
 Current status:
 
-- source folder skeleton exists
-- `.sln` and `.csproj` files are still pending
-- runtime implementation is not complete yet
+- `Code/NetManager.sln` and project files exist
+- `ServerApp` has a server UI shell
+- `ClientApp` still needs real workflow screens
+- TCP, auth/database, and end-to-end runtime implementation are not complete yet
 
 ## 1. Required Environment
 
@@ -15,9 +16,9 @@ Current status:
 - Visual Studio 2022 or another editor that supports .NET 8
 - SQLite runtime/package selected by Member 5 during implementation
 
-## 2. Planned Solution Shape
+## 2. Solution Shape
 
-The runtime solution should be created under `Code/`.
+The runtime solution is under `Code/`.
 
 ```text
 Code/

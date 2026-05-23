@@ -1,177 +1,97 @@
 # Member 5 - Database & Authentication
 
-## 1. Vai tro
+## Role
 
-Ban phu trach persistence, authentication, va session state.
-Muc tieu cua ban la tao mot auth/data layer don gian, on dinh, de debug, va de cac module khac goi den ma khong can doan internal behavior.
+Ban own persistence, authentication, session state, seed data, va account-to-`machineId` validation. Muc tieu la auth/data layer don gian, on dinh, de debug, va de module khac goi qua interface ro.
 
-## 2. Write Scope
+Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
+
+## Write Scope
 
 Ban duoc uu tien sua:
 
-- `ServerApp/Auth/`
-- `ServerApp/Database/`
-- persistence va repository files
+- `Code/ServerApp/Auth/`
+- `Code/ServerApp/Database/`
+- persistence/repository files
+- auth/session model docs khi da thong nhat voi M1/M2
 
-Ban co the cap nhat:
+## Non-Owned Scope
 
-- `DOCS/API.md` neu can bo sung auth/session response, sau khi thong nhat voi Member 1 va Member 2
+Ban khong own:
 
-Ban khong nen sua:
+- socket dispatcher cua M2
+- packet schema implementation cua M2
+- server UI cua M3
+- client UI cua M4
+- release/gate decision cua M1
 
-- UI forms
-- packet dispatcher implementation
-- client runtime
+## Dependencies
 
-## 3. Thu ban so huu
+- Can M2 cung cap login packet flow va auth interface call path.
+- Can M3/M4 consume auth result dung contract.
+- Can M1 approve auth/session contract neu anh huong flow.
+- Can M6 feedback tu valid/invalid login tests.
 
-- SQLite schema
-- repository/data access layer
-- auth service
-- session service
-- seed data
-- config persistence neu can
-- account-to-`machineId` validation
+## Handoff Rules
 
-## 4. Dependency cua ban
+- Cung cap auth service interface, auth result shape, session shape, seed account baseline, expected error cases.
+- Schema change phai thong nhat truoc khi module khac depend.
+- UI khong chua SQL; network layer khong embed DB logic.
+- Wrong `machineId` phai co deterministic error result.
 
-- login packet flow tu Member 2
-- admin/client login screens cua Member 3 va Member 4 se dung output cua ban
-- scope va release order tu Member 1
-
-## 5. Nhiem vu theo phase
-
-### Phase 0 Completion Checklist
-
-- [x] Review and confirm auth/database scope aligns with project rules in `LEADER_FLOW.md` and `API.md`.
-- [x] Confirm ownership of `ServerApp/Auth/`, `ServerApp/Database/`, persistence, and repository files.
-- [x] Confirm dependency on login packet flow from Member 2 and login screens from Member 3 and Member 4.
-- [x] Confirm account-to-machineId validation rule: server validates username, password, machineId; reject if wrong machineId.
-- [x] Confirm SQLite schema, auth service, session service, and seed data ownership.
-
-### Phase 0
-
-- review auth/database scope
-
-### Phase 1
-
-- define schema assumptions
-- define auth result shape
-- define session state shape
-- define account-to-machine mapping rule
-
-### Phase 2
-
-- expose auth interface cho network layer goi
-
-### Phase 3
-
-- implement `Users`
-- implement `Sessions`
-- implement repositories
-- implement auth validation
-- implement session tracking
-- reject login neu sai `machineId`
-
-### Phase 4
-
-- provide auth stubs hoac service contracts cho GUI team neu can
-
-### Phase 5
-
-- support login integration
-- support session-to-server-state behavior
-
-### Phase 6
-
-- finish timer/session persistence neu can
-- finish machine mapping neu can
-
-### Phase 7
-
-- harden invalid login, missing user, DB error, consistency issue
-
-### Phase 8
-
-- chi sua release-blocking auth/DB bug
-- verify demo accounts va setup
-
-### Phase 9
-
-- giai thich auth/session/database flow khi demo
-
-## 6. Ke hoach theo tuan
+## My 8-Week Flow
 
 ### Week 1
 
-- draft schema
-- draft auth result model
-- draft session model
-- create auth service skeleton
-- chot demo seed account baseline voi Member 1 va Member 6
-- cung cap interface du de Member 2 noi login path trong Week 2
+- `W1.P1`: confirm auth/database scope, machine mapping validation, seed/auth/session responsibility.
+- `W1.P2`: draft `Users`, `Sessions`, auth result, session state, wrong `machineId` validation.
+- `W1.P3`: create auth service skeleton and schema/session draft.
 
 ### Week 2
 
-- finish schema
-- finish repository layer
-- finish auth validation
-- finish session basics
+- `W2.P1`: provide auth interface shape needed by network login path.
+- `W2.P2`: implement schema, repository skeleton, auth validation, session basics.
+- `W2.P3`: provide auth stubs/service contracts to UI owners.
 
 ### Week 3
 
-- support login integration
-- fix auth/session mismatch trong core flow
+- `W3.P1`: validate username/password/role/`machineId` and create session state.
+- `W3.P2`: support session fields needed by status flow.
+- `W3.P3`: fix auth/session issues found in integration.
 
 ### Week 4
 
-- finish timer/session persistence rules neu co
+- `W4.P1`: verify active session and machine ownership before command flow.
+- `W4.P2`: return deterministic auth/session errors where relevant.
+- `W4.P3`: fix session consistency issues.
 
 ### Week 5
 
-- fix DB/auth edge cases
-- fix consistency and error handling
+- `W5.P1`: confirm notification does not need persistence unless approved.
+- `W5.P2`: support timer/session persistence if approved.
+- `W5.P3`: avoid chat history unless approved.
 
 ### Week 6
 
-- verify real LAN va local multi-instance account behavior
+- `W6.P1`: enforce account-machine mapping and duplicate active session rules.
+- `W6.P2`: harden DB/auth failure behavior and data consistency.
+- `W6.P3`: verify seed accounts and machine mapping in both demo modes.
 
 ### Week 7
 
-- verify release candidate data va cleanup auth/data boundaries
+- `W7.P1`: fix release-blocking auth/DB bugs only.
+- `W7.P2`: clean auth/data boundaries without behavior change.
+- `W7.P3`: verify demo accounts, seed data, auth/session behavior.
 
 ### Week 8
 
-- verify final demo accounts va persistence behavior
+- `W8.P1`: rehearse auth/DB/session explanation.
+- `W8.P2`: avoid DB/auth changes unless release-blocking.
+- `W8.P3`: explain auth/session/database flow.
 
-## 7. Handoff cho nguoi khac
+## Definition of Done
 
-Ban phai cung cap:
-
-- auth service interface
-- auth result shape
-- session state shape
-- seed account thong tin can thiet cho demo
-- expected error cases
-
-## 8. Nguyen tac tranh xung dot
-
-- schema change phai thong nhat truoc
-- Member 2 own packet transport, ban own auth/data logic
-- UI khong duoc chua SQL
-- khong de password plaintext trong flow production-like
-
-## 9. Deliverables
-
-- SQLite schema
-- repository layer
-- auth service
-- session service
-- seed data
-
-## 10. Definition of Done
-
-- admin/client login on dinh
-- data doc ghi duoc
-- DB/auth error khong lam sap demo
-- module khac co the goi auth layer ma khong can doan internals
+- Admin/client login behavior is stable.
+- Correct account + wrong `machineId` is rejected clearly.
+- Session state is deterministic.
+- DB/auth errors do not crash the demo.

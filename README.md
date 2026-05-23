@@ -96,10 +96,11 @@ DOCS/
 |-- DECISIONS.md
 |-- DEMO_CHECKLIST.md
 |-- LEADER_FLOW.md
-|-- MEMBER3_SERVER_GUI_GUIDE.md
+|-- README.md
 |-- RUN_GUIDE.md
 |-- TASKS.md
-`-- TEST_MATRIX.md
+|-- TEST_MATRIX.md
+`-- members/
 ```
 
 ## Tech Stack
@@ -239,7 +240,9 @@ Contract rules worth keeping stable:
 
 - Keep all runtime code under `Code/`
 - Treat `DOCS/API.md` as the contract source of truth
-- Update `DOCS/TASKS.md`, `DOCS/BUGS.md`, and `DOCS/RUN_GUIDE.md` when behavior changes
+- Use `DOCS/LEADER_FLOW.md` as the master 8-week working flow
+- Use `DOCS/TASKS.md` as the only checkbox tracker
+- Update `DOCS/BUGS.md` and `DOCS/RUN_GUIDE.md` when behavior changes
 - Keep server-visible UI text in `UiStrings.resx` rather than hard-coding it in forms
 - Prefer service boundaries over packet parsing inside WinForms event handlers
 - Verify the solution with `dotnet build Code/NetManager.sln`
@@ -279,16 +282,16 @@ Contract rules worth keeping stable:
 
 ## Roadmap
 
-The docs currently organize delivery around an 8-week baseline:
+The docs organize delivery around a fixed 8-week baseline:
 
-- Week 1: runnable skeleton and contract freeze
-- Week 2: network core and auth core
-- Week 3: end-to-end login and state sync
-- Week 4: stable control flow
-- Week 5: notification, timer, and chat
-- Week 6: reconnect and environment validation
-- Week 7: cleanup and release candidate
-- Week 8: final demo readiness
+- Week 1: `W1.P1` kickoff/ownership, `W1.P2` API contract, `W1.P3` scaffold/first round trip
+- Week 2: `W2.P1` network core, `W2.P2` auth/DB core, `W2.P3` UI skeleton completion
+- Week 3: `W3.P1` login integration, `W3.P2` status sync, `W3.P3` one-client core demo
+- Week 4: `W4.P1` lock/unlock, `W4.P2` ACK/error handling, `W4.P3` control regression
+- Week 5: `W5.P1` notification, `W5.P2` timer, `W5.P3` 1-1 chat
+- Week 6: `W6.P1` multi-client, `W6.P2` stability hardening, `W6.P3` demo mode validation
+- Week 7: `W7.P1` regression/bug triage, `W7.P2` source/docs cleanup, `W7.P3` release candidate
+- Week 8: `W8.P1` final rehearsal, `W8.P2` release lock, `W8.P3` demo/archive
 
 See [`DOCS/TASKS.md`](DOCS/TASKS.md) for the current execution tracker.
 

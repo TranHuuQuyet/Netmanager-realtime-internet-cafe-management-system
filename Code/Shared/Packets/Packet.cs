@@ -1,5 +1,11 @@
 using System.Text.Json.Serialization;
-
+using NETManager.Shared.Enums;
+using NETManager.Shared.Models;
+using NETManager.Shared.Utilities;
+using NETManager.Shared.DTOs.Bidrectional;
+using NETManager.Shared.DTOs.CommandPayloads;
+using NETManager.Shared.DTOs.RequestPayloads;
+using NETManager.Shared.DTOs.ResponsePayloads;
 namespace NETManager.Shared.Packets;
 
 public abstract class Packet
@@ -28,7 +34,7 @@ public abstract class Packet
     [JsonPropertyName("error")]
     public ErrorInfo? Error { get; set; }
 
-    [JsonPropertyName("payload")]
+    [JsonIgnore]
     public abstract object Payload { get; }
 
     protected Packet() { }
@@ -46,13 +52,16 @@ public abstract class Packet
 public class Packet<T> : Packet where T : class
 {
     [JsonPropertyName("payload")]
-    public new T Payload { get; set; } = default!;
+    public T TypedPayload { get; set; } = default!;
+
+    [JsonIgnore]
+    public override object Payload => TypedPayload;
 
     public Packet() : base() { }
 
     public Packet(PacketType type, string source, string target, T payload, string? requestId = null)
         : base(type, source, target, requestId)
     {
-        Payload = payload;
+        TypedPayload = payload;
     }
 }

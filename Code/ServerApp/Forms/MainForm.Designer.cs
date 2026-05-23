@@ -186,6 +186,7 @@ partial class MainForm
         btnLockMachine.TabIndex = 0;
         btnLockMachine.Text = UiStrings.MainLockMachine;
         btnLockMachine.UseVisualStyleBackColor = true;
+        btnLockMachine.Click += MachineAction_Click;
         // 
         // btnUnlockMachine
         // 
@@ -195,6 +196,7 @@ partial class MainForm
         btnUnlockMachine.TabIndex = 1;
         btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
         btnUnlockMachine.UseVisualStyleBackColor = true;
+        btnUnlockMachine.Click += MachineAction_Click;
         // 
         // btnShutdownMachine
         // 
@@ -204,6 +206,7 @@ partial class MainForm
         btnShutdownMachine.TabIndex = 2;
         btnShutdownMachine.Text = UiStrings.MainShutdownMachine;
         btnShutdownMachine.UseVisualStyleBackColor = true;
+        btnShutdownMachine.Click += MachineAction_Click;
         // 
         // machineSplit
         // 
@@ -727,6 +730,8 @@ partial class MainForm
         btnAddCustomer.Size = new Size(160, 42);
         btnAddCustomer.TabIndex = 0;
         btnAddCustomer.Text = UiStrings.MainAddCustomerButton;
+        btnAddCustomer.UseVisualStyleBackColor = true;
+        btnAddCustomer.Click += CustomerAction_Click;
         // 
         // btnEditCustomer
         // 
@@ -736,6 +741,8 @@ partial class MainForm
         btnEditCustomer.Size = new Size(160, 42);
         btnEditCustomer.TabIndex = 1;
         btnEditCustomer.Text = UiStrings.MainEditCustomerButton;
+        btnEditCustomer.UseVisualStyleBackColor = true;
+        btnEditCustomer.Click += CustomerAction_Click;
         // 
         // btnDeleteCustomer
         // 
@@ -745,6 +752,8 @@ partial class MainForm
         btnDeleteCustomer.Size = new Size(160, 42);
         btnDeleteCustomer.TabIndex = 2;
         btnDeleteCustomer.Text = UiStrings.MainDeleteCustomerButton;
+        btnDeleteCustomer.UseVisualStyleBackColor = true;
+        btnDeleteCustomer.Click += CustomerAction_Click;
         // 
         // btnCancelCustomer
         // 
@@ -753,6 +762,8 @@ partial class MainForm
         btnCancelCustomer.Size = new Size(160, 42);
         btnCancelCustomer.TabIndex = 3;
         btnCancelCustomer.Text = UiStrings.MainCancelCustomerButton;
+        btnCancelCustomer.UseVisualStyleBackColor = true;
+        btnCancelCustomer.Click += CustomerAction_Click;
         // 
         // statusStrip
         // 

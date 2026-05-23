@@ -1,321 +1,244 @@
 # TASKS
 
-## 1. Current Project State
-
-Current phase:
-
-- `Phase 1 - Architecture and Contract Freeze`
-
-Current gate target:
-
-- `Gate A - Scope and Contract Gate` passed
-- Next gate target: `Gate B - Connection Gate`
-
-Current reality:
-
-- Phase 0 da hoan thanh va duoc dong bo trong docs
-- leader flow da duoc lam lai
-- role docs da duoc dong bo
-- `Code/` da co `NetManager.sln`, `ServerApp`, `ClientApp`, va `Shared` project files
-- `ServerApp` da co GUI skeleton cho login va main dashboard cua Member 3
-- Member 3 da hoan thanh UI-only follow-up cho `ServerApp/Forms`, bao gom `machineId` input, tab order cleanup, visible Vietnamese text cleanup, va resource-backed UI strings
-- runtime implementation day du van chua co: networking, auth/database, va real end-to-end flow con pending
-- Week 1 phai chuyen du an tu documentation-first sang runnable skeleton
-- deadline hien tai la 8 tuan
-- project uu tien demo chay on dinh truoc
-
-## 2. Phase 0 Completion Checklist
-
-These decisions are frozen before deeper coding:
-
-- [x] Confirm final source folder structure for `ServerApp`, `ClientApp`, `Shared`, `ServerApp/Auth`, and `ServerApp/Database`.
-- [x] Confirm first accepted version of `DOCS/API.md`.
-- [x] Freeze tech stack: `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`.
-- [x] Freeze account-per-machine rule with `username <-> machineId`.
-- [x] Freeze supported demo modes: real LAN and local multi-instance.
-- [x] Freeze minimal chat scope: 1-1 text only, no emoji, no history, no file/image.
-- [x] Confirm Week 1 task ownership for all 6 members.
-- [x] Confirm branch naming rule and commit naming rule.
-- [x] Confirm bug report format and test matrix format.
-- [x] Confirm source-of-truth docs:
-  - `LEADER_FLOW.md` for phase, scope, ownership, branch rules, commit rules, and release decisions
-  - `API.md` for packet/auth/session contract
-  - `TASKS.md` for current execution status
-  - `BUGS.md` for risks, unresolved issues, and runtime bugs
-
-### Member 3 Phase 0 Review
-
-Member 3 has reviewed and accepted the server GUI scope for Phase 0.
-
-- [x] Confirmed owned UI scope:
-  - admin login form
-  - dashboard shell
-  - machine list and machine status rendering
-  - admin control area for lock, unlock, notification, timer, and chat
-  - admin-side realtime display
-  - WinForms UI thread-safe update pattern for server-side events
-- [x] Confirmed write scope:
-  - primary runtime area: `Code/ServerApp/`
-  - server-side UI folders and UI-facing services only
-- [x] Confirmed non-owned areas:
-  - packet schema and shared DTOs stay with Member 2
-  - socket dispatcher stays with Member 2
-  - auth/database internals stay with Member 5
-  - client UI stays with Member 4
-- [x] Confirmed dependencies:
-  - Member 2 still needs to provide network-facing service/interface shape
-  - Member 5 still needs to provide admin auth result shape
-  - Member 1 controls phase order and scope changes
-- [x] Confirmed dependency status:
-  - network-facing service/interface shape is not available yet
-  - admin auth result shape is not available yet
-  - these are Phase 1/Phase 2 handoff dependencies, not blockers for Member 3 Phase 0 completion
-- [x] Confirmed Phase 0 repo state:
-  - `Code/ServerApp/` exists with planned folders
-  - runtime implementation has not started yet, which is acceptable for Phase 0
-- [x] Confirmed next Member 3 action:
-  - review `DOCS/API.md` in Phase 1 and list exact dashboard data/actions needed from Member 2 and Member 5
-
-## 3. Phase 1 Immediate Start Tasks
-
-These tasks must be done next:
-
-- [ ] Review and accept `DOCS/API.md` with Member 2 and Member 5.
-- [ ] Freeze packet order and state model.
-- [ ] Freeze shared DTO list, enum list, and invalid packet behavior.
-- [ ] Confirm auth/session response contract with Member 5.
-- [ ] Confirm local multi-instance test assumption with Member 2 and Member 6.
-- [ ] Prepare first networking/auth skeleton handoff.
-- [x] Create `Code/NetManager.sln`, `ServerApp`, `ClientApp`, and `Shared` project files.
-- [x] Confirm `ServerApp` and `ClientApp` reference `Shared`.
-- [ ] Prove one TCP JSON-line packet round trip before deep UI work.
-
-## 4. This Week Priority
-
-### Member 1
-
-- [x] Freeze MVP and out-of-scope list.
-- [x] Freeze ownership map and write scope boundaries.
-- [x] Freeze stack and identity assumptions.
-- [x] Freeze first-week tasks and announce owners.
-- [ ] Review `API.md` with Member 2 and Member 5.
-- [ ] Keep `LEADER_FLOW.md`, `TASKS.md`, `BUGS.md`, `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` aligned.
-- [ ] Approve Week 1 runnable skeleton before the team moves past Gate B.
+`TASKS.md` la tracker duy nhat co checkbox. Member tick tien do tai day theo week/phase.
 
-### Member 2
+Tracking rules:
 
-- [X] Finalize packet envelope and packet type baseline.
-- [ ] Draft serializer/parser rules.
-- [ ] Create or support `Shared` packet models needed for packet round trip.
-- [ ] Create networking skeleton for server/client communication.
-- [ ] Prove first connect/send/receive flow.
-- [ ] Draft local multi-instance launch assumptions.
+- Dung dung phase label `Wn.Pm`.
+- Moi task co member owner va evidence.
+- Neu task bi block, de checkbox pending va ghi blocker ngan trong evidence.
+- Member playbook trong `DOCS/members/` khong dung checkbox.
 
-### Member 3
+Current focus: Week 1 contract/scaffold handoff, chuan bi cho Week 2 network/auth core.
 
-- [x] Create server login shell.
-- [x] Create dashboard shell.
-- [x] Create stub machine list and control area.
-- [x] Bind server UI to service interfaces or placeholders only.
-- [x] Prepare admin login view for `username + password + machineId`.
-- [x] Move visible UI strings into a reusable resource-backed helper for `ServerApp/Forms`.
+## Week 1
 
-### Member 4
+### W1.P1 Kickoff & Ownership
 
-- [ ] Create client connect screen.
-- [ ] Create client login shell.
-- [ ] Create main client shell.
-- [ ] Create lock screen shell.
-- [ ] Prepare client login flow for bound account and machine.
+- [x] M1 - Chot MVP, out-of-scope, ownership, stack, identity rule, demo modes, branch rule, commit rule; evidence: kickoff decisions migrated from old completion checklist.
+- [x] M2 - Confirm TCP/JSON-line feasibility va packet boundary ban dau; evidence: `DOCS/API.md` baseline accepted.
+- [x] M3 - Confirm server GUI scope, write scope, non-owned areas, dependencies; evidence: Member 3 kickoff review migrated.
+- [x] M4 - Confirm client GUI scope, write scope, non-owned areas, demo modes, machine-bound login rule; evidence: Member 4 self-review migrated.
+- [x] M5 - Confirm auth/database ownership, machine mapping validation, seed/auth/session responsibility; evidence: Member 5 completion checklist migrated.
+- [x] M6 - Confirm bug/test/doc ownership and source-of-truth docs; evidence: old tracker marked bug/test matrix format confirmed.
 
-### Member 5
+### W1.P2 API Contract
 
-- [ ] Draft `Users`, `Sessions`, and needed persistence fields.
-- [ ] Draft auth result model.
-- [ ] Create auth service skeleton.
-- [ ] Define session state baseline.
-- [ ] Draft validation rule for wrong `machineId`.
+- [ ] M1 - Review and accept `DOCS/API.md` with M2 and M5; evidence: API approval note or decision entry.
+- [x] M2 - Finalize packet envelope and packet type baseline; evidence: existing checked task migrated from old tracker.
+- [ ] M3 - Review API and list dashboard data/actions needed from M2/M5; evidence: comment/update in tracker or handoff note.
+- [ ] M4 - Review API and list client input/output needs; evidence: client handoff note.
+- [ ] M5 - Draft `Users`, `Sessions`, auth result, session state, wrong `machineId` validation; evidence: schema/auth note or code skeleton.
+- [ ] M6 - Review docs for contradictions against API contract; evidence: mismatch list or "no mismatch" note.
 
-### Member 6
+### W1.P3 Scaffold & First Round Trip
 
-- [x] Create bug report template.
-- [x] Create test matrix template.
-- [x] Create first checklist for contract and connection tests.
-- [ ] Review docs for contradictions.
-- [x] Create separate checklists for real LAN and local multi-instance demo.
-- [ ] Keep `RUN_GUIDE.md`, `TEST_MATRIX.md`, and `DEMO_CHECKLIST.md` updated as code appears.
+- [x] M1 - Confirm `Code/NetManager.sln`, `ServerApp`, `ClientApp`, `Shared`, and project references exist; evidence: solution/project files present.
+- [ ] M2 - Create serializer/parser rules, networking skeleton, and first TCP JSON-line round trip; evidence: server/client connect and one packet exchange local.
+- [x] M3 - Complete server login shell, dashboard shell, machine list/control placeholder, machineId input, and resource-backed UI strings; evidence: `Code/ServerApp/Forms` and `Code/ServerApp/UiStrings.*`.
+- [ ] M4 - Create client connect screen, login shell, main shell, and lock screen shell; evidence: client forms/screens exist and open.
+- [ ] M5 - Create auth service skeleton and schema/session draft; evidence: `Code/ServerApp/Auth` and `Code/ServerApp/Database` skeleton or documented handoff.
+- [x] M6 - Create bug report template, test matrix template, contract/connection checklist, and demo-mode checklist; evidence: `BUGS.md`, `TEST_MATRIX.md`, `DEMO_CHECKLIST.md`.
 
-## 5. Week-by-Week Delivery Targets
+## Week 2
 
-### Week 1
+### W2.P1 Network Core
 
-Target:
+- [ ] M1 - Remove blocker between network/auth/UI owners; evidence: blocker owner assigned.
+- [ ] M2 - Finish TCP listener, connector, send/receive loop, dispatcher skeleton; evidence: one server and one client exchange packet without UI freeze.
+- [ ] M3 - Consume server-side network service/interface only; evidence: dashboard does not parse packet directly.
+- [ ] M4 - Consume client-side network service/interface only; evidence: client UI does not parse packet directly.
+- [ ] M5 - Provide auth interface shape for network login path; evidence: interface/model documented or implemented.
+- [ ] M6 - Run connection, invalid packet, and local multi-instance checks; evidence: `TEST_MATRIX.md` Gate B status updated.
 
-- scope, contract baseline, ownership, and runnable skeleton start are stable
+### W2.P2 Auth/DB Core
 
-Must be visible by end of week:
+- [ ] M1 - Approve auth/network boundary and login integration order; evidence: tracker note.
+- [ ] M2 - Call auth service through agreed interface; evidence: login route invokes auth layer.
+- [ ] M3 - Prepare admin login UI for real auth result; evidence: UI handles success/failure state.
+- [ ] M4 - Prepare client login UI for real auth result; evidence: UI handles success/failure/wrong machine state.
+- [ ] M5 - Implement schema, repository skeleton, auth validation, session basics; evidence: auth/db code and seed baseline.
+- [ ] M6 - Test valid login, invalid login, disabled account, wrong `machineId`; evidence: Gate C cases updated.
 
-- `API.md` baseline
-- source folder structure
-- `NetManager.sln`
-- `ServerApp`, `ClientApp`, and `Shared` project files
-- `ServerApp` and `ClientApp` reference `Shared`
-- chosen stack
-- identity rule
-- networking skeleton
-- one JSON-line packet round trip
-- auth skeleton
-- server shell
-- client shell
-- `RUN_GUIDE.md`
-- `TEST_MATRIX.md`
-- `DEMO_CHECKLIST.md`
+### W2.P3 UI Skeleton Completion
 
-### Week 2
+- [ ] M1 - Verify UI scope stays inside MVP; evidence: scope review note.
+- [ ] M2 - Provide UI-facing connection/state events or stubs; evidence: service/event contract available.
+- [ ] M3 - Finish dashboard status areas and command placeholders; evidence: admin demo path visible.
+- [ ] M4 - Finish client connect/login/main/lock shells; evidence: client demo path visible.
+- [ ] M5 - Provide auth stubs/service contracts to UI owners; evidence: auth result shape consumable.
+- [ ] M6 - Verify screens cover final demo path; evidence: `DEMO_CHECKLIST.md` updated.
 
-Target:
+## Week 3
 
-- network core and auth core start working together
+### W3.P1 Login Integration
 
-Must be visible by end of week:
+- [ ] M1 - Define login integration order and blocker owners; evidence: integration note.
+- [ ] M2 - Route `LOGIN` request/response and network errors; evidence: login packet round trip.
+- [ ] M3 - Bind admin login UI to real auth response; evidence: admin login uses real result.
+- [ ] M4 - Bind client login UI to real auth response; evidence: client login uses real result.
+- [ ] M5 - Validate username/password/role/`machineId` and create session; evidence: auth tests pass.
+- [ ] M6 - Test admin/client login, bad password, wrong `machineId`; evidence: Gate C status updated.
 
-- TCP listener/connector
-- send/receive loop
-- repository/auth basics
-- login flow baseline
-- first real bugs recorded
+### W3.P2 Status Sync
+
+- [ ] M1 - Confirm status model still matches API; evidence: API/status review note.
+- [ ] M2 - Route `STATUS` heartbeat/state changes; evidence: server receives status.
+- [ ] M3 - Render online/offline/status state on dashboard; evidence: dashboard updates from real state.
+- [ ] M4 - Send status after login and local state changes; evidence: client emits `STATUS`.
+- [ ] M5 - Support session fields needed by status flow; evidence: session state available.
+- [ ] M6 - Test status after login and stale/disconnect behavior; evidence: Gate D status updated.
 
-### Week 3
+### W3.P3 One-Client Core Demo
 
-Target:
+- [ ] M1 - Freeze non-essential work until one-client core flow works; evidence: priority note.
+- [ ] M2 - Connect login, status, lock/unlock route skeleton, ACK visibility; evidence: one-client flow trace.
+- [ ] M3 - Show one client state and command result on dashboard; evidence: admin can inspect one client.
+- [ ] M4 - React to one command and return visible result; evidence: client executes command path.
+- [ ] M5 - Fix auth/session issues found in integration; evidence: login/session blockers closed.
+- [ ] M6 - Record integration bugs with exact repro steps; evidence: `BUGS.md` entries.
+
+## Week 4
 
-- core end-to-end flow works
-
-Must be visible by end of week:
-
-- login -> status -> lock/unlock flow
-- dashboard sees machine state
-- client reacts to command
-- ACK path visible
-
-### Week 4
-
-Target:
-
-- core control flow is stable
-
-Must be visible by end of week:
-
-- lock/unlock
-- ACK visibility
-- machine-bound login behavior
-- stable admin/client control flow
-
-### Week 5
-
-Target:
-
-- all MVP features exist in real flow
-
-Must be visible by end of week:
-
-- notification
-- timer
-- chat
-- multi-client baseline
-
-### Week 6
-
-Target:
-
-- stabilization and environment validation
-
-Must be visible by end of week:
-
-- reconnect/disconnect handling
-- timeout and invalid packet handling
-- real LAN smoke test
-- local multi-instance smoke test
-
-### Week 7
-
-Target:
-
-- source cleanup, regression, and release candidate
-
-Must be visible by end of week:
-
-- release candidate
-- bug severity list
-- known limitation list
-- cleaned architecture boundaries
-
-### Week 8
-
-Target:
-
-- final demo readiness
-
-Must be visible by end of week:
-
-- final smoke test
-- clean-machine setup pass
-- demo checklist
-- final docs aligned with build
-
-## 6. Cross-Member Dependencies
-
-- Member 3 waits on Member 2 for network-facing interface.
-- Member 4 waits on Member 2 for client-facing network interface.
-- Member 2 waits on Member 5 for auth interface details during login integration.
-- Member 3 waits on Member 5 for admin login/auth result behavior.
-- Member 4 waits on Member 2 and Member 5 for real client login behavior.
-- Member 6 waits on all members for build output, feature status, and bug reproduction.
-- All members wait on Member 1 for final stack, scope, and gate approval.
-
-## 7. Conflict Watch List
-
-These are the most likely overlap areas:
-
-- `DOCS/API.md`: Member 2 edits, Member 1 approves, Member 5 reviews auth/session shape.
-- `Shared/`: Member 2 owns packet/runtime shared transport models.
-- login flow: Member 2 owns transport path, Member 5 owns auth logic, Member 3/4 own UI response.
-- timer state: Member 2 owns transport, Member 5 owns persistence if stored, Member 3/4 own display only.
-- account-to-`machineId` validation: Member 5 owns validation logic, Member 2 owns transport field path, Member 3/4 own display only.
-- README/run guide: Member 6 updates, Member 1 reviews final top-level alignment.
-
-## 8. Weekly Reporting Format
-
-Each member should report in this shape:
-
-- completed
-- in progress
-- blocked by
-- next task
-- docs that need update
-
-## 9. Done This Turn
-
-- [x] `LEADER_FLOW.md` restructured into full project execution flow.
-- [x] member role docs aligned with the leader flow.
-- [x] `TASKS.md` upgraded from short priority list to execution tracker.
-- [x] Phase 0 branch and commit rules added.
-- [x] Phase 0 source-of-truth docs confirmed.
-- [x] Initial risk list added and linked to conflict control.
-- [x] `ServerApp/Database` chosen consistently over `ServerApp/Data`.
-- [x] Gate A marked passed.
-- [x] Member 4 Phase 0 client GUI scope checklist confirmed by Member 4 self-review.
-
-## 10. Next Review Checkpoint
-
-Before moving beyond `Gate B`, Member 1 should verify:
-
-- [ ] solution builds successfully.
-- [ ] server and client can connect successfully.
-- [ ] at least one packet can be exchanged.
-- [ ] invalid packet does not crash the receiver.
-- [ ] two local client instances can connect or the blocker is documented.
-- [ ] receive loop does not freeze UI.
-- [ ] local multi-instance test works.
-- [ ] networking handoff does not conflict with auth ownership.
-- [ ] no GUI member is parsing packet shape independently.
+### W4.P1 Lock/Unlock
+
+- [ ] M1 - Keep control flow priority and block secondary feature detours; evidence: priority note.
+- [ ] M2 - Finish `LOCK` and `UNLOCK` routing; evidence: command packets reach target client.
+- [ ] M3 - Wire admin lock/unlock controls to service calls; evidence: buttons trigger real commands.
+- [ ] M4 - Show lock screen and exit on unlock; evidence: client UI changes state correctly.
+- [ ] M5 - Verify active session and machine ownership before command flow; evidence: session guard works.
+- [ ] M6 - Test lock/unlock in local mode; evidence: Gate D cases updated.
+
+### W4.P2 ACK/Error Handling
+
+- [ ] M1 - Approve error behavior and blocker severity; evidence: error policy note.
+- [ ] M2 - Finish `ACK`, error packet handling, invalid packet guard; evidence: ACK/error packets visible.
+- [ ] M3 - Show command result/error on dashboard; evidence: admin sees success/failure.
+- [ ] M4 - Send ACK after command execution or clear failure; evidence: client ACK path works.
+- [ ] M5 - Return deterministic auth/session errors where relevant; evidence: error codes match API.
+- [ ] M6 - Test ACK success, ACK failure, invalid packet, unsupported packet; evidence: test matrix updated.
+
+### W4.P3 Control Regression
+
+- [ ] M1 - Decide whether control gate can pass; evidence: gate decision note.
+- [ ] M2 - Fix network regressions in core control path; evidence: no open high network blocker.
+- [ ] M3 - Fix server UI stale state or cross-thread display issues; evidence: dashboard remains responsive.
+- [ ] M4 - Fix client lock-state or command-state issues; evidence: client state remains consistent.
+- [ ] M5 - Fix session consistency issues; evidence: active session state stable.
+- [ ] M6 - Run Gate D regression and update bug status; evidence: `TEST_MATRIX.md` and `BUGS.md`.
+
+## Week 5
+
+### W5.P1 Notification
+
+- [ ] M1 - Keep notification scope small; evidence: no scope expansion.
+- [ ] M2 - Route direct/broadcast `NOTIFICATION`; evidence: packet reaches intended client(s).
+- [ ] M3 - Add admin notification action and result display; evidence: admin can send notification.
+- [ ] M4 - Show notification with simple severity; evidence: client notification visible.
+- [ ] M5 - Confirm no persistence needed unless approved; evidence: decision note if persistence added.
+- [ ] M6 - Test direct and broadcast notification behavior; evidence: Gate E status updated.
+
+### W5.P2 Timer
+
+- [ ] M1 - Decide timer persistence requirement for MVP; evidence: decision note.
+- [ ] M2 - Route `TIMER` updates; evidence: timer packet reaches client.
+- [ ] M3 - Show timer state on admin side if required; evidence: dashboard timer state visible.
+- [ ] M4 - Show remaining time on client; evidence: client timer display updates.
+- [ ] M5 - Support timer/session persistence if approved; evidence: persistence behavior documented.
+- [ ] M6 - Test timer update, expiry path, and reset assumptions; evidence: Gate E status updated.
+
+### W5.P3 1-1 Chat
+
+- [ ] M1 - Enforce 1-1 text-only chat scope; evidence: no chat scope creep.
+- [ ] M2 - Route direct `CHAT` messages; evidence: chat packet reaches receiver.
+- [ ] M3 - Send/receive admin chat messages; evidence: admin chat panel works.
+- [ ] M4 - Send/receive client chat messages; evidence: client chat UI works.
+- [ ] M5 - Avoid chat history unless approved; evidence: no unintended persistence.
+- [ ] M6 - Test one admin/client chat path; evidence: Gate E status updated.
+
+## Week 6
+
+### W6.P1 Multi-Client
+
+- [ ] M1 - Prioritize multi-client blockers; evidence: blocker list ranked.
+- [ ] M2 - Manage multiple connections, session routing, duplicate login behavior; evidence: 2 to 3 clients connect distinctly.
+- [ ] M3 - Render multiple clients clearly on dashboard; evidence: dashboard distinguishes clients.
+- [ ] M4 - Keep each client instance isolated by account and `machineId`; evidence: no cross-client state leak.
+- [ ] M5 - Enforce account-machine mapping and duplicate active session rules; evidence: duplicate/wrong mapping tests handled.
+- [ ] M6 - Test 2 to 3 clients in local multi-instance mode; evidence: Gate F/local notes updated.
+
+### W6.P2 Stability Hardening
+
+- [ ] M1 - Freeze feature work and rank bugs by severity; evidence: bug triage note.
+- [ ] M2 - Harden disconnect, reconnect, timeout, malformed packet handling; evidence: stability tests pass.
+- [ ] M3 - Harden server UI thread safety and error states; evidence: no UI freeze in receive events.
+- [ ] M4 - Harden client reconnect/disconnect UX; evidence: client recovers or errors clearly.
+- [ ] M5 - Harden DB/auth failure behavior and consistency; evidence: auth/db failures do not crash demo.
+- [ ] M6 - Run regression and verify fixed bugs; evidence: bug statuses updated.
+
+### W6.P3 Demo Mode Validation
+
+- [ ] M1 - Decide accepted fallback if real LAN is unstable; evidence: fallback decision note.
+- [ ] M2 - Verify local and real LAN network assumptions; evidence: mode test notes.
+- [ ] M3 - Verify server UI path in both modes; evidence: server demo path checked.
+- [ ] M4 - Verify client setup path in both modes; evidence: client demo path checked.
+- [ ] M5 - Verify seed accounts and machine mapping in both modes; evidence: demo accounts work.
+- [ ] M6 - Run local multi-instance and real LAN smoke checks; evidence: `DEMO_CHECKLIST.md` updated.
+
+## Week 7
+
+### W7.P1 Regression & Bug Triage
+
+- [ ] M1 - Classify bugs as fix/accept/defer; evidence: bug triage complete.
+- [ ] M2 - Fix release-blocking network bugs only; evidence: no high network blocker.
+- [ ] M3 - Fix release-blocking server UI bugs only; evidence: no high server UI blocker.
+- [ ] M4 - Fix release-blocking client UI bugs only; evidence: no high client UI blocker.
+- [ ] M5 - Fix release-blocking auth/DB bugs only; evidence: no high auth/db blocker.
+- [ ] M6 - Maintain bug severity list and regression status; evidence: `BUGS.md` and `TEST_MATRIX.md` current.
+
+### W7.P2 Source/Docs Cleanup
+
+- [ ] M1 - Approve cleanup scope and block unrelated refactors; evidence: cleanup decision note.
+- [ ] M2 - Clean network/shared boundaries without changing behavior; evidence: build still passes.
+- [ ] M3 - Clean server UI/service boundaries without changing behavior; evidence: server demo path unchanged.
+- [ ] M4 - Clean client UI/service boundaries without changing behavior; evidence: client demo path unchanged.
+- [ ] M5 - Clean auth/data boundaries without changing behavior; evidence: auth tests unchanged.
+- [ ] M6 - Align README, run guide, test matrix, demo checklist with build; evidence: docs review complete.
+
+### W7.P3 Release Candidate
+
+- [ ] M1 - Approve release candidate and code freeze rules; evidence: RC note.
+- [ ] M2 - Support setup and network verification; evidence: setup/network check done.
+- [ ] M3 - Rehearse server dashboard demo path; evidence: rehearsal note.
+- [ ] M4 - Rehearse client demo path; evidence: rehearsal note.
+- [ ] M5 - Verify demo accounts, seed data, auth/session behavior; evidence: demo account check done.
+- [ ] M6 - Prepare final regression report draft and known limitations; evidence: report draft ready.
+
+## Week 8
+
+### W8.P1 Final Rehearsal
+
+- [ ] M1 - Lead rehearsal and decide fallback trigger; evidence: rehearsal decision note.
+- [ ] M2 - Validate network setup and fallback local mode; evidence: network rehearsal pass.
+- [ ] M3 - Rehearse admin dashboard operations; evidence: server demo path pass.
+- [ ] M4 - Rehearse client behavior and lock/unlock reaction; evidence: client demo path pass.
+- [ ] M5 - Rehearse auth/DB/session explanation; evidence: explanation notes ready.
+- [ ] M6 - Run final checklist and record rehearsal issues; evidence: `DEMO_CHECKLIST.md` current.
+
+### W8.P2 Release Lock
+
+- [ ] M1 - Lock release scope and approve emergency fixes only; evidence: release lock note.
+- [ ] M2 - Avoid network changes unless release-blocking; evidence: no unapproved network changes.
+- [ ] M3 - Avoid server UI changes unless release-blocking; evidence: no unapproved server UI changes.
+- [ ] M4 - Avoid client changes unless release-blocking; evidence: no unapproved client changes.
+- [ ] M5 - Avoid DB/auth changes unless release-blocking; evidence: no unapproved auth/db changes.
+- [ ] M6 - Verify docs match final build and limitation list; evidence: final docs review complete.
+
+### W8.P3 Demo & Archive
+
+- [ ] M1 - Lead final demo and final decision notes; evidence: demo complete.
+- [ ] M2 - Support live network troubleshooting; evidence: network notes archived.
+- [ ] M3 - Demonstrate server dashboard; evidence: server demo complete.
+- [ ] M4 - Demonstrate client app; evidence: client demo complete.
+- [ ] M5 - Explain auth/session/database flow; evidence: module explanation complete.
+- [ ] M6 - Archive demo notes, bug summary, final docs status; evidence: final archive notes complete.

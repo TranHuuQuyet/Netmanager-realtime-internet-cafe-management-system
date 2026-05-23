@@ -2,32 +2,33 @@
 
 ## Risk Register
 
-Current Phase 0 risks and controls:
+Current flow risks and controls:
 
 | Risk | Owner | Severity | Control |
 | --- | --- | --- | --- |
-| Packet contract drift between server and client | Member 2, Member 1 approves | High | `DOCS/API.md` is the contract source of truth; packet changes must be documented same day. |
-| Login ownership unclear between networking and auth | Member 2 + Member 5 | High | Member 2 owns transport; Member 5 owns auth/session validation. |
-| GUI code invents its own packet parsing | Member 3 + Member 4 | Medium | GUI consumes agreed services/interfaces only. |
-| Wrong `machineId` mapping during demo | Member 5 | High | Account-to-machine rule is frozen and must be tested before integration. |
-| Real LAN behavior differs from local multi-instance | Member 2 + Member 6 | Medium | Both demo modes need separate smoke checks. |
-| Chat scope expands beyond MVP | Member 1 | Medium | Chat remains 1-1 text only, no emoji/history/file/group. |
-| UI freezes on network receive | Member 2 + GUI owner | High | Network events must not block WinForms UI thread. |
-| Database schema changes after consumers depend on it | Member 5, Member 1 approves | Medium | Auth/session contract must be reviewed in Phase 1 before deep implementation. |
+| Packet contract drift between server and client | M2, M1 approves | High | `DOCS/API.md` is the contract source of truth; packet changes must be documented same day. |
+| Login ownership unclear between networking and auth | M2 + M5 | High | M2 owns transport; M5 owns auth/session validation. |
+| GUI code invents its own packet parsing | M3 + M4 | Medium | GUI consumes agreed services/interfaces only. |
+| Wrong `machineId` mapping during demo | M5 | High | Account-to-machine rule is frozen and must be tested by `W3.P1`. |
+| Real LAN behavior differs from local multi-instance | M2 + M6 | Medium | Both demo modes need separate smoke checks by `W6.P3`. |
+| Chat scope expands beyond MVP | M1 | Medium | Chat remains 1-1 text only, no emoji/history/file/group. |
+| UI freezes on network receive | M2 + GUI owner | High | Network events must not block WinForms UI thread. |
+| Database schema changes after consumers depend on it | M5, M1 approves | Medium | Auth/session contract must be reviewed in `W1.P2` before deep implementation. |
 
 ## Known Bugs
 
-- No application runtime implementation has been committed yet, so runtime bugs cannot be observed in code.
-- Existing roadmap and architecture docs describe intended behavior, but implementation status is still pending.
+- No live TCP/auth/database end-to-end runtime has been completed yet, so most runtime bugs are still pending discovery.
+- Current code contains scaffold and server UI shell behavior; networking, auth, persistence, real command flow, and client workflow still need implementation.
 
 ## Unresolved Issues
 
-- Source folder skeleton is present, but `.sln` and `.csproj` files are not present yet.
-- Exact packet schema implementation has not been committed.
-- SQLite schema and auth storage details still need implementation.
-- Reconnect behavior is only documented, not validated in code.
-- Real LAN mode and local multi-instance mode are planned but not yet validated in code.
-- Account-to-`machineId` validation is defined in docs but not yet validated in code.
+- TCP listener/connector and send/receive loop are not completed yet.
+- First TCP JSON-line round trip is still pending.
+- Auth/database folders and runtime implementation still need to be created under `Code/ServerApp/Auth/` and `Code/ServerApp/Database/`.
+- Client workflow screens still need implementation beyond the default shell.
+- Reconnect behavior is documented but not validated in code.
+- Real LAN mode and local multi-instance mode are planned but not validated in runtime.
+- Account-to-`machineId` validation is defined in docs but not validated in runtime.
 - Default port, database path, and seed account baseline are documented in `RUN_GUIDE.md` but not implemented yet.
 
 ## Temporary Fixes
@@ -36,8 +37,8 @@ Current Phase 0 risks and controls:
 
 ## Debugging Notes
 
-- Treat the current repository as documentation-first until implementation files appear.
-- Week 1 should produce a runnable skeleton so connection and packet tests can start early.
+- Use `TASKS.md` for progress and `TEST_MATRIX.md` for test status.
+- Week 1 should end with scaffold clarity and first connection proof, or leave round trip as the top W2 blocker.
 - When code is added, record only actionable bugs here.
 - Keep each bug entry concise and tied to a reproduction step.
 - Mark whether a bug appears in `Mode A - Real LAN Demo`, `Mode B - Local Multi-Instance Demo`, or both.

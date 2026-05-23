@@ -1,7 +1,8 @@
-# Member Guides
+# Member Playbooks
 
-Day la thu muc huong dan rieng cho tung thanh vien trong `DOCS/`.
-Moi file da duoc dong bo voi `LEADER_FLOW.md`, `TASKS.md`, va `API.md`.
+Thu muc nay chua playbook rieng cho tung thanh vien. Cac file nay giup member biet role, write scope, dependency, handoff rule, va flow 8 tuan cua rieng minh.
+
+Khong tick tien do trong thu muc nay. Tracker duy nhat co checkbox la `../TASKS.md`.
 
 ## Files
 
@@ -12,18 +13,19 @@ Moi file da duoc dong bo voi `LEADER_FLOW.md`, `TASKS.md`, va `API.md`.
 - [Member 5 - Database & Authentication](./member-5-database-authentication.md)
 - [Member 6 - Tester & Documentation](./member-6-tester-documentation.md)
 
-## Cach dung
+## How to Use
 
-1. Doc `../LEADER_FLOW.md` de hieu flow tong the.
-2. Doc `../TASKS.md` de biet uu tien hien tai.
-3. Doc `../API.md` neu cong viec lien quan den packet, login, timer, notification, chat, hoac ACK.
-4. Mo dung file role cua minh.
-5. Lam theo phase, theo tuan, roi doi chieu voi definition of done.
+1. Doc `../LEADER_FLOW.md` de nam master flow.
+2. Doc `../TASKS.md` de xem task/evidence va tick tien do.
+3. Doc `../API.md` neu viec cua ban lien quan packet, login, status, command, timer, notification, chat, ACK.
+4. Mo dung playbook cua minh.
+5. Lam theo `Wn.Pm`, handoff dung owner, cap nhat tracker khi co evidence.
 
-## Luu y chung
+## Shared Rules
 
-- Deadline baseline la `8 tuan`.
-- Stack de xuat la `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`.
-- Chat chi la 1-1 text toi gian.
+- Deadline baseline la 8 tuan.
+- Stack la `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`.
+- Chat chi la 1-1 text toi thieu.
 - Moi client account gan voi mot `machineId`.
-- Project phai ho tro ca real LAN va local multi-instance.
+- Project phai support real LAN va local multi-instance.
+- Packet/schema thay doi thi update `DOCS/API.md` cung ngay.

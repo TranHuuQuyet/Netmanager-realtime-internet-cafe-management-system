@@ -1,6 +1,5 @@
 namespace ServerApp.Auth.Models;
 
-
 public enum UserRole {
     Admin = 0,
     Client = 1

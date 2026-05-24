@@ -2,6 +2,9 @@ namespace ServerApp;
 
 public partial class MainForm : Form
 {
+    private bool _isSelectingMachine;
+    private string? _selectedMachineName;
+
     public MainForm()
     {
         InitializeComponent();
@@ -61,6 +64,7 @@ public partial class MainForm : Form
             Dock = DockStyle.Top,
             Height = 68,
             BackColor = Color.White,
+            Cursor = Cursors.Hand,
             Tag = status
         };
         icon.Paint += MachineIcon_Paint;
@@ -70,7 +74,9 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             Text = $"{machineName} - {status}",
             TextAlign = ContentAlignment.MiddleCenter,
-            Font = new Font("Segoe UI", 8F, FontStyle.Bold)
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            Tag = machineName
         };
 
         card.Controls.Add(label);
@@ -115,13 +121,9 @@ public partial class MainForm : Form
 
     private void MachineCard_Click(object? sender, EventArgs e)
     {
-        if (sender is PictureBox pictureBox && pictureBox.Parent?.Tag is string parentMachineName)
-        {
-            SelectMachine(parentMachineName);
-            return;
-        }
+        string? machineName = GetMachineNameFromCardSender(sender);
 
-        if (sender is Control control && control.Tag is string machineName)
+        if (!string.IsNullOrWhiteSpace(machineName))
         {
             SelectMachine(machineName);
         }
@@ -129,6 +131,11 @@ public partial class MainForm : Form
 
     private void DgvMachines_SelectionChanged(object? sender, EventArgs e)
     {
+        if (_isSelectingMachine)
+        {
+            return;
+        }
+
         if (dgvMachines.CurrentRow?.Cells["MachineNameColumn"].Value is string machineName)
         {
             SelectMachine(machineName);
@@ -137,17 +144,36 @@ public partial class MainForm : Form
 
     private void SelectMachine(string machineName)
     {
-        lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
-        txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, machineName);
-
-        foreach (DataGridViewRow row in dgvMachines.Rows)
+        if (string.IsNullOrWhiteSpace(machineName))
         {
-            if (row.Cells["MachineNameColumn"].Value?.ToString() == machineName)
+            return;
+        }
+
+        _isSelectingMachine = true;
+
+        try
+        {
+            _selectedMachineName = machineName;
+            lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
+            txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, machineName);
+            lblServerStatus.Text = string.Format(UiStrings.MainSelectedMachineStatusTemplate, machineName);
+
+            foreach (DataGridViewRow row in dgvMachines.Rows)
             {
-                row.Selected = true;
-                dgvMachines.CurrentCell = row.Cells[0];
-                break;
+                bool isSelected = row.Cells["MachineNameColumn"].Value?.ToString() == machineName;
+                row.Selected = isSelected;
+
+                if (isSelected)
+                {
+                    dgvMachines.CurrentCell = row.Cells[0];
+                }
             }
+
+            UpdateMachineCardSelection(machineName);
+        }
+        finally
+        {
+            _isSelectingMachine = false;
         }
     }
 
@@ -163,6 +189,73 @@ public partial class MainForm : Form
         txtChatHistory.AppendText($"{Environment.NewLine}{UiStrings.ServerPrefix}: {message}");
         txtChatMessage.Clear();
         txtChatMessage.Focus();
+    }
+
+    private void MachineAction_Click(object? sender, EventArgs e)
+    {
+        string action = sender switch
+        {
+            Button button when button == btnLockMachine => UiStrings.MainLockMachine,
+            Button button when button == btnUnlockMachine => UiStrings.MainUnlockMachine,
+            Button button when button == btnShutdownMachine => UiStrings.MainShutdownMachine,
+            _ => UiStrings.MainPendingAction
+        };
+
+        if (string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            return;
+        }
+
+        lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
+    }
+
+    private void CustomerAction_Click(object? sender, EventArgs e)
+    {
+        string action = sender switch
+        {
+            Button button when button == btnAddCustomer => UiStrings.MainAddCustomerButton,
+            Button button when button == btnEditCustomer => UiStrings.MainEditCustomerButton,
+            Button button when button == btnDeleteCustomer => UiStrings.MainDeleteCustomerButton,
+            Button button when button == btnCancelCustomer => UiStrings.MainCancelCustomerButton,
+            _ => UiStrings.MainPendingAction
+        };
+
+        lblServerStatus.Text = string.Format(UiStrings.MainCustomerActionPendingTemplate, action);
+    }
+
+    private static string? GetMachineNameFromCardSender(object? sender)
+    {
+        return sender switch
+        {
+            PictureBox pictureBox => pictureBox.Parent?.Tag as string,
+            Control { Tag: string machineName } => machineName,
+            Control control => control.Parent?.Tag as string,
+            _ => null
+        };
+    }
+
+    private void UpdateMachineCardSelection(string selectedMachineName)
+    {
+        foreach (Control control in pnlMachineCards.Controls)
+        {
+            if (control is not Panel card || card.Tag is not string machineName)
+            {
+                continue;
+            }
+
+            bool isSelected = machineName == selectedMachineName;
+            card.BackColor = isSelected ? Color.FromArgb(232, 244, 255) : Color.White;
+            card.BorderStyle = isSelected ? BorderStyle.Fixed3D : BorderStyle.FixedSingle;
+
+            foreach (Control child in card.Controls)
+            {
+                if (child is not PictureBox)
+                {
+                    child.BackColor = card.BackColor;
+                }
+            }
+        }
     }
 
     private void LoadCustomerData()

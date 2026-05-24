@@ -152,7 +152,6 @@ partial class LoginForm
         // 
         // btnLogin
         // 
-        btnLogin.DialogResult = DialogResult.OK;
         btnLogin.Location = new Point(247, 10);
         btnLogin.Margin = new Padding(8, 0, 0, 0);
         btnLogin.Name = "btnLogin";
@@ -160,6 +159,7 @@ partial class LoginForm
         btnLogin.TabIndex = 0;
         btnLogin.Text = UiStrings.LoginButtonText;
         btnLogin.UseVisualStyleBackColor = true;
+        btnLogin.Click += BtnLogin_Click;
         // 
         // btnExit
         // 

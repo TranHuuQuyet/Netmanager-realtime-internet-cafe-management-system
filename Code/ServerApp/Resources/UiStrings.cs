@@ -5,7 +5,7 @@ namespace ServerApp;
 
 internal static class UiStrings
 {
-    private static readonly ResourceManager ResourceManager = new("ServerApp.UiStrings", typeof(UiStrings).Assembly);
+    private static readonly ResourceManager ResourceManager = new("ServerApp.Resources.UiStrings", typeof(UiStrings).Assembly);
 
     private static string Get(string name, string fallback)
     {
@@ -19,6 +19,10 @@ internal static class UiStrings
     public static string LoginButtonText => Get(nameof(LoginButtonText), "Đăng nhập");
     public static string ExitButtonText => Get(nameof(ExitButtonText), "Thoát");
     public static string LoginFormTitle => Get(nameof(LoginFormTitle), "Đăng nhập");
+
+    public static string LoginUsernameRequired => Get(nameof(LoginUsernameRequired), "Vui lòng nhập tài khoản.");
+    public static string LoginPasswordRequired => Get(nameof(LoginPasswordRequired), "Vui lòng nhập mật khẩu.");
+    public static string LoginMachineIdRequired => Get(nameof(LoginMachineIdRequired), "Vui lòng nhập mã máy.");
 
     public static string MainTabMachines => Get(nameof(MainTabMachines), "Quản lý máy");
     public static string MainMachineTitle => Get(nameof(MainMachineTitle), "DANH SÁCH MÁY");
@@ -61,4 +65,9 @@ internal static class UiStrings
     public static string ChatWithMachineTemplate => Get(nameof(ChatWithMachineTemplate), "Chat với máy {0}");
     public static string ChatHistoryTemplate => Get(nameof(ChatHistoryTemplate), "[{0}] Sẵn sàng nhận tin nhắn từ máy chủ.");
     public static string ServerPrefix => Get(nameof(ServerPrefix), "Máy chủ");
+    public static string MainSelectedMachineStatusTemplate => Get(nameof(MainSelectedMachineStatusTemplate), "Đang chọn máy {0}.");
+    public static string MainNoMachineSelectedStatus => Get(nameof(MainNoMachineSelectedStatus), "Vui lòng chọn một máy trước.");
+    public static string MainActionPendingTemplate => Get(nameof(MainActionPendingTemplate), "{0} cho {1}: đang chờ backend.");
+    public static string MainCustomerActionPendingTemplate => Get(nameof(MainCustomerActionPendingTemplate), "{0} khách hàng: đang chờ backend.");
+    public static string MainPendingAction => Get(nameof(MainPendingAction), "Thao tác");
 }

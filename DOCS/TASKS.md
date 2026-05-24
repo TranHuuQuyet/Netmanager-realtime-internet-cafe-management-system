@@ -28,11 +28,7 @@ Current focus: Week 1 contract/scaffold handoff, chuan bi cho Week 2 network/aut
 - [x] M2 - Finalize packet envelope and packet type baseline; evidence: existing checked task migrated from old tracker.
 - [ ] M3 - Review API and list dashboard data/actions needed from M2/M5; evidence: comment/update in tracker or handoff note.
 - [ ] M4 - Review API and list client input/output needs; evidence: client handoff note.
-<<<<<<< HEAD
 - [x] M5 - Draft `Users`, `Sessions`, auth result, session state, wrong `machineId` validation; evidence: schema/auth note or code skeleton.
-=======
-- [x] M5 - Draft `Users`, `Sessions`, auth result, session state, wrong `machineId` validation; evidence: `Code/ServerApp/Auth/Models` plus `AuthService`, `SessionService`, and SQLite repository skeleton.
->>>>>>> cuong-auth-member-5
 - [ ] M6 - Review docs for contradictions against API contract; evidence: mismatch list or "no mismatch" note.
 
 ### W1.P3 Scaffold & First Round Trip
@@ -41,11 +37,7 @@ Current focus: Week 1 contract/scaffold handoff, chuan bi cho Week 2 network/aut
 - [ ] M2 - Create serializer/parser rules, networking skeleton, and first TCP JSON-line round trip; evidence: server/client connect and one packet exchange local.
 - [x] M3 - Complete server login shell, dashboard shell, machine list/control placeholder, machineId input, and resource-backed UI strings; evidence: `Code/ServerApp/Forms` and `Code/ServerApp/UiStrings.*`.
 - [ ] M4 - Create client connect screen, login shell, main shell, and lock screen shell; evidence: client forms/screens exist and open.
-<<<<<<< HEAD
 - [x] M5 - Create auth service skeleton and schema/session draft; evidence: `Code/ServerApp/Auth` and `Code/ServerApp/Database` skeleton or documented handoff.
-=======
-- [x] M5 - Create auth service skeleton and schema/session draft; evidence: `Code/ServerApp/Auth` contains auth models, services, bootstrapper, and SQLite-backed repository/session draft.
->>>>>>> cuong-auth-member-5
 - [x] M6 - Create bug report template, test matrix template, contract/connection checklist, and demo-mode checklist; evidence: `BUGS.md`, `TEST_MATRIX.md`, `DEMO_CHECKLIST.md`.
 
 ## Week 2

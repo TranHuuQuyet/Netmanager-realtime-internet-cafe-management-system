@@ -15,11 +15,11 @@ This file defines the baseline tests for the project. Member 6 owns this file, a
 
 | ID | Test | Mode | Owner | Status |
 | --- | --- | --- | --- | --- |
-| B-01 | Server starts and listens on default port | Local | Member 2 | Pending |
-| B-02 | One client connects to server | Local | Member 2 | Pending |
+| B-01 | Server starts and listens on default port | Local | Member 2 | Pass |
+| B-02 | One client connects to server | Local | Member 2 | Pass |
 | B-03 | Two clients connect to server at the same time | Local | Member 2 | Pending |
-| B-04 | Client sends one valid JSON-line packet | Local | Member 2 | Pending |
-| B-05 | Server returns one response packet | Local | Member 2 | Pending |
+| B-04 | Client sends one valid JSON-line packet | Local | Member 2 | Pass |
+| B-05 | Server returns one response packet | Local | Member 2 | Pass |
 | B-06 | Invalid packet does not crash server | Local | Member 2 | Pending |
 | B-07 | Network receive does not freeze WinForms UI | Local | Member 2 + GUI owner | Pending |
 

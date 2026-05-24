@@ -25,7 +25,7 @@ Current focus: Week 1 contract/scaffold handoff, chuan bi cho Week 2 network/aut
 ### W1.P2 API Contract
 
 - [ ] M1 - Review and accept `DOCS/API.md` with M2 and M5; evidence: API approval note or decision entry.
-- [x] M2 - Finalize packet envelope and packet type baseline; evidence: existing checked task migrated from old tracker.
+- [x] M2 - Finalize packet envelope and packet type baseline; evidence: `DOCS/API.md`, `Code/Shared/Enums/PacketType.cs`, `Code/Shared/Packets/Packet.cs`, `Code/Shared/Packets/PacketFactory.cs`, and `Code/Shared/Utilities/JsonHelper/JsonHelper.cs`.
 - [ ] M3 - Review API and list dashboard data/actions needed from M2/M5; evidence: comment/update in tracker or handoff note.
 - [ ] M4 - Review API and list client input/output needs; evidence: client handoff note.
 - [ ] M5 - Draft `Users`, `Sessions`, auth result, session state, wrong `machineId` validation; evidence: schema/auth note or code skeleton.
@@ -34,7 +34,7 @@ Current focus: Week 1 contract/scaffold handoff, chuan bi cho Week 2 network/aut
 ### W1.P3 Scaffold & First Round Trip
 
 - [x] M1 - Confirm `Code/NetManager.sln`, `ServerApp`, `ClientApp`, `Shared`, and project references exist; evidence: solution/project files present.
-- [ ] M2 - Create serializer/parser rules, networking skeleton, and first TCP JSON-line round trip; evidence: server/client connect and one packet exchange local.
+- [x] M2 - Create serializer/parser rules, networking skeleton, and first TCP JSON-line round trip; evidence: `NetworkSmokeTest` passed locally on `127.0.0.1:5000`; server listened, client connected, client sent one `STATUS` JSON-line packet, server parsed it, and server returned one `ACK` JSON-line packet.
 - [x] M3 - Complete server login shell, dashboard shell, machine list/control placeholder, machineId input, and resource-backed UI strings; evidence: `Code/ServerApp/Forms` and `Code/ServerApp/UiStrings.*`.
 - [ ] M4 - Create client connect screen, login shell, main shell, and lock screen shell; evidence: client forms/screens exist and open.
 - [ ] M5 - Create auth service skeleton and schema/session draft; evidence: `Code/ServerApp/Auth` and `Code/ServerApp/Database` skeleton or documented handoff.

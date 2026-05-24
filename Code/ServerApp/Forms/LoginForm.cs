@@ -3,6 +3,7 @@ using ServerApp.Auth.Services;
 
 namespace ServerApp;
 
+
 public partial class LoginForm : Form
 {
     private readonly Task<AuthRuntime> _authRuntimeTask;

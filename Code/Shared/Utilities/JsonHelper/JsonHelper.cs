@@ -1,32 +1,4 @@
-// using System.Text.Json;
-// using System.Text.Json.Serialization;
-// using NETManager.Shared.Enums;
-// using NETManager.Shared.Models;
 
-// namespace NETManager.Shared.Utilities;
-
-// public static class JsonHelper
-// {
-//     public static byte[] Serialize(object obj)
-//     {
-//         return JsonSerializer.Serialize(obj, obj.GetType(), Shared);
-//     }
-
-//     public static T Deserialize<T>(byte[] data)
-//     {
-//         return JsonSerializer.Deserialize<T>(data, Shared)!;
-//     }
-
-//     public static PacketType DeserializePacketType(byte[] data)
-//     {
-//         using var doc = JsonDocument.Parse(data);
-//         if (doc.RootElement.TryGetProperty("type", out var typeElement))
-//         {
-//             return typeElement.Deserialize<PacketType>(Shared);
-//         }
-//         throw new InvalidDataException("Packet missing required field: type");
-//     }
-// }
 using System.Text.Json;
 using NETManager.Shared.Enums;
 using NETManager.Shared.Models;

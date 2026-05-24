@@ -4,7 +4,7 @@
 
 Version: `v0.1`
 
-This document is the shared contract reference for Phase 1.
+This document is the shared contract reference for `W1.P2 API Contract`.
 Server, client, and shared models must follow this file until the team formally changes the contract.
 
 ## Scope

@@ -30,7 +30,9 @@
 using System.Text.Json;
 using NETManager.Shared.Enums;
 using NETManager.Shared.Models;
+using NETManager.Shared.DTOs.Bidrectional;
 using NETManager.Shared.DTOs.CommandPayloads;
+using NETManager.Shared.DTOs.RequestPayloads;
 using NETManager.Shared.Packets;
 using System.IO;
 using System.Text.Json.Serialization;

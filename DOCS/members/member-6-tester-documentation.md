@@ -1,173 +1,99 @@
 # Member 6 - Tester & Documentation
 
-## 1. Vai tro
+## Role
 
-Ban phu trach test, bug tracking, docs, va demo support.
-Muc tieu cua ban la giup team biet phan nao da on, phan nao chua on, bug nao nghiem trong, va docs nao dang lech so voi implementation.
+Ban own testing, bug tracking, run guide, demo checklist, va docs consistency. Muc tieu la giup team biet cai gi pass, cai gi fail, bug nao nghiem trong, va docs nao dang lech build.
 
-## 2. Write Scope
+Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
+
+## Write Scope
 
 Ban duoc uu tien sua:
 
 - `DOCS/BUGS.md`
-- `DOCS/TASKS.md` khi duoc Member 1 giao cap nhat tracker
+- `DOCS/RUN_GUIDE.md`
+- `DOCS/TEST_MATRIX.md`
+- `DOCS/DEMO_CHECKLIST.md`
 - `README.md`
-- cac test note hoac run guide trong `DOCS/`
+- `DOCS/TASKS.md` khi M1 giao cap nhat tracker
 
-Ban khong nen sua runtime code tru khi dang verify bug va da duoc owner giao.
+## Non-Owned Scope
 
-## 3. Thu ban so huu
+Ban khong own:
 
-- bug format
-- test matrix
-- regression notes
-- demo checklist
-- run guide
-- docs consistency review
-- real LAN checklist
-- local multi-instance checklist
+- runtime network code cua M2
+- server UI code cua M3
+- client UI code cua M4
+- auth/database code cua M5
+- scope/release approval cua M1
 
-## 4. Dependency cua ban
+## Dependencies
 
-- can output va build tu ca team
-- can phase/gate tu Member 1
-- can contract tu Member 2
-- can auth/session behavior tu Member 5 de viet test case
+- Can M1 chot gate, priority, accepted risk.
+- Can M2 cung cap API/connection behavior de test.
+- Can M3/M4 cung cap UI build de verify.
+- Can M5 cung cap auth/session behavior va seed accounts.
 
-## 5. Nhiem vu theo phase
+## Handoff Rules
 
-### Phase 0
+- Bug report phai co module, mode, steps, expected, actual, severity, workaround neu co.
+- Docs update theo implementation that, khong theo assumption cu.
+- Contract mismatch phai report cho M1/M2 truoc khi sua API.
+- Test status doi tu pass sang fail thi tao bug entry.
 
-- tao bug template
-- tao test matrix template
-- tao demo-note structure
-
-### Phase 1
-
-- derive test case tu `API.md`
-- xac nhan docs khong mau thuan nhau
-
-### Phase 2
-
-- test connection basics
-- test invalid packet basics neu co the
-- test local multi-instance launch path
-
-### Phase 3
-
-- test login success/fail
-- test inactive user va DB error handling
-- test wrong `machineId` login
-
-### Phase 4
-
-- review GUI shell co cover du demo flow khong
-
-### Phase 5
-
-- test core flow end-to-end
-- ghi bug co reproduction step va severity
-
-### Phase 6
-
-- test notification, timer, chat, multi-client
-- cap nhat docs theo behavior that
-- xac nhan chat scope khong vuot quy dinh
-
-### Phase 7
-
-- run regression checklist
-- verify bug fixes
-- maintain known limitation list
-
-### Phase 8
-
-- produce final test report
-- final demo checklist
-- verify clean-machine setup docs
-
-### Phase 9
-
-- support demo
-- ghi post-release note
-
-## 6. Ke hoach theo tuan
+## My 8-Week Flow
 
 ### Week 1
 
-- tao bug report template
-- tao test matrix template
-- tao connection/contract checklist
-- tao `RUN_GUIDE.md`
-- tao `DEMO_CHECKLIST.md`
-- tao `DECISIONS.md` baseline
-- xac nhan checklist co the dung de verify runnable skeleton cuoi Week 1
+- `W1.P1`: confirm bug/test/doc ownership and source-of-truth docs.
+- `W1.P2`: derive first test cases and flag doc contradictions.
+- `W1.P3`: create bug template, test matrix, connection checklist, demo-mode checklist.
 
 ### Week 2
 
-- test connect/login co ban
-- record first real bugs
+- `W2.P1`: run connection, invalid packet, local multi-instance checks.
+- `W2.P2`: create valid/invalid login and wrong `machineId` test cases.
+- `W2.P3`: verify screens cover planned demo path.
 
 ### Week 3
 
-- test login -> status -> lock/unlock flow
-- record integration bugs
+- `W3.P1`: test admin/client login, bad password, wrong `machineId`.
+- `W3.P2`: test status after login and stale/disconnect behavior.
+- `W3.P3`: record integration bugs with exact repro steps.
 
 ### Week 4
 
-- test timer, notification, chat, multi-client
+- `W4.P1`: test lock/unlock in local mode.
+- `W4.P2`: test ACK success, ACK failure, invalid packet, unsupported packet.
+- `W4.P3`: run Gate D regression and update bug status.
 
 ### Week 5
 
-- run regression
-- verify fixes
-- maintain known limitation list
+- `W5.P1`: test direct and broadcast notification behavior.
+- `W5.P2`: test timer update, expiry path, and reset assumptions.
+- `W5.P3`: test one admin/client chat path and confirm scope remains 1-1 text.
 
 ### Week 6
 
-- run real LAN smoke test
-- run local multi-instance smoke test
+- `W6.P1`: test 2 to 3 clients in local multi-instance mode.
+- `W6.P2`: run regression and verify fixed bugs.
+- `W6.P3`: run local multi-instance and real LAN smoke checks.
 
 ### Week 7
 
-- final smoke test cho release candidate
-- verify run guide
-- finalize demo checklist
+- `W7.P1`: maintain bug severity list and regression status.
+- `W7.P2`: align README, run guide, test matrix, demo checklist with build.
+- `W7.P3`: prepare final regression report draft and known limitations.
 
 ### Week 8
 
-- final checklist
-- hold fallback demo steps
+- `W8.P1`: run final checklist and record rehearsal issues.
+- `W8.P2`: verify docs match final build and limitation list.
+- `W8.P3`: archive demo notes, bug summary, final docs status.
 
-## 7. Handoff cho nguoi khac
+## Definition of Done
 
-Ban can cung cap cho owner bug:
-
-- module anh huong
-- steps to reproduce
-- expected result
-- actual result
-- severity
-- workaround neu co
-
-## 8. Nguyen tac tranh xung dot
-
-- ban ghi bug, khong tu sua logic neu chua duoc giao
-- ban cap nhat docs theo implementation that
-- ban khong doi contract neu khong qua Member 1 va Member 2
-
-## 9. Deliverables
-
-- `BUGS.md`
-- test matrix
-- regression notes
-- run guide
-- demo checklist
-- final test report
-
-## 10. Definition of Done
-
-- bug duoc ghi ro va de lap lai
-- docs de chay va de hieu
-- demo checklist du de support buoi demo
-- team biet ro muc do on dinh cua build hien tai
+- Bug entries are reproducible and actionable.
+- Test matrix reflects real status.
+- Run guide and demo checklist can be followed by the team.
+- Final docs match the build and accepted limitations.

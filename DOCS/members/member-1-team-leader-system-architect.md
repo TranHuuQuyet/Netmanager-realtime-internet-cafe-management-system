@@ -1,20 +1,12 @@
 # Member 1 - Team Leader / System Architect
 
-## 1. Vai tro
+## Role
 
-Ban la nguoi giu huong di tong the cua project.
-Ban khong can code nhieu nhat, nhung ban phai dam bao ca team biet dang lam gi, phu thuoc vao ai, va khi nao duoc chuyen phase.
+Ban giu huong di tong the cua project. Viec chinh la chot scope, chot ownership, dieu phoi dependency, approve gate, va giu demo on dinh trong baseline 8 tuan.
 
-Muc tieu cua ban:
+Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
 
-- giu dung MVP
-- giu dung contract
-- giu dung ownership
-- giu dung timeline
-- giu cho integration khong vo
-- giu duoc demo on dinh trong deadline 8 tuan
-
-## 2. Write Scope
+## Write Scope
 
 Ban duoc uu tien sua:
 
@@ -22,187 +14,85 @@ Ban duoc uu tien sua:
 - `DOCS/TASKS.md`
 - `DOCS/BUGS.md`
 - `README.md`
-- cac file docs tong quan khac neu can
+- docs tong quan khi can dong bo flow
 
-Ban khong nen sua runtime code trong `Shared`, `ServerApp`, `ClientApp`, `Data`, `Auth` tru khi dang review integration va da co owner dong y.
+## Non-Owned Scope
 
-## 3. Thu ban so huu
+Ban khong own runtime implementation cua:
 
-Ban la owner chinh cua:
+- packet/network code cua M2
+- server UI cua M3
+- client UI cua M4
+- auth/database logic cua M5
+- detailed test execution cua M6
 
-- scope MVP
-- phase va gate
-- task assignment
-- integration order
-- release approval
-- conflict resolution
-- decision log
+## Dependencies
 
-## 4. Thu ban khong so huu
+- M2 can API/packet approval som de code network.
+- M3 va M4 can service/interface ro de khong parse packet trong UI.
+- M5 can login/auth/session boundary ro voi M2.
+- M6 can build output va decision ro de update tests/docs.
 
-Ban khong la owner runtime cua:
+## Handoff Rules
 
-- packet implementation cua Member 2
-- server UI cua Member 3
-- client UI cua Member 4
-- database/auth logic cua Member 5
-- test execution chi tiet cua Member 6
+- Chot owner chinh cho moi cross-module blocker.
+- Ghi decision vao docs trong cung ngay.
+- Khong cho scope moi vao khi current gate chua qua.
+- Neu team doi packet/auth/session, yeu cau update `API.md` truoc hoac cung review batch.
 
-## 5. Dependency can theo doi
-
-Ban phai biet cac dependency chinh sau:
-
-- Member 3 va Member 4 phu thuoc contract cua Member 2
-- Member 2 phu thuoc auth interface cua Member 5 cho login flow
-- Member 3 va Member 4 phu thuoc network/auth interface de noi UI
-- Member 6 phu thuoc output cua ca team de test va cap nhat docs
-- ca team phu thuoc quyet dinh som ve stack, machine identity, va demo mode
-
-## 6. Nhiem vu theo phase
-
-### Phase 0 - Kickoff and Scope Freeze
-
-- chot MVP va out-of-scope
-- chot ownership map
-- chot branch va commit rule
-- chot nguon truth cho docs
-- chot risk list dau tien
-- chot stack: `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`
-- chot account rieng gan voi `machineId`
-- chot 2 mode demo: real LAN va local multi-instance
-
-### Phase 1 - Architecture and Contract Freeze
-
-- review `API.md`
-- chot packet order va state model
-- chot architecture direction
-- giai quyet conflict contract truoc khi code di xa
-
-### Phase 2 - Networking Foundation
-
-- theo doi Member 2 co bi block boi auth hay khong
-- dam bao GUI members khong tu viet protocol rieng
-- kiem tra output network co the handoff duoc
-
-### Phase 3 - Authentication and Persistence
-
-- theo doi Member 5 va Member 2 noi login flow
-- dam bao session rule ro rang
-- dam bao auth fail co behavior ro
-
-### Phase 4 - GUI Skeletons and Local Stub Flow
-
-- dam bao Member 3 va Member 4 chi build theo interface
-- ngan pham vi UI vuot MVP
-- review skeleton da du cho demo flow chua
-
-### Phase 5 - End-to-End Integration
-
-- chot thu tu integrate: login -> status -> lock/unlock -> ack
-- chi dinh lead owner cho moi blocker cross-module
-- ngan contract drift
-
-### Phase 6 - Realtime Feature Completion
-
-- xac nhan notification, timer, chat duoc lam dung uu tien
-- xac nhan chat chi la 1-1 text scope toi thieu
-- ngan team danh thoi gian vao polish som
-- chap nhan feature chi khi da qua test co ban
-
-### Phase 7 - Stabilization and Hardening
-
-- freeze feature
-- uu tien bug theo severity
-- quyet dinh bug nao phai fix, bug nao duoc chap nhan tam thoi
-
-### Phase 8 - Testing and Release Candidate
-
-- approve code freeze
-- approve release candidate
-- doi chieu build voi docs
-
-### Phase 9 - Final Demo and Post-Release Review
-
-- dan demo
-- quyet dinh fallback neu co su co
-- chot tong ket va limitation
-
-## 7. Ke hoach theo tuan
+## My 8-Week Flow
 
 ### Week 1
 
-- chot MVP, scope, ownership, branch rule, commit rule
-- dong bo `LEADER_FLOW.md`, `API.md`, `TASKS.md`, `RUN_GUIDE.md`, `TEST_MATRIX.md`, va `DEMO_CHECKLIST.md`
-- giao task dau tien cho tung member
-- dam bao `Code/NetManager.sln`, `ServerApp`, `ClientApp`, va `Shared` project files duoc tao
-- xac nhan Week 1 ket thuc bang runnable skeleton va mot TCP JSON-line packet round trip
+- `W1.P1`: chot MVP, out-of-scope, stack, ownership, source of truth, branch/commit rules.
+- `W1.P2`: review `API.md` voi M2/M5 va approve contract baseline.
+- `W1.P3`: confirm scaffold, project references, handoff order, va first round-trip target.
 
 ### Week 2
 
-- theo doi network core va auth core
-- go blocker giua Member 2 va Member 5
-- giu contract on dinh
+- `W2.P1`: remove blocker cho network core va ngan contract drift.
+- `W2.P2`: approve auth/network boundary va login integration order.
+- `W2.P3`: verify UI skeleton scope van nam trong MVP.
 
 ### Week 3
 
-- dieu phoi integration core flow
-- chot owner cho bug cross-module
-- ngan task moi ngoai luong
+- `W3.P1`: define login integration order va owner cho blocker.
+- `W3.P2`: confirm status model khop API.
+- `W3.P3`: freeze non-essential work den khi one-client core demo chay.
 
 ### Week 4
 
-- chot feature completion theo MVP
-- buoc team test end-to-end thay vi chi test module rieng
+- `W4.P1`: giu control flow la uu tien chinh.
+- `W4.P2`: approve error behavior va severity cho ACK/error blockers.
+- `W4.P3`: decide control gate pass/defer.
 
 ### Week 5
 
-- freeze feature
-- tap trung stabilization va regression
-- cap nhat risk va limitation
+- `W5.P1`: giu notification scope nho.
+- `W5.P2`: decide timer persistence co can cho MVP hay khong.
+- `W5.P3`: enforce chat 1-1 text-only.
 
 ### Week 6
 
-- kiem tra multi-client, reconnect, invalid packet, va 2 mode demo
+- `W6.P1`: prioritize multi-client blockers.
+- `W6.P2`: freeze feature work va rank bugs by severity.
+- `W6.P3`: decide accepted fallback neu real LAN khong on.
 
 ### Week 7
 
-- approve release candidate
-- chot cleanup source va docs
-- chot known limitations
+- `W7.P1`: classify bugs as fix, accept, or defer.
+- `W7.P2`: approve cleanup scope va block unrelated refactors.
+- `W7.P3`: approve release candidate va code freeze rules.
 
 ### Week 8
 
-- chot demo checklist
-- chot final docs va archive state
-- khoa pham vi phat hanh cuoi
+- `W8.P1`: lead final rehearsal va fallback trigger.
+- `W8.P2`: lock release scope, approve emergency fixes only.
+- `W8.P3`: lead final demo va archive final decisions.
 
-## 8. Hanh dong hang ngay
+## Definition of Done
 
-- doc `TASKS.md`
-- xac nhan ai dang block ai
-- xac nhan packet/state co doi khong
-- cap nhat quyet dinh vao docs
-- nhac owner khi thay overlap write scope
-
-## 9. Nguyen tac tranh xung dot
-
-- moi task chi co 1 owner chinh
-- file chung phai co nguoi chot cuoi
-- packet doi thi docs doi cung ngay
-- khong cho 2 nguoi sua cung runtime area neu khong co ly do ro
-- merge integration theo tung buoc nho
-
-## 10. Deliverables
-
-- `LEADER_FLOW.md` on dinh
-- `TASKS.md` ro rang theo tuan
-- `BUGS.md` co severity va owner
-- release decision ro rang
-- demo flow ro rang
-
-## 11. Definition of Done
-
-- moi member biet ngay viec tiep theo cua minh
-- team khong tranh cai vi ownership mo ho
-- contract va docs khop implementation
-- project di dung phase va kip timeline
+- Team biet viec tiep theo theo dung `Wn.Pm`.
+- Ownership ro, khong tranh sua cung module.
+- Contract va docs khop implementation.
+- Demo path co fallback ro va khong con blocker high severity chua accept.

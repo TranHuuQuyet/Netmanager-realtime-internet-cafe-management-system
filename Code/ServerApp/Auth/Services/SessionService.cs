@@ -1,6 +1,5 @@
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
-using ServerApp.Database.Entities;
 
 namespace ServerApp.Auth.Services;
 
@@ -16,16 +15,15 @@ public sealed class SessionService : ISessionService {
 
         await _sessions.RevokeActiveSessionsByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
 
-        var record = new SessionRecord {
-            Id = Guid.NewGuid().ToString("N"),
-            UserId = user.Id,
-            Username = user.Username,
-            Role = user.Role,
-            MachineId = user.MachineId,
-            State = SessionState.Active,
-            StartedAtUtc = startedAtUtc,
-            EndedAtUtc = null
-        };
+        var record = new SessionRecord(
+            Guid.NewGuid().ToString("N"),
+            user.Id,
+            user.Username,
+            user.Role,
+            user.MachineId,
+            SessionState.Active,
+            startedAtUtc,
+            null);
 
         await _sessions.AddAsync(record, cancellationToken).ConfigureAwait(false);
         return ToSessionInfo(record);

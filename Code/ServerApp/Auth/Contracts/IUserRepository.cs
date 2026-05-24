@@ -1,4 +1,4 @@
-using ServerApp.Database.Entities;
+using ServerApp.Auth.Models;
 
 namespace ServerApp.Auth.Contracts;
 

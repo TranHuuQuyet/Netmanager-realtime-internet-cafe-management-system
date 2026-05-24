@@ -4,6 +4,8 @@ using ServerApp.Auth.Models;
 namespace ServerApp.Auth.Services;
 
 public sealed class AuthService : IAuthService {
+    private const string AdminMachineId = "PC00";
+
     private readonly IUserRepository _users;
     private readonly ISessionService _sessions;
 
@@ -21,8 +23,8 @@ public sealed class AuthService : IAuthService {
         var password = request.Password ?? string.Empty;
         var machineId = Normalize(request.MachineId);
 
-        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(machineId)) {
-            return AuthResult.Failure(AuthStatus.InvalidInput, "Username, password, and machineId are required.");
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password)) {
+            return AuthResult.Failure(AuthStatus.InvalidInput, "Username and password are required.");
         }
 
         try {
@@ -43,7 +45,20 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.InvalidCredentials, "Password is incorrect.");
             }
 
-            if (user.Role != UserRole.Admin) {
+            if (user.Role == UserRole.Admin) {
+                if (string.IsNullOrWhiteSpace(machineId)) {
+                    return AuthResult.Failure(AuthStatus.InvalidMachineId, "Admin machine ID is required.");
+                }
+
+                if (!string.Equals(machineId, AdminMachineId, StringComparison.OrdinalIgnoreCase)) {
+                    return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "Admin account is only allowed on PC00.");
+                }
+            }
+            else {
+                if (string.IsNullOrWhiteSpace(machineId)) {
+                    return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine ID is required for client accounts.");
+                }
+
                 if (string.IsNullOrWhiteSpace(user.MachineId)) {
                     return AuthResult.Failure(AuthStatus.InvalidMachineId, "This account has no machine assignment.");
                 }

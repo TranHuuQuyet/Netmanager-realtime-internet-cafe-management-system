@@ -22,7 +22,8 @@ Current flow risks and controls:
 
 ## Unresolved Issues
 
-- TCP listener, connector, send, receive, disconnect, and reconnect skeletons exist; the first local smoke test passed through `NetworkSmokeTest`, but the networking layer is not wired into the WinForms app runtime yet.
+- TCP listener/connector and send/receive loop are not completed yet.
+- First TCP JSON-line round trip is still pending.
 - Auth/database folders and runtime implementation still need to be created under `Code/ServerApp/Auth/` and `Code/ServerApp/Database/`.
 - Client workflow screens still need implementation beyond the default shell.
 - Reconnect behavior is documented but not validated in code.

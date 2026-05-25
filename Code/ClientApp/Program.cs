@@ -1,3 +1,5 @@
+using ClientApp.Forms;
+
 namespace ClientApp;
 
 static class Program

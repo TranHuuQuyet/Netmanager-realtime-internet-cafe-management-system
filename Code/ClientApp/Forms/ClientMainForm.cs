@@ -143,6 +143,11 @@ public sealed class ClientMainForm : Form
         Close();
     }
 
+    private void InitializeComponent()
+    {
+
+    }
+
     private void Communication_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(this, "Giao tiếp với máy chủ sẽ được bật sau khi route CHAT sẵn sàng.", "Giao tiếp", MessageBoxButtons.OK, MessageBoxIcon.Information);

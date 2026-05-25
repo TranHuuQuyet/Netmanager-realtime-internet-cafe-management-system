@@ -56,4 +56,9 @@ public sealed class LockScreenForm : Form
 
         Controls.Add(root);
     }
+
+    private void InitializeComponent()
+    {
+
+    }
 }

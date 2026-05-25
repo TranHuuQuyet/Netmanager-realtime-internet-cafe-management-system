@@ -98,7 +98,7 @@ This command is currently known to fail in the working tree and is the first cor
 ## Active Documents
 
 - [DOCS/LEADER_FLOW.md](DOCS/LEADER_FLOW.md): six-week recovery flow and gate policy.
-- [DOCS/TASKS.md](DOCS/TASKS.md): active tracker; only `Verified Pass` counts.
+- [DOCS/TASKS.md](DOCS/TASKS.md): member submission checklist; a tick is not a verified gate pass.
 - [DOCS/API.md](DOCS/API.md): recovery contract `v0.2`.
 - [DOCS/TEST_MATRIX.md](DOCS/TEST_MATRIX.md): actual gate status and evidence.
 - [DOCS/DEMO_CHECKLIST.md](DOCS/DEMO_CHECKLIST.md): core and retained extension demo paths.

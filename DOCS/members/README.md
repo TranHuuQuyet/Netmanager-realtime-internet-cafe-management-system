@@ -6,7 +6,8 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 ## Shared Rules
 
 - Core local demo is mandatory; retained extensions remain part of the project but are gate controlled.
-- Only `Verified Pass` in `../TASKS.md` counts as completion.
+- Tick work in `../TASKS.md` after the member submits the required work/evidence; a tick is not a runtime pass.
+- Runtime and gate completion are counted only from verified results in `../TEST_MATRIX.md` and `../DEMO_CHECKLIST.md`.
 - Do not claim shell, draft or local uncommitted artifact as runtime delivery.
 - Packet/schema changes follow `../API.md` and require owner approval.
 - Feature work must follow the dependency and gate order in `../LEADER_FLOW.md`.

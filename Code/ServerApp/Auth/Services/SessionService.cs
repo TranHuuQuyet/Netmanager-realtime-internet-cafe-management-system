@@ -3,6 +3,7 @@ using ServerApp.Auth.Models;
 
 namespace ServerApp.Auth.Services;
 
+// Quan ly vong doi session: mo session moi, dong session va doc session active.
 public sealed class SessionService : ISessionService {
     private readonly ISessionRepository _sessions;
 
@@ -10,6 +11,7 @@ public sealed class SessionService : ISessionService {
         _sessions = sessions;
     }
 
+    // Khi user login thanh cong, revoke session cu roi tao session moi de tranh dang nhap tron.
     public async Task<SessionInfo> OpenSessionAsync(UserRecord user, CancellationToken cancellationToken = default) {
         var startedAtUtc = DateTimeOffset.UtcNow;
 
@@ -29,6 +31,7 @@ public sealed class SessionService : ISessionService {
         return ToSessionInfo(record);
     }
 
+    // Dong session neu co sessionId hop le; neu sessionId rong thi bo qua an toan.
     public async Task CloseSessionAsync(string sessionId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(sessionId)) {
             return;
@@ -37,11 +40,13 @@ public sealed class SessionService : ISessionService {
         await _sessions.UpdateStateAsync(sessionId.Trim(), SessionState.Closed, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
     }
 
+    // Lay session active hien tai cua user de server/UI co the kiem tra trang thai dang hoat dong.
     public async Task<SessionInfo?> GetActiveSessionAsync(string userId, CancellationToken cancellationToken = default) {
         var record = await _sessions.GetActiveByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
         return record is null ? null : ToSessionInfo(record);
     }
 
+    // Chuyen SessionRecord trong DB thanh SessionInfo domain object.
     private static SessionInfo ToSessionInfo(SessionRecord record)
         => new(record.Id, record.UserId, record.Username, record.Role, record.MachineId ?? string.Empty, record.State, record.StartedAtUtc, record.EndedAtUtc);
 }

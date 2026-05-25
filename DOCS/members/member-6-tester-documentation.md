@@ -1,99 +1,44 @@
-# Member 6 - Tester & Documentation
+# Member 6 - Tester And Documentation
 
-## Role
+## Recovery Role
 
-Ban own testing, bug tracking, run guide, demo checklist, va docs consistency. Muc tieu la giup team biet cai gi pass, cai gi fail, bug nao nghiem trong, va docs nao dang lech build.
-
-Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
+Ban own evidence, test status, bug tracking, run/demo docs va final continuation report. Audit baseline co `0/33` runtime test pass va build fail, nen M6 tham gia tu `R1`, khong cho den release moi test.
 
 ## Write Scope
-
-Ban duoc uu tien sua:
 
 - `DOCS/BUGS.md`
 - `DOCS/RUN_GUIDE.md`
 - `DOCS/TEST_MATRIX.md`
 - `DOCS/DEMO_CHECKLIST.md`
 - `README.md`
-- `DOCS/TASKS.md` khi M1 giao cap nhat tracker
+- Tracker updates khi M1 yeu cau
 
-## Non-Owned Scope
+## Verification Rules
 
-Ban khong own:
+- Chi danh dau tracker `Verified Pass` sau khi chay test/evidence cua current build.
+- Moi `Fail` phai co bug ID, steps, actual/expected, severity va owner.
+- `Blocked` phai ghi dependency dang thieu; khong de pending mo ho.
+- Extension khong xong van duoc bao cao `Retained - Continue After Core Release`.
 
-- runtime network code cua M2
-- server UI code cua M3
-- client UI code cua M4
-- auth/database code cua M5
-- scope/release approval cua M1
+## Core Assignments
 
-## Dependencies
+| Due | Task | Dependency | Required evidence |
+| --- | --- | --- | --- |
+| `2026-05-27` | Publish initial fail/blocked baseline va docs mismatch list | Audit evidence | Bugs/test/docs update |
+| `2026-05-31` | Verify build/contract/network foundation | Owner submissions | `G0/G1` statuses |
+| `2026-06-07` | Verify login/machine/status | Runtime flow | `G2` report |
+| `2026-06-14` | Verify command/ACK repeated demo | Runtime flow | `G3` report |
+| `2026-06-21` | Verify two-client/disconnect and extension opening | Runtime flow | `G4` report |
+| `2026-06-28` | Verify regression/setup/local rehearsal | RC candidate | `G5` report |
+| `2026-07-05` | Publish final demo and retained extension continuation status | Release build | Final report |
 
-- Can M1 chot gate, priority, accepted risk.
-- Can M2 cung cap API/connection behavior de test.
-- Can M3/M4 cung cap UI build de verify.
-- Can M5 cung cap auth/session behavior va seed accounts.
+## Retained Extension Ownership
 
-## Handoff Rules
+- Verify direct notification, timer, chat or LAN only when M1 opens the corresponding gate.
+- Record every retained feature in final status even if it is not complete by core delivery.
 
-- Bug report phai co module, mode, steps, expected, actual, severity, workaround neu co.
-- Docs update theo implementation that, khong theo assumption cu.
-- Contract mismatch phai report cho M1/M2 truoc khi sua API.
-- Test status doi tu pass sang fail thi tao bug entry.
+## Definition Of Done
 
-## My 8-Week Flow
-
-### Week 1
-
-- `W1.P1`: confirm bug/test/doc ownership and source-of-truth docs.
-- `W1.P2`: derive first test cases and flag doc contradictions.
-- `W1.P3`: create bug template, test matrix, connection checklist, demo-mode checklist.
-
-### Week 2
-
-- `W2.P1`: run connection, invalid packet, local multi-instance checks.
-- `W2.P2`: create valid/invalid login and wrong `machineId` test cases.
-- `W2.P3`: verify screens cover planned demo path.
-
-### Week 3
-
-- `W3.P1`: test admin/client login, bad password, wrong `machineId`.
-- `W3.P2`: test status after login and stale/disconnect behavior.
-- `W3.P3`: record integration bugs with exact repro steps.
-
-### Week 4
-
-- `W4.P1`: test lock/unlock in local mode.
-- `W4.P2`: test ACK success, ACK failure, invalid packet, unsupported packet.
-- `W4.P3`: run Gate D regression and update bug status.
-
-### Week 5
-
-- `W5.P1`: test direct and broadcast notification behavior.
-- `W5.P2`: test timer update, expiry path, and reset assumptions.
-- `W5.P3`: test one admin/client chat path and confirm scope remains 1-1 text.
-
-### Week 6
-
-- `W6.P1`: test 2 to 3 clients in local multi-instance mode.
-- `W6.P2`: run regression and verify fixed bugs.
-- `W6.P3`: run local multi-instance and real LAN smoke checks.
-
-### Week 7
-
-- `W7.P1`: maintain bug severity list and regression status.
-- `W7.P2`: align README, run guide, test matrix, demo checklist with build.
-- `W7.P3`: prepare final regression report draft and known limitations.
-
-### Week 8
-
-- `W8.P1`: run final checklist and record rehearsal issues.
-- `W8.P2`: verify docs match final build and limitation list.
-- `W8.P3`: archive demo notes, bug summary, final docs status.
-
-## Definition of Done
-
-- Bug entries are reproducible and actionable.
-- Test matrix reflects real status.
-- Run guide and demo checklist can be followed by the team.
-- Final docs match the build and accepted limitations.
+- Tests reflect executable truth rather than claimed progress.
+- Demo can be followed from current run guide.
+- Final report separates passed core capability from retained extension continuation.

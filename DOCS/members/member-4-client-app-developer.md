@@ -1,95 +1,46 @@
 # Member 4 - Client App Developer
 
-## Role
+## Recovery Role
 
-Ban own client app. Muc tieu la client co the connect, login voi `machineId`, nhan realtime command, hien lock screen, notification, timer, chat, va giu UX on dinh cho demo.
-
-Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
+Ban own client UI va client reaction trong core demo. Audit ghi nhan connect/login/main/lock forms dang ton tai duoi dang local artifact, nhung chua phai runtime completion vi chua consume network/auth service.
 
 ## Write Scope
 
-Ban duoc uu tien sua:
-
 - `Code/ClientApp/`
-- client-side forms/views
-- client-side UI bridge/services neu chi phuc vu presentation
+- Client presentation bridge/service files duoc approve
 
-## Non-Owned Scope
+## Historical Handoff Preserved
 
-Ban khong own:
+- Client input for MVP: `LOGIN` and `STATUS`.
+- Client must render/handle: `LOGIN` response, `LOCK`, `UNLOCK`, `ACK`, `NOTIFICATION`, `TIMER`, `CHAT`.
+- Client login rule: `machineId` is required and a wrong machine must be rejected visibly.
+- M4 does not own packet schema; UI consumes the approved shared contract.
 
-- packet schema hoac shared DTO contract cua M2
-- server dashboard cua M3
-- database/auth internals cua M5
-- release/gate decision cua M1
+## Boundary Rules
 
-## Dependencies
+- Khong parse raw JSON trong form va khong invent packet shape.
+- Form shell chi la artifact den khi duoc bind vao real client service.
+- UI result phai dua tren auth/command event that, khong dung dialog placeholder lam evidence.
 
-- Can M2 cung cap client network/service interface.
-- Can M2/M5 cung cap login result flow va error codes.
-- Can M1 chot scope va phase order.
-- Can M6 feedback tu client/demo/regression tests.
+## Core Assignments
 
-## Handoff Rules
+| Due | Task | Dependency | Required evidence |
+| --- | --- | --- | --- |
+| `2026-05-31` | Hop nhat forms local vao buildable client path va report shell status trung thuc | Server/build gate | Build/UI smoke note |
+| `2026-06-07` | Bind connect/login vao real service va render auth/wrong-machine result | M2/M5 login route | `G2` UI evidence |
+| `2026-06-14` | Execute lock/unlock state va send real ACK | M2 control route | `G3` pass |
+| `2026-06-21` | Keep two local client instances isolated | M2/M5 routing | `G4` pass |
+| `2026-06-28` | Rehearse client core path | Core regression | `G5` result |
 
-- Noi ro client can nhan event nao, render state nao, action nao con placeholder.
-- UI chi render state va goi service; khong invent packet shape trong form.
-- Sai `machineId` phai hien loi ro khi auth flow co result.
-- Khong sua server-side code de fix client issue neu chua duoc giao.
+## Retained Extension Ownership
 
-## My 8-Week Flow
+- `E1`: show direct notification after `G3`.
+- `E2`: show timer update after notification/stability gate.
+- `E3`: send/receive direct text chat after timely `G4`.
+- `E4/E7`: support LAN/reconnect UX only after their gates open.
 
-### Week 1
+## Definition Of Done
 
-- `W1.P1`: confirm client GUI scope, write scope, demo modes, machine-bound login rule.
-- `W1.P2`: review API va list client input/output needs.
-- `W1.P3`: create connect screen, login shell, main shell, lock screen shell.
-
-### Week 2
-
-- `W2.P1`: consume client-side network service/interface, khong parse packet in forms.
-- `W2.P2`: prepare client login UI for real auth result.
-- `W2.P3`: finish client connect/login/main/lock shells.
-
-### Week 3
-
-- `W3.P1`: bind client login UI to real auth response.
-- `W3.P2`: send status after login and local state changes.
-- `W3.P3`: react to one command and return visible result.
-
-### Week 4
-
-- `W4.P1`: show lock screen and exit lock screen on unlock.
-- `W4.P2`: send ACK after command execution or clear failure.
-- `W4.P3`: fix lock-state, stale state, and command-state regression issues.
-
-### Week 5
-
-- `W5.P1`: show notification with simple severity.
-- `W5.P2`: show remaining timer on client.
-- `W5.P3`: send/receive client chat messages.
-
-### Week 6
-
-- `W6.P1`: keep each client instance isolated by account and `machineId`.
-- `W6.P2`: harden reconnect/disconnect UX.
-- `W6.P3`: verify client setup path in local and real LAN modes.
-
-### Week 7
-
-- `W7.P1`: fix release-blocking client UI bugs only.
-- `W7.P2`: clean client UI/service boundaries without behavior change.
-- `W7.P3`: rehearse client demo path.
-
-### Week 8
-
-- `W8.P1`: rehearse client behavior and lock/unlock reaction.
-- `W8.P2`: avoid client changes unless release-blocking.
-- `W8.P3`: demonstrate client app.
-
-## Definition of Done
-
-- Client connect/login path is visible and clear.
-- Client receives and reacts to commands correctly.
-- Lock screen, notification, timer, and chat display match MVP.
-- Reconnect/disconnect cases do not break the basic demo experience.
+- Client logs in and reacts to commands through real runtime boundaries.
+- Lock/unlock/ACK path passes verification.
+- Existing and future client features remain visible in extension tracking without overstating completion.

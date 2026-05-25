@@ -15,7 +15,7 @@ Primary mode: `Local Multi-Instance Core Demo`
 
 | ID | Severity | Title | Evidence | Owner | Due / gate | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| `B-001` | Critical | Full solution does not build in current working tree | `dotnet build Code/NetManager.sln` fails at `ServerApp/Forms/LoginForm.Designer.cs(7,29)` because `LoginForm.cs` is deleted locally | M3 + M5, M1 approves | `R1/G0` | Open |
+| `B-001` | Critical | Full solution build/server UI startup was broken by missing UI implementations and resource drift | Baseline build failed because `LoginForm.cs` was missing; follow-up also found missing `ConnectForm`. After restoring typed-auth login/client shell, server startup exposed an incorrect resource base name (`ServerApp.Resources.UiStrings` vs manifest `ServerApp.UiStrings`). Candidate fix now builds with `0` warnings/errors and opens a responsive `Dang nhap` dialog in a local startup smoke. | M3 + M5 + M4, M1 approves; M6 verifies | `R1/G0` | Evidence Submitted - verification pending |
 | `B-002` | Critical | No verified TCP listener/dispatcher round-trip | Socket wrappers exist but no found listener/dispatcher/wiring; legacy network tests have no pass | M2 | `R1/G1` | Open |
 | `B-003` | Critical | No integrated login/status/control demo | No runtime proof for UI -> TCP -> auth or command/ACK flow | M2 + M3 + M4 + M5 | `R2-R3` | Open |
 | `B-004` | High | Shared wire implementation does not yet prove API `v0.2` | Existing serializer/parser needs string enum and LOGIN response/error verification | M2 + M1 | `R1/G0` | Open |

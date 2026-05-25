@@ -1,4 +1,8 @@
+<<<<<<< ours
+<Project Sdk="Microsoft.NET.Sdk">
+=======
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+>>>>>>> theirs
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

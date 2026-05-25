@@ -8,7 +8,7 @@ public static class SeedData
 
     public static IReadOnlyList<UserEntity> Users { get; } =
     [
-        CreateUser("admin", "Admin", null),
+        CreateUser("admin", "Admin", "PC00"),
         CreateUser("client01", "Client", "PC-01"),
         CreateUser("client02", "Client", "PC-02")
     ];
@@ -26,7 +26,7 @@ public static class SeedData
         {
             Id = StableGuid($"user:{username}"),
             Username = username,
-            Password = "123456",
+            Password = "123",
             Role = role,
             MachineId = machineId,
             IsActive = true,

@@ -5,6 +5,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Database\bin\**" />
+    <Compile Remove="Database\obj\**" />
+    <None Remove="Database\bin\**" />
+    <None Remove="Database\obj\**" />
+    <EmbeddedResource Remove="Database\bin\**" />
+    <EmbeddedResource Remove="Database\obj\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
   </ItemGroup>
 

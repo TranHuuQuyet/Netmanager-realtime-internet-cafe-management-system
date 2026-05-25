@@ -42,7 +42,7 @@ public static class AuthBootstrapper {
     // Danh sach tai khoan mac dinh cho demo/local test.
     private static IReadOnlyList<SeedAccount> BuildSeedUsers() {
         return new List<SeedAccount> {
-            new("admin", "123", string.Empty, UserRole.Admin, true),
+            new("admin", "123", "PC00", UserRole.Admin, true),
             new("client01", "123", "PC-01", UserRole.Client, true),
             new("client02", "123", "PC-02", UserRole.Client, true)
         };

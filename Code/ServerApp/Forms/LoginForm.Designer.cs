@@ -70,7 +70,7 @@ partial class LoginForm
         lblTitle.Name = "lblTitle";
         lblTitle.Size = new Size(370, 62);
         lblTitle.TabIndex = 0;
-        lblTitle.Text = UiStrings.LoginTitle;
+        lblTitle.Text = "ĐĂNG NHẬP MÁY CHỦ";
         lblTitle.TextAlign = ContentAlignment.MiddleCenter;
         // 
         // lblUsername
@@ -81,7 +81,7 @@ partial class LoginForm
         lblUsername.Name = "lblUsername";
         lblUsername.Size = new Size(114, 42);
         lblUsername.TabIndex = 1;
-        lblUsername.Text = UiStrings.LoginUsernameLabel;
+        lblUsername.Text = "Tài khoản";
         lblUsername.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtUsername
@@ -92,7 +92,6 @@ partial class LoginForm
         txtUsername.Name = "txtUsername";
         txtUsername.Size = new Size(250, 23);
         txtUsername.TabIndex = 1;
-        txtUsername.Text = "";
         // 
         // lblPassword
         // 
@@ -102,7 +101,7 @@ partial class LoginForm
         lblPassword.Name = "lblPassword";
         lblPassword.Size = new Size(114, 42);
         lblPassword.TabIndex = 3;
-        lblPassword.Text = UiStrings.LoginPasswordLabel;
+        lblPassword.Text = "Mật khẩu";
         lblPassword.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtPassword
@@ -114,7 +113,6 @@ partial class LoginForm
         txtPassword.PasswordChar = '*';
         txtPassword.Size = new Size(250, 23);
         txtPassword.TabIndex = 2;
-        txtPassword.Text = "";
         // 
         // lblMachineId
         // 
@@ -124,7 +122,7 @@ partial class LoginForm
         lblMachineId.Name = "lblMachineId";
         lblMachineId.Size = new Size(114, 42);
         lblMachineId.TabIndex = 4;
-        lblMachineId.Text = UiStrings.LoginMachineIdLabel;
+        lblMachineId.Text = "Mã máy";
         lblMachineId.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtMachineId
@@ -135,7 +133,6 @@ partial class LoginForm
         txtMachineId.Name = "txtMachineId";
         txtMachineId.Size = new Size(250, 23);
         txtMachineId.TabIndex = 3;
-        txtMachineId.Text = "";
         // 
         // buttonPanel
         // 
@@ -144,7 +141,7 @@ partial class LoginForm
         buttonPanel.Controls.Add(btnExit);
         buttonPanel.Dock = DockStyle.Fill;
         buttonPanel.FlowDirection = FlowDirection.RightToLeft;
-        buttonPanel.Location = new Point(3, 188);
+        buttonPanel.Location = new Point(3, 191);
         buttonPanel.Name = "buttonPanel";
         buttonPanel.Padding = new Padding(0, 10, 0, 0);
         buttonPanel.Size = new Size(370, 48);
@@ -157,7 +154,7 @@ partial class LoginForm
         btnLogin.Name = "btnLogin";
         btnLogin.Size = new Size(123, 32);
         btnLogin.TabIndex = 0;
-        btnLogin.Text = UiStrings.LoginButtonText;
+        btnLogin.Text = "Đăng nhập";
         btnLogin.UseVisualStyleBackColor = true;
         btnLogin.Click += BtnLogin_Click;
         // 
@@ -169,7 +166,7 @@ partial class LoginForm
         btnExit.Name = "btnExit";
         btnExit.Size = new Size(123, 32);
         btnExit.TabIndex = 1;
-        btnExit.Text = UiStrings.ExitButtonText;
+        btnExit.Text = "Thoát";
         btnExit.UseVisualStyleBackColor = true;
         // 
         // lblMessage
@@ -196,9 +193,8 @@ partial class LoginForm
         MinimizeBox = false;
         Name = "LoginForm";
         Padding = new Padding(24);
-        ActiveControl = txtUsername;
         StartPosition = FormStartPosition.CenterScreen;
-        Text = UiStrings.LoginFormTitle;
+        Text = "Đăng nhập";
         loginPanel.ResumeLayout(false);
         loginPanel.PerformLayout();
         buttonPanel.ResumeLayout(false);

@@ -122,7 +122,7 @@ partial class MainForm
         tabMachines.Padding = new Padding(8);
         tabMachines.Size = new Size(876, 531);
         tabMachines.TabIndex = 0;
-        tabMachines.Text = UiStrings.MainTabMachines;
+        tabMachines.Text = "Quản lý máy";
         tabMachines.UseVisualStyleBackColor = true;
         // 
         // machineLayout
@@ -152,7 +152,7 @@ partial class MainForm
         lblMachineTitle.Name = "lblMachineTitle";
         lblMachineTitle.Size = new Size(854, 60);
         lblMachineTitle.TabIndex = 0;
-        lblMachineTitle.Text = UiStrings.MainMachineTitle;
+        lblMachineTitle.Text = "DANH SÁCH MÁY";
         lblMachineTitle.TextAlign = ContentAlignment.MiddleCenter;
         // 
         // pnlMachineCards
@@ -184,7 +184,7 @@ partial class MainForm
         btnLockMachine.Name = "btnLockMachine";
         btnLockMachine.Size = new Size(120, 28);
         btnLockMachine.TabIndex = 0;
-        btnLockMachine.Text = UiStrings.MainLockMachine;
+        btnLockMachine.Text = "Khóa máy";
         btnLockMachine.UseVisualStyleBackColor = true;
         btnLockMachine.Click += MachineAction_Click;
         // 
@@ -194,7 +194,7 @@ partial class MainForm
         btnUnlockMachine.Name = "btnUnlockMachine";
         btnUnlockMachine.Size = new Size(120, 28);
         btnUnlockMachine.TabIndex = 1;
-        btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
+        btnUnlockMachine.Text = "Mở khóa";
         btnUnlockMachine.UseVisualStyleBackColor = true;
         btnUnlockMachine.Click += MachineAction_Click;
         // 
@@ -204,7 +204,7 @@ partial class MainForm
         btnShutdownMachine.Name = "btnShutdownMachine";
         btnShutdownMachine.Size = new Size(120, 28);
         btnShutdownMachine.TabIndex = 2;
-        btnShutdownMachine.Text = UiStrings.MainShutdownMachine;
+        btnShutdownMachine.Text = "Tắt máy";
         btnShutdownMachine.UseVisualStyleBackColor = true;
         btnShutdownMachine.Click += MachineAction_Click;
         // 
@@ -246,25 +246,25 @@ partial class MainForm
         // 
         // MaMayColumn
         // 
-        MaMayColumn.HeaderText = UiStrings.MainMachineColumn;
+        MaMayColumn.HeaderText = "Mã máy";
         MaMayColumn.Name = "MaMayColumn";
         MaMayColumn.ReadOnly = true;
         // 
         // SoMayColumn
         // 
-        SoMayColumn.HeaderText = UiStrings.MainSeatColumn;
+        SoMayColumn.HeaderText = "Số máy";
         SoMayColumn.Name = "SoMayColumn";
         SoMayColumn.ReadOnly = true;
         // 
         // TinhTrangColumn
         // 
-        TinhTrangColumn.HeaderText = UiStrings.MainStatusColumn;
+        TinhTrangColumn.HeaderText = "Tình trạng";
         TinhTrangColumn.Name = "TinhTrangColumn";
         TinhTrangColumn.ReadOnly = true;
         // 
         // MachineNameColumn
         // 
-        MachineNameColumn.HeaderText = UiStrings.MainMachineColumn;
+        MachineNameColumn.HeaderText = "Mã máy";
         MachineNameColumn.Name = "MachineNameColumn";
         MachineNameColumn.ReadOnly = true;
         MachineNameColumn.Visible = false;
@@ -280,7 +280,7 @@ partial class MainForm
         chatGroup.Size = new Size(306, 151);
         chatGroup.TabIndex = 0;
         chatGroup.TabStop = false;
-        chatGroup.Text = UiStrings.MainChatGroup;
+        chatGroup.Text = "Chat máy";
         // 
         // chatLayout
         // 
@@ -307,7 +307,7 @@ partial class MainForm
         lblSelectedClient.Name = "lblSelectedClient";
         lblSelectedClient.Size = new Size(280, 28);
         lblSelectedClient.TabIndex = 0;
-        lblSelectedClient.Text = UiStrings.MainChatSelectedClientDefault;
+        lblSelectedClient.Text = "Chat với PC01";
         lblSelectedClient.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtChatHistory
@@ -341,7 +341,7 @@ partial class MainForm
         txtChatMessage.Dock = DockStyle.Fill;
         txtChatMessage.Location = new Point(3, 3);
         txtChatMessage.Name = "txtChatMessage";
-        txtChatMessage.PlaceholderText = UiStrings.MainChatPlaceholder;
+        txtChatMessage.PlaceholderText = "Nhập tin nhắn...";
         txtChatMessage.Size = new Size(192, 23);
         txtChatMessage.TabIndex = 0;
         // 
@@ -352,7 +352,7 @@ partial class MainForm
         btnSendChat.Name = "btnSendChat";
         btnSendChat.Size = new Size(76, 28);
         btnSendChat.TabIndex = 1;
-        btnSendChat.Text = UiStrings.MainSendButton;
+        btnSendChat.Text = "Gửi";
         btnSendChat.UseVisualStyleBackColor = true;
         btnSendChat.Click += BtnSendChat_Click;
         // 
@@ -364,7 +364,7 @@ partial class MainForm
         tabCustomers.Padding = new Padding(14);
         tabCustomers.Size = new Size(876, 531);
         tabCustomers.TabIndex = 1;
-        tabCustomers.Text = UiStrings.MainTabCustomers;
+        tabCustomers.Text = "Quản lý khách hàng";
         tabCustomers.UseVisualStyleBackColor = true;
         // 
         // customerLayout
@@ -438,7 +438,7 @@ partial class MainForm
         lblCustomerId.Name = "lblCustomerId";
         lblCustomerId.Size = new Size(88, 34);
         lblCustomerId.TabIndex = 0;
-        lblCustomerId.Text = UiStrings.MainCustomerIdLabel;
+        lblCustomerId.Text = "Mã KH";
         lblCustomerId.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtCustomerId
@@ -457,7 +457,7 @@ partial class MainForm
         lblFirstName.Name = "lblFirstName";
         lblFirstName.Size = new Size(88, 34);
         lblFirstName.TabIndex = 2;
-        lblFirstName.Text = UiStrings.MainFirstNameLabel;
+        lblFirstName.Text = "Họ";
         lblFirstName.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtFirstName
@@ -476,7 +476,7 @@ partial class MainForm
         lblLastName.Name = "lblLastName";
         lblLastName.Size = new Size(54, 34);
         lblLastName.TabIndex = 4;
-        lblLastName.Text = UiStrings.MainLastNameLabel;
+        lblLastName.Text = "Tên";
         lblLastName.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtLastName
@@ -495,7 +495,7 @@ partial class MainForm
         lblPhone.Name = "lblPhone";
         lblPhone.Size = new Size(88, 34);
         lblPhone.TabIndex = 6;
-        lblPhone.Text = UiStrings.MainPhoneLabel;
+        lblPhone.Text = "SĐT";
         lblPhone.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtPhone
@@ -514,7 +514,7 @@ partial class MainForm
         lblIdentity.Name = "lblIdentity";
         lblIdentity.Size = new Size(88, 34);
         lblIdentity.TabIndex = 8;
-        lblIdentity.Text = UiStrings.MainIdentityLabel;
+        lblIdentity.Text = "Số CMND";
         lblIdentity.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtIdentity
@@ -533,7 +533,7 @@ partial class MainForm
         lblBirthday.Name = "lblBirthday";
         lblBirthday.Size = new Size(88, 42);
         lblBirthday.TabIndex = 10;
-        lblBirthday.Text = UiStrings.MainBirthdayLabel;
+        lblBirthday.Text = "Ngày sinh";
         lblBirthday.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtBirthday
@@ -576,7 +576,7 @@ partial class MainForm
         lblLoginTitle.Name = "lblLoginTitle";
         lblLoginTitle.Size = new Size(342, 45);
         lblLoginTitle.TabIndex = 0;
-        lblLoginTitle.Text = UiStrings.MainLoginTitle;
+        lblLoginTitle.Text = "THÔNG TIN ĐĂNG NHẬP";
         lblLoginTitle.TextAlign = ContentAlignment.MiddleCenter;
         // 
         // lblUsername
@@ -587,7 +587,7 @@ partial class MainForm
         lblUsername.Name = "lblUsername";
         lblUsername.Size = new Size(114, 36);
         lblUsername.TabIndex = 1;
-        lblUsername.Text = UiStrings.MainUsernameLabel;
+        lblUsername.Text = "Tên đăng nhập";
         lblUsername.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtUsername
@@ -606,7 +606,7 @@ partial class MainForm
         lblPassword.Name = "lblPassword";
         lblPassword.Size = new Size(114, 36);
         lblPassword.TabIndex = 3;
-        lblPassword.Text = UiStrings.MainPasswordLabel;
+        lblPassword.Text = "Mật khẩu";
         lblPassword.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtPassword
@@ -626,7 +626,7 @@ partial class MainForm
         lblAccountBalance.Name = "lblAccountBalance";
         lblAccountBalance.Size = new Size(114, 61);
         lblAccountBalance.TabIndex = 5;
-        lblAccountBalance.Text = UiStrings.MainAccountBalanceLabel;
+        lblAccountBalance.Text = "Tài khoản";
         lblAccountBalance.TextAlign = ContentAlignment.MiddleLeft;
         // 
         // txtAccountBalance
@@ -657,55 +657,55 @@ partial class MainForm
         // 
         // CustomerIdColumn
         // 
-        CustomerIdColumn.HeaderText = UiStrings.MainCustomerIdColumn;
+        CustomerIdColumn.HeaderText = "Mã KH";
         CustomerIdColumn.Name = "CustomerIdColumn";
         CustomerIdColumn.ReadOnly = true;
         // 
         // FirstNameColumn
         // 
-        FirstNameColumn.HeaderText = UiStrings.MainCustomerFirstNameColumn;
+        FirstNameColumn.HeaderText = "Tên KH";
         FirstNameColumn.Name = "FirstNameColumn";
         FirstNameColumn.ReadOnly = true;
         // 
         // LastNameColumn
         // 
-        LastNameColumn.HeaderText = UiStrings.MainCustomerLastNameColumn;
+        LastNameColumn.HeaderText = "Họ KH";
         LastNameColumn.Name = "LastNameColumn";
         LastNameColumn.ReadOnly = true;
         // 
         // PhoneColumn
         // 
-        PhoneColumn.HeaderText = UiStrings.MainCustomerPhoneColumn;
+        PhoneColumn.HeaderText = "SĐT";
         PhoneColumn.Name = "PhoneColumn";
         PhoneColumn.ReadOnly = true;
         // 
         // IdentityColumn
         // 
-        IdentityColumn.HeaderText = UiStrings.MainCustomerIdentityColumn;
+        IdentityColumn.HeaderText = "Số CMND";
         IdentityColumn.Name = "IdentityColumn";
         IdentityColumn.ReadOnly = true;
         // 
         // BirthdayColumn
         // 
-        BirthdayColumn.HeaderText = UiStrings.MainCustomerBirthdayColumn;
+        BirthdayColumn.HeaderText = "Ngày sinh";
         BirthdayColumn.Name = "BirthdayColumn";
         BirthdayColumn.ReadOnly = true;
         // 
         // UsernameColumn
         // 
-        UsernameColumn.HeaderText = UiStrings.MainCustomerUsernameColumn;
+        UsernameColumn.HeaderText = "Tên đăng nhập";
         UsernameColumn.Name = "UsernameColumn";
         UsernameColumn.ReadOnly = true;
         // 
         // PasswordColumn
         // 
-        PasswordColumn.HeaderText = UiStrings.MainCustomerPasswordColumn;
+        PasswordColumn.HeaderText = "Mật khẩu";
         PasswordColumn.Name = "PasswordColumn";
         PasswordColumn.ReadOnly = true;
         // 
         // AccountBalanceColumn
         // 
-        AccountBalanceColumn.HeaderText = UiStrings.MainCustomerAccountColumn;
+        AccountBalanceColumn.HeaderText = "Tài khoản";
         AccountBalanceColumn.Name = "AccountBalanceColumn";
         AccountBalanceColumn.ReadOnly = true;
         // 
@@ -729,7 +729,7 @@ partial class MainForm
         btnAddCustomer.Name = "btnAddCustomer";
         btnAddCustomer.Size = new Size(160, 42);
         btnAddCustomer.TabIndex = 0;
-        btnAddCustomer.Text = UiStrings.MainAddCustomerButton;
+        btnAddCustomer.Text = "Thêm";
         btnAddCustomer.UseVisualStyleBackColor = true;
         btnAddCustomer.Click += CustomerAction_Click;
         // 
@@ -740,7 +740,7 @@ partial class MainForm
         btnEditCustomer.Name = "btnEditCustomer";
         btnEditCustomer.Size = new Size(160, 42);
         btnEditCustomer.TabIndex = 1;
-        btnEditCustomer.Text = UiStrings.MainEditCustomerButton;
+        btnEditCustomer.Text = "Sửa";
         btnEditCustomer.UseVisualStyleBackColor = true;
         btnEditCustomer.Click += CustomerAction_Click;
         // 
@@ -751,7 +751,7 @@ partial class MainForm
         btnDeleteCustomer.Name = "btnDeleteCustomer";
         btnDeleteCustomer.Size = new Size(160, 42);
         btnDeleteCustomer.TabIndex = 2;
-        btnDeleteCustomer.Text = UiStrings.MainDeleteCustomerButton;
+        btnDeleteCustomer.Text = "Xóa";
         btnDeleteCustomer.UseVisualStyleBackColor = true;
         btnDeleteCustomer.Click += CustomerAction_Click;
         // 
@@ -761,7 +761,7 @@ partial class MainForm
         btnCancelCustomer.Name = "btnCancelCustomer";
         btnCancelCustomer.Size = new Size(160, 42);
         btnCancelCustomer.TabIndex = 3;
-        btnCancelCustomer.Text = UiStrings.MainCancelCustomerButton;
+        btnCancelCustomer.Text = "Hủy";
         btnCancelCustomer.UseVisualStyleBackColor = true;
         btnCancelCustomer.Click += CustomerAction_Click;
         // 
@@ -777,7 +777,7 @@ partial class MainForm
         // 
         lblServerStatus.Name = "lblServerStatus";
         lblServerStatus.Size = new Size(207, 17);
-        lblServerStatus.Text = UiStrings.MainServerStatus;
+        lblServerStatus.Text = "Máy chủ: đang thiết kế giao diện mẫu";
         // 
         // MainForm
         // 
@@ -790,7 +790,7 @@ partial class MainForm
         MinimumSize = new Size(900, 620);
         Name = "MainForm";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = UiStrings.MainFormTitle;
+        Text = "MÁY CHỦ";
         Load += MainForm_Load;
         mainTabs.ResumeLayout(false);
         tabMachines.ResumeLayout(false);

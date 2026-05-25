@@ -5,7 +5,7 @@ namespace ServerApp;
 
 internal static class UiStrings
 {
-    private static readonly ResourceManager ResourceManager = new("ServerApp.Resources.UiStrings", typeof(UiStrings).Assembly);
+    private static readonly ResourceManager ResourceManager = new("ServerApp.UiStrings", typeof(UiStrings).Assembly);
 
     private static string Get(string name, string fallback)
     {

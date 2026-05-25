@@ -15,6 +15,13 @@ Core delivery deadline: `2026-07-05`
 
 Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tables below are the active recovery matrix.
 
+## Current Evidence Submissions - `2026-05-25`
+
+| Test | Candidate result | Evidence | Acceptance state |
+| --- | --- | --- | --- |
+| `G0-01` Full solution builds | `Pass` on implementation working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors after server login/client shell restoration | Submitted for M6 verification; gate remains blocked until required `G0` cases pass |
+| Server UI startup smoke | `Pass` on implementation working tree | Launching `ServerApp.exe` after correcting the `UiStrings` resource base name produced a responsive `Dang nhap` window | Supporting evidence only; it does not prove listener, authentication result or `G1/G2` |
+
 ## G0 - Build And Contract (`R1`)
 
 | ID | Test | Owner | Initial status | Evidence / blocker |

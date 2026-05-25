@@ -4,8 +4,10 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 
 ## Current Status - 2026-05-25
 
-- Current working tree full solution build fails because the server login form implementation is incomplete/deleted locally.
-- Client forms exist as local shell artifacts but do not prove integration.
+- A current implementation candidate restores the typed-auth server login path and a buildable client shell; an isolated build submission passes with `0` warnings and `0` errors.
+- Server startup smoke now opens a responsive login dialog after correcting the UI resource manifest lookup; login result behavior is not yet gate-verified.
+- The build evidence is submitted for M6 verification and does not by itself pass `G0`, because API/auth contract checks remain outstanding.
+- Client startup is an explicit shell artifact and does not prove network/login integration.
 - TCP round-trip, login integration, status and control flow are not verified.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 

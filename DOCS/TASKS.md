@@ -31,12 +31,22 @@ Only `Verified Pass` counts toward delivery completion. Screen shell, source ske
 | Demo path | `Blocked` | `14/14` legacy demo steps van pending tai baseline audit |
 | M4 client forms | `Historical Artifact` | Forms local/uncommitted ton tai, chua consume runtime service |
 
+## Current Evidence Submission - `2026-05-25`
+
+| Item | Submitted evidence | Current disposition |
+| --- | --- | --- |
+| Full solution build candidate | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors after restoring the server login path and adding an explicit client shell entry form | `Evidence Submitted`; pending M6 verification and M1 gate approval |
+| Server login path | `Program` initializes typed auth off the UI thread and passes `IAuthService` into `LoginForm`; the resource manifest lookup is corrected and a startup smoke opens the `Dang nhap` dialog responsively | `Evidence Submitted`; local admin authentication interaction still requires verification |
+| Client startup path | `ConnectForm` is present as a buildable shell and explicitly states that network login binding remains pending `G1/G2` | Build blocker removed only; no runtime integration claim |
+
+`G0` is not passed by this submission: API `v0.2` contract checks, auth runtime verification and M6/M1 acceptance remain outstanding.
+
 ## R1 - Foundation Repair (`2026-05-25` to `2026-05-31`)
 
 | ID | Owner | Task | Dependency | Required evidence | Status |
 | --- | --- | --- | --- | --- | --- |
 | `R1-L01` | M1 | Approve recovery scope, deadline, core/extension lanes va merge gates | Recovery report | Decision entry + team notice | `Evidence Submitted` |
-| `R1-C01` | M3 + M5 | Restore buildable server login path va full solution build | Current broken form state | `dotnet build Code/NetManager.sln` pass | `Blocked` |
+| `R1-C01` | M3 + M5 | Restore buildable server login path va full solution build | Current broken form state | `dotnet build Code/NetManager.sln` pass | `Evidence Submitted` |
 | `R1-C02` | M2 + M1 | Freeze API `v0.2`; align string packet type, LOGIN response va error envelope | Contract review | API approval + serialization tests | `Blocked` |
 | `R1-A01` | M5 + M1 | Declare SQLite auth path, seed/admin rule va runtime schema canonical | `R1-L01` | Decision + auth handoff note | `Evidence Submitted` |
 | `R1-N01` | M2 | Implement server listener, typed dispatcher baseline va local JSON-line round-trip | `R1-C01`, `R1-C02` | Trace valid request/response | `Blocked` |

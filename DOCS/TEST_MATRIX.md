@@ -1,81 +1,94 @@
-# TEST MATRIX
+# TEST MATRIX - RECOVERY GATES
 
-This file defines the baseline tests for the project. Member 6 owns this file, and each module owner supports reproduction and fixes.
+Baseline date: `2026-05-25`
+Core delivery deadline: `2026-07-05`
 
-## 1. Test Status Legend
+## Status Legend
 
 | Status | Meaning |
 | --- | --- |
-| `Pending` | not implemented or not tested yet |
-| `Pass` | tested and working |
-| `Fail` | tested and broken |
-| `Blocked` | cannot test because a dependency is missing |
+| `Pass` | Executed and verified against the current build |
+| `Fail` | Executed and failed; requires bug entry |
+| `Blocked` | Cannot execute because a required implementation/dependency is missing or failing |
+| `Conditional` | Retained extension test, not opened until its gate allows work |
+| `Not Run` | Runnable gate has not yet been executed |
 
-## 2. Gate B - Connection Tests
+Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tables below are the active recovery matrix.
 
-| ID | Test | Mode | Owner | Status |
+## G0 - Build And Contract (`R1`)
+
+| ID | Test | Owner | Initial status | Evidence / blocker |
 | --- | --- | --- | --- | --- |
-| B-01 | Server starts and listens on default port | Local | Member 2 | Pending |
-| B-02 | One client connects to server | Local | Member 2 | Pending |
-| B-03 | Two clients connect to server at the same time | Local | Member 2 | Pending |
-| B-04 | Client sends one valid JSON-line packet | Local | Member 2 | Pending |
-| B-05 | Server returns one response packet | Local | Member 2 | Pending |
-| B-06 | Invalid packet does not crash server | Local | Member 2 | Pending |
-| B-07 | Network receive does not freeze WinForms UI | Local | Member 2 + GUI owner | Pending |
+| `G0-01` | Full solution builds from approved setup command | M3 + M5 + M6 | `Fail` | Audit build failed at `ServerApp/Forms/LoginForm.Designer.cs(7,29)` |
+| `G0-02` | Packet `type` serializes/deserializes as API string value | M2 + M6 | `Blocked` | Existing shared implementation not yet verified against API `v0.2` |
+| `G0-03` | `LOGIN` request and response parse into distinct expected paths | M2 + M6 | `Blocked` | Requires contract implementation correction |
+| `G0-04` | Failure response emits top-level `success: false` and `error.code` | M2 + M5 + M6 | `Blocked` | Requires contract/auth mapping |
+| `G0-05` | Canonical auth seed/database/admin rule match docs | M5 + M6 | `Blocked` | Documentation decision recorded; runtime proof required |
 
-## 3. Gate C - Auth Tests
+## G1 - Network Foundation (`R1`)
 
-| ID | Test | Mode | Owner | Status |
+| ID | Test | Mode | Owner | Initial status |
 | --- | --- | --- | --- | --- |
-| C-01 | Admin login succeeds | Local | Member 5 | Pending |
-| C-02 | Client login succeeds with correct `machineId` | Local | Member 5 | Pending |
-| C-03 | Client login fails with wrong password | Local | Member 5 | Pending |
-| C-04 | Client login fails with wrong `machineId` | Local | Member 5 | Pending |
-| C-05 | Disabled account cannot login | Local | Member 5 | Pending |
-| C-06 | Duplicate active machine login is handled clearly | Local | Member 5 + Member 2 | Pending |
+| `G1-01` | Server starts and listens on recovery local endpoint | Local | M2 | `Blocked` |
+| `G1-02` | One client connects without UI freeze | Local | M2 + M4 | `Blocked` |
+| `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2 | `Blocked` |
+| `G1-04` | Invalid JSON fails gracefully without receiver crash | Local | M2 | `Blocked` |
+| `G1-05` | Unsupported packet type yields controlled behavior | Local | M2 | `Blocked` |
 
-## 4. Gate D - Core Control Tests
+## G2 - Authentication And Status (`R2`)
 
-| ID | Test | Mode | Owner | Status |
+| ID | Test | Mode | Owner | Initial status |
 | --- | --- | --- | --- | --- |
-| D-01 | Client sends `STATUS` after login | Local | Member 2 + Member 4 | Pending |
-| D-02 | Server dashboard shows online machine | Local | Member 3 | Pending |
-| D-03 | Admin sends `LOCK` to one client | Local | Member 3 + Member 2 | Pending |
-| D-04 | Client shows lock screen after `LOCK` | Local | Member 4 | Pending |
-| D-05 | Client sends `ACK` after lock | Local | Member 4 + Member 2 | Pending |
-| D-06 | Admin sends `UNLOCK` to one client | Local | Member 3 + Member 2 | Pending |
-| D-07 | Client exits lock screen after `UNLOCK` | Local | Member 4 | Pending |
-| D-08 | Server displays command result or ACK | Local | Member 3 | Pending |
+| `G2-01` | Admin login succeeds with `admin` / `123` / `PC00` | Local | M5 + M3 | `Blocked` |
+| `G2-02` | Client login succeeds with `client01` / `123` / `PC-01` | Local | M5 + M4 | `Blocked` |
+| `G2-03` | Wrong password is rejected visibly | Local | M5 + M4 | `Blocked` |
+| `G2-04` | Correct client credentials with wrong `machineId` are rejected | Local | M5 + M4 | `Blocked` |
+| `G2-05` | Authenticated client sends status and dashboard shows online | Local | M2 + M3 + M4 | `Blocked` |
+| `G2-06` | Disconnect/status update shows client offline or clearly stale | Local | M2 + M3 | `Blocked` |
 
-## 5. Gate E - MVP Feature Tests
+## G3 - Core Control (`R3`)
 
-| ID | Test | Mode | Owner | Status |
+| ID | Test | Mode | Owner | Initial status |
 | --- | --- | --- | --- | --- |
-| E-01 | Admin sends notification to one client | Local | Member 3 + Member 4 | Pending |
-| E-02 | Admin broadcasts notification to clients | Local | Member 2 + GUI owners | Pending |
-| E-03 | Timer update appears on client | Local | Member 4 | Pending |
-| E-04 | Timer state appears on server if required | Local | Member 3 + Member 5 | Pending |
-| E-05 | Client sends 1-1 chat to admin | Local | Member 4 + Member 3 | Pending |
-| E-06 | Admin replies with 1-1 chat | Local | Member 3 + Member 4 | Pending |
+| `G3-01` | Admin locks authenticated target client | Local | M2 + M3 + M4 | `Blocked` |
+| `G3-02` | Client returns visible ACK after lock | Local | M2 + M3 + M4 | `Blocked` |
+| `G3-03` | Admin unlocks target client and client exits lock state | Local | M2 + M3 + M4 | `Blocked` |
+| `G3-04` | Invalid/unauthorized command displays controlled error | Local | M2 + M5 | `Blocked` |
+| `G3-05` | One-client login/status/lock/ACK/unlock flow passes repeatedly | Local | M6 + all core owners | `Blocked` |
 
-## 6. Gate F - Release Tests
+## G4 - Multi-Client Stability (`R4`)
 
-| ID | Test | Mode | Owner | Status |
+| ID | Test | Mode | Owner | Initial status |
 | --- | --- | --- | --- | --- |
-| F-01 | Local multi-instance smoke test passes | Local | Member 6 | Pending |
-| F-02 | Real LAN smoke test passes | Real LAN | Member 6 + Member 2 | Pending |
-| F-03 | Client disconnect does not crash server | Both | Member 2 | Pending |
-| F-04 | Server restart behavior is documented | Both | Member 6 | Pending |
-| F-05 | Clean-machine setup follows `RUN_GUIDE.md` | Both | Member 6 | Pending |
-| F-06 | No high-severity demo blocker remains open | Both | Member 1 + Member 6 | Pending |
+| `G4-01` | `client01` and `client02` connect and remain distinct | Local multi-instance | M2 + M3 + M4 + M5 | `Blocked` |
+| `G4-02` | Command routes only to selected machine | Local multi-instance | M2 + M3 + M4 | `Blocked` |
+| `G4-03` | Duplicate active login behavior is deterministic | Local multi-instance | M2 + M5 | `Blocked` |
+| `G4-04` | Client disconnect does not crash server | Local multi-instance | M2 + M6 | `Blocked` |
 
-## 7. Regression Rule
+## G5 - Release Readiness (`R5-R6`)
 
-When a test changes from `Pass` to `Fail`, add a bug entry to `DOCS/BUGS.md` with:
+| ID | Test | Mode | Owner | Initial status |
+| --- | --- | --- | --- | --- |
+| `G5-01` | Clean setup follows current run guide | Local | M6 | `Blocked` |
+| `G5-02` | Full core regression passes | Local | M6 + all core owners | `Blocked` |
+| `G5-03` | Local multi-instance rehearsal passes twice on RC | Local | M1 + M6 | `Blocked` |
+| `G5-04` | No unaccepted High/Critical demo blocker remains | Both | M1 + M6 | `Blocked` |
+| `G5-05` | Release docs match approved build and retained extension state | Local | M6 | `Blocked` |
 
-- test ID
-- reproduction steps
-- expected behavior
-- actual behavior
-- severity
-- owner
+## Retained Extension Tests
+
+| ID | Feature case | Open condition | Owner | Status |
+| --- | --- | --- | --- | --- |
+| `E1-01` | Admin sends direct notification and correct client displays it | `G3` pass | M2 + M3 + M4 + M6 | `Conditional` |
+| `E2-01` | Client displays timer update and expiry behavior is documented | `E1` pass; no core blocker | M2 + M4 + M6 | `Conditional` |
+| `E3-01` | Admin and client exchange 1-1 text chat | `G4` pass on time | M2 + M3 + M4 + M6 | `Conditional` |
+| `E4-01` | One real LAN client connects and completes a smoke path | Local rehearsal pass | M2 + M6 | `Conditional` |
+| `E5-01` | Notification broadcasts only to intended active clients | `E1` stable | M2 + GUI owners | `Conditional` |
+| `E6-01` | Timer survives required session persistence scenario | `E2` and session stable | M5 + M6 | `Conditional` |
+| `E7-01` | Client reconnect UX behaves according to approved policy | Disconnect core pass | M2 + M4 + M6 | `Conditional` |
+
+## Evidence Rule
+
+- Every `Fail` must create or reference a bug in `DOCS/BUGS.md`.
+- Every `Pass` must record test date, build/commit identity, mode and tester.
+- Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting.

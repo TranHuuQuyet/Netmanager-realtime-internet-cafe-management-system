@@ -1,61 +1,59 @@
-# BUGS
+# BUGS AND RISKS - RECOVERY BASELINE
 
-## Risk Register
+Baseline date: `2026-05-25`
+Delivery deadline: `2026-07-05`
+Primary mode: `Local Multi-Instance Core Demo`
 
-Current flow risks and controls:
+## Severity Rule
 
-| Risk | Owner | Severity | Control |
-| --- | --- | --- | --- |
-| Packet contract drift between server and client | M2, M1 approves | High | `DOCS/API.md` is the contract source of truth; packet changes must be documented same day. |
-| Login ownership unclear between networking and auth | M2 + M5 | High | M2 owns transport; M5 owns auth/session validation. |
-| GUI code invents its own packet parsing | M3 + M4 | Medium | GUI consumes agreed services/interfaces only. |
-| Wrong `machineId` mapping during demo | M5 | High | Account-to-machine rule is frozen and must be tested by `W3.P1`. |
-| Real LAN behavior differs from local multi-instance | M2 + M6 | Medium | Both demo modes need separate smoke checks by `W6.P3`. |
-| Chat scope expands beyond MVP | M1 | Medium | Chat remains 1-1 text only, no emoji/history/file/group. |
-| UI freezes on network receive | M2 + GUI owner | High | Network events must not block WinForms UI thread. |
-| Database schema changes after consumers depend on it | M5, M1 approves | Medium | Auth/session contract must be reviewed in `W1.P2` before deep implementation. |
+- `Critical`: prevents build, connection, login or required core demo.
+- `High`: threatens a core gate or makes demo result unreliable.
+- `Medium`: extension/demo usability issue with a workable core path.
+- `Low`: cosmetic or non-blocking.
 
-## Known Bugs
+## Active Blockers
 
-- No live TCP/auth/database end-to-end runtime has been completed yet, so most runtime bugs are still pending discovery.
-- Current code contains scaffold and server UI shell behavior; networking, auth, persistence, real command flow, and client workflow still need implementation.
+| ID | Severity | Title | Evidence | Owner | Due / gate | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| `B-001` | Critical | Full solution does not build in current working tree | `dotnet build Code/NetManager.sln` fails at `ServerApp/Forms/LoginForm.Designer.cs(7,29)` because `LoginForm.cs` is deleted locally | M3 + M5, M1 approves | `R1/G0` | Open |
+| `B-002` | Critical | No verified TCP listener/dispatcher round-trip | Socket wrappers exist but no found listener/dispatcher/wiring; legacy network tests have no pass | M2 | `R1/G1` | Open |
+| `B-003` | Critical | No integrated login/status/control demo | No runtime proof for UI -> TCP -> auth or command/ACK flow | M2 + M3 + M4 + M5 | `R2-R3` | Open |
+| `B-004` | High | Shared wire implementation does not yet prove API `v0.2` | Existing serializer/parser needs string enum and LOGIN response/error verification | M2 + M1 | `R1/G0` | Open |
+| `B-005` | High | Competing auth/database directions | `AuthUsers/AuthSessions` runtime path coexists with broader `Users/Machines/Sessions` draft | M5 + M1 | `R1/G0` | Decision recorded; implementation alignment open |
+| `B-006` | High | Seed/admin machine docs previously drifted from selected auth runtime | Runtime path uses `admin`/`PC00`/`123`; docs formerly listed another seed | M5 + M6 | `R1/G0` | Docs aligned; runtime verification open |
+| `B-007` | High | Progress can be overstated by shells/skeletons | Legacy ticked tasks lack runtime evidence; client forms are local/uncommitted artifacts | M1 + M6 | Immediate | Tracking reset applied |
 
-## Unresolved Issues
+## Core Risk Register
 
-- TCP listener/connector and send/receive loop are not completed yet.
-- First TCP JSON-line round trip is still pending.
-- Auth/database folders and runtime implementation still need to be created under `Code/ServerApp/Auth/` and `Code/ServerApp/Database/`.
-- Client workflow screens still need implementation beyond the default shell.
-- Reconnect behavior is documented but not validated in code.
-- Real LAN mode and local multi-instance mode are planned but not validated in runtime.
-- Account-to-`machineId` validation is defined in docs but not validated in runtime.
-- Default port, database path, and seed account baseline are documented in `RUN_GUIDE.md` but not implemented yet.
+| Risk | Owner | Control |
+| --- | --- | --- |
+| Packet drift between docs, client and server | M2, M1 approve | API `v0.2`, `G0` serialization/error tests before integration |
+| Auth/network boundary mismatch | M2 + M5 | Canonical auth handoff and runtime LOGIN trace in `G2` |
+| UI directly handles packet/DB logic | M3 + M4 | Typed service boundary; reject integration completion without evidence |
+| Wrong `machineId` during demo | M5 + M6 | Deterministic error test in `G2` |
+| Multi-client state leak or duplicate login ambiguity | M2 + M5 | Decide behavior and test in `G4` |
+| UI freeze or crash on socket/disconnect | M2 + GUI owner | Network and disconnect verification in `G1/G4` |
 
-## Temporary Fixes
+## Retained Extension Risks
 
-- None.
+| Extension | Current status | Rule |
+| --- | --- | --- |
+| Notification | `Conditional` | Open only after `G3` |
+| Timer display/persistence | `Conditional` | Display after stable notification; persistence later |
+| Chat | `Conditional` | Open only if `G4` passes on time |
+| Real LAN | `Conditional` | Smoke-test only after local rehearsal |
+| Reconnect polish | `Conditional` | Does not replace core disconnect stability |
 
-## Debugging Notes
+An unopened or incomplete extension is recorded as `Retained - Continue After Core Release`, not removed from the product.
 
-- Use `TASKS.md` for progress and `TEST_MATRIX.md` for test status.
-- Week 1 should end with scaffold clarity and first connection proof, or leave round trip as the top W2 blocker.
-- When code is added, record only actionable bugs here.
-- Keep each bug entry concise and tied to a reproduction step.
-- Mark whether a bug appears in `Mode A - Real LAN Demo`, `Mode B - Local Multi-Instance Demo`, or both.
+## Bug Reporting Format
 
-## Bug Tracking Format
+For each newly observed failure, record:
 
-- title
-- affected module
-- affected mode
-- reproduction steps
-- expected behavior
-- actual behavior
-- severity
-- temporary workaround if any
-
-## Severity Guidance
-
-- High: blocks login, connection, or core demo flow
-- Medium: affects usability but has a workaround
-- Low: cosmetic or non-blocking issue
+- bug ID, date and reporter;
+- affected gate and mode;
+- reproduction steps;
+- expected and actual behavior;
+- severity and owner;
+- evidence link or command result;
+- workaround and resolution status.

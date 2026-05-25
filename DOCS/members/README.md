@@ -1,31 +1,25 @@
-# Member Playbooks
+# MEMBER PLAYBOOKS - RECOVERY DELIVERY
 
-Thu muc nay chua playbook rieng cho tung thanh vien. Cac file nay giup member biet role, write scope, dependency, handoff rule, va flow 8 tuan cua rieng minh.
-
-Khong tick tien do trong thu muc nay. Tracker duy nhat co checkbox la `../TASKS.md`.
-
-## Files
-
-- [Member 1 - Team Leader / System Architect](./member-1-team-leader-system-architect.md)
-- [Member 2 - Network Engineer](./member-2-network-engineer.md)
-- [Member 3 - Server GUI Developer](./member-3-server-gui-developer.md)
-- [Member 4 - Client App Developer](./member-4-client-app-developer.md)
-- [Member 5 - Database & Authentication](./member-5-database-authentication.md)
-- [Member 6 - Tester & Documentation](./member-6-tester-documentation.md)
-
-## How to Use
-
-1. Doc `../LEADER_FLOW.md` de nam master flow.
-2. Doc `../TASKS.md` de xem task/evidence va tick tien do.
-3. Doc `../API.md` neu viec cua ban lien quan packet, login, status, command, timer, notification, chat, ACK.
-4. Mo dung playbook cua minh.
-5. Lam theo `Wn.Pm`, handoff dung owner, cap nhat tracker khi co evidence.
+Active window: `2026-05-25` to `2026-07-05`.
+Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` before taking new work.
 
 ## Shared Rules
 
-- Deadline baseline la 8 tuan.
-- Stack la `.NET 8`, C#, WinForms, TCP, SQLite, `System.Text.Json`.
-- Chat chi la 1-1 text toi thieu.
-- Moi client account gan voi mot `machineId`.
-- Project phai support real LAN va local multi-instance.
-- Packet/schema thay doi thi update `DOCS/API.md` cung ngay.
+- Core local demo is mandatory; retained extensions remain part of the project but are gate controlled.
+- Only `Verified Pass` in `../TASKS.md` counts as completion.
+- Do not claim shell, draft or local uncommitted artifact as runtime delivery.
+- Packet/schema changes follow `../API.md` and require owner approval.
+- Feature work must follow the dependency and gate order in `../LEADER_FLOW.md`.
+
+## Files
+
+- `member-1-team-leader-system-architect.md`
+- `member-2-network-engineer.md`
+- `member-3-server-gui-developer.md`
+- `member-4-client-app-developer.md`
+- `member-5-database-authentication.md`
+- `member-6-tester-documentation.md`
+
+## Handoff Checklist
+
+Each handoff includes interface/result shape, evidence or blocker, consumer, due date and affected gate. M6 verifies pass status; M1 approves gate transitions and extension opening.

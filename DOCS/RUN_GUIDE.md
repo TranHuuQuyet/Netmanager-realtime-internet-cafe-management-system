@@ -1,130 +1,101 @@
-# RUN GUIDE
+# RUN GUIDE - RECOVERY TARGET
 
-This guide defines how the team should build, run, and verify the project during development and demo preparation.
+This guide documents the approved setup target for the recovery roadmap. Runtime steps remain `Blocked` until the corresponding test gate passes.
 
-Current status:
+## Current Status - 2026-05-25
 
-- `Code/NetManager.sln` and project files exist
-- `ServerApp` has a server UI shell
-- `ClientApp` still needs real workflow screens
-- TCP, auth/database, and end-to-end runtime implementation are not complete yet
+- Current working tree full solution build fails because the server login form implementation is incomplete/deleted locally.
+- Client forms exist as local shell artifacts but do not prove integration.
+- TCP round-trip, login integration, status and control flow are not verified.
+- Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 
-## 1. Required Environment
+## Required Environment
 
-- Windows 10 or Windows 11
-- .NET 8 SDK
-- Visual Studio 2022 or another editor that supports .NET 8
-- SQLite runtime/package selected by Member 5 during implementation
+- Windows 10 or Windows 11.
+- .NET 8 SDK.
+- Visual Studio 2022 or terminal support for `net8.0-windows`.
+- SQLite runtime via the selected `Microsoft.Data.Sqlite` ServerApp dependency.
 
-## 2. Solution Shape
+## Approved Build Command
 
-The runtime solution is under `Code/`.
+From repository root:
 
-```text
-Code/
-|-- NetManager.sln
-|-- ServerApp/
-|-- ClientApp/
-`-- Shared/
+```powershell
+dotnet build Code/NetManager.sln
 ```
 
-Planned project types:
+This command must pass before a runtime demo or feature gate can be accepted.
 
-- `ServerApp`: Windows Forms app
-- `ClientApp`: Windows Forms app
-- `Shared`: class library
+## Recovery Runtime Defaults
 
-Required references:
+| Setting | Recovery value | Status |
+| --- | --- | --- |
+| Local server host | `127.0.0.1` | Target until `G1` pass |
+| Default port | `5000` | Target until `G1` pass |
+| Framing | one UTF-8 JSON object per line | Approved contract target |
+| Auth schema | `AuthUsers`, `AuthSessions` | Canonical recovery path |
+| Database under approved root-run workflow | `internet_cafe.db` in repository root | Matches current selected auth runtime artifact; verify in `G0` |
+| Machine status storage | in-memory connection registry | Core architecture target |
 
-- `ServerApp` references `Shared`
-- `ClientApp` references `Shared`
+Until a deterministic application data path is implemented and approved, run recovery commands from repository root so the relative SQLite database location is not ambiguous.
 
-## 3. Default Development Configuration
-
-These defaults should be used unless Member 1 approves a change.
-
-| Setting | Default |
-| --- | --- |
-| Server host for local mode | `127.0.0.1` |
-| Server port | `5000` |
-| Packet framing | one UTF-8 JSON object per line |
-| Database location | `Code/ServerApp/AppData/netmanager.db` |
-| Local log location | `Code/Logs/` if file logging is added |
-
-## 4. Demo Seed Accounts
-
-Member 5 owns the final seed implementation, but the demo account baseline should remain stable.
+## Recovery Demo Accounts
 
 | Role | Username | Password | MachineId |
 | --- | --- | --- | --- |
-| Admin | `admin01` | `123456` | empty or `SERVER` |
-| Client | `pc01` | `123456` | `PC-01` |
-| Client | `pc02` | `123456` | `PC-02` |
-| Client | `pc03` | `123456` | `PC-03` |
+| Admin | `admin` | `123` | `PC00` |
+| Client | `client01` | `123` | `PC-01` |
+| Client | `client02` | `123` | `PC-02` |
 
 Rules:
 
-- client login must validate `username`, `password`, and `machineId`
-- login with the correct client account but the wrong `machineId` must fail
-- seed passwords are only for demo and development
+- Admin uses `PC00` in the recovery baseline.
+- A client account can use only its assigned `machineId`.
+- A wrong machine login must fail visibly in the app after `G2` is implemented.
+- These credentials are demo-only and must not be treated as production security.
 
-## 5. Local Multi-Instance Mode
+## Core Local Demo Mode - Required
 
-Use this mode for daily development and fallback demo.
+Expected flow after `G0-G4` pass:
 
-Expected flow:
+1. Build the approved solution.
+2. Start `ServerApp` from the approved build/run workflow.
+3. Confirm server listens on `127.0.0.1:5000`.
+4. Start client instance one and login as `client01` / `PC-01`.
+5. Start client instance two and login as `client02` / `PC-02`.
+6. Confirm server displays distinct online clients.
+7. Lock and unlock one selected client and inspect ACK/result.
+8. Disconnect a client and confirm the server remains running.
 
-1. Start `ServerApp`.
-2. Confirm the server is listening on `127.0.0.1:5000`.
-3. Start one `ClientApp` instance using `pc01` and `PC-01`.
-4. Start another `ClientApp` instance using `pc02` and `PC-02`.
-5. Confirm both clients appear separately on the server dashboard.
+This is the release-critical demonstration path.
 
-Local instance rule:
+## Retained Extension Mode
 
-- each client instance must use a different `machineId`
-- do not reuse the same account for multiple client instances unless testing duplicate-login behavior
+Extension features remain in the project and may be added to rehearsal only when their test gate passes:
 
-## 6. Real LAN Mode
+- direct notification after `G3`;
+- timer display after notification is stable;
+- chat only after timely `G4`;
+- Real LAN smoke only after local rehearsal;
+- broadcast, persistence and reconnect polish after prerequisite extensions.
 
-Use this mode for the final demo if the network environment is stable.
+Unfinished extension setup must be documented as continuation work, not silently omitted.
 
-Expected flow:
+## Real LAN Smoke - Extension Only
 
-1. Start `ServerApp` on the server machine.
-2. Confirm firewall allows the selected TCP port.
-3. Find the server machine LAN IP.
-4. Start `ClientApp` on each client machine.
-5. Connect each client to the server LAN IP and default port.
-6. Login each client with its assigned account and `machineId`.
+When `E4` is opened:
 
-Real LAN risks to check:
+1. Confirm local core rehearsal already passed.
+2. Start server on the selected server machine.
+3. Permit the approved TCP port through firewall.
+4. Connect one client using the server LAN IP.
+5. Run a limited smoke path and keep local multi-instance available as fallback.
 
-- firewall blocking the server port
-- client machines using the wrong server IP
-- duplicate `machineId`
-- unstable Wi-Fi or mixed network segments
+Real LAN is retained as a valuable project capability, but it is not allowed to block the local core release.
 
-## 7. Minimum Weekly Build Rule
+## Reset And Evidence Rules
 
-At the end of every week, the team should be able to run a visible build.
-
-Minimum checks:
-
-- solution builds
-- server starts
-- client starts
-- latest completed feature can be demonstrated
-- failing checks are recorded in `DOCS/BUGS.md`
-
-## 8. Reset Rules
-
-Member 5 must document the final reset behavior when database implementation exists.
-
-Until then, expected reset behavior is:
-
-- stop server and clients
-- remove generated local database only if the team agrees it is safe
-- recreate seed data through the official setup path
-
-Never remove source files, project files, or docs as part of a runtime reset.
+- M5 must document a verified SQLite reset/seed path during `G0/G2`.
+- Do not delete or replace the tracked database without an approved reset procedure.
+- M6 records build identity, runtime mode, test date and evidence for each pass.
+- A screen opening without real network/auth interaction is not a completed demo step.

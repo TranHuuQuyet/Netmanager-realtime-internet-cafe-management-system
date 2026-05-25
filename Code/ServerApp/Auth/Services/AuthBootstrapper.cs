@@ -5,6 +5,7 @@ using ServerApp.Auth.Models;
 
 namespace ServerApp.Auth.Services;
 
+// Gom runtime auth day du: repository, session service, va auth service.
 public sealed record AuthRuntime(
     IUserRepository Users,
     ISessionRepository SessionRepository,
@@ -12,6 +13,7 @@ public sealed record AuthRuntime(
     IAuthService Auth);
 
 public static class AuthBootstrapper {
+    // Tao database, schema, seed data va dependency graph cho auth.
     public static async Task<AuthRuntime> CreateAsync(string? databasePath = null, CancellationToken cancellationToken = default) {
         var database = new AuthDatabase(databasePath);
         await database.InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -26,6 +28,7 @@ public static class AuthBootstrapper {
         return new AuthRuntime(users, sessionRepository, sessionService, auth);
     }
 
+    // Chi seed user neu username chua ton tai, de khong ghi de du lieu co san.
     private static async Task SeedUsersAsync(SqliteUserRepository users, CancellationToken cancellationToken) {
         foreach (var seed in BuildSeedUsers()) {
             if (await users.UsernameExistsAsync(seed.Username, cancellationToken).ConfigureAwait(false)) {
@@ -36,6 +39,7 @@ public static class AuthBootstrapper {
         }
     }
 
+    // Danh sach tai khoan mac dinh cho demo/local test.
     private static IReadOnlyList<SeedAccount> BuildSeedUsers() {
         return new List<SeedAccount> {
             new("admin", "123", string.Empty, UserRole.Admin, true),
@@ -44,6 +48,7 @@ public static class AuthBootstrapper {
         };
     }
 
+    // Chuyen seed account thanh ban ghi user day du, co hash mat khau va machine mapping.
     private static UserRecord CreateUserRecord(SeedAccount seed) {
         var hash = PasswordHasher.Hash(seed.Password);
         var machineId = string.IsNullOrWhiteSpace(seed.MachineId) ? null : seed.MachineId.Trim();
@@ -60,6 +65,7 @@ public static class AuthBootstrapper {
     }
 }
 
+// Lop phu tro tao connection string va khoi tao schema SQLite cho auth.
 internal sealed class AuthDatabase {
     private readonly string _connectionString;
 
@@ -70,6 +76,7 @@ internal sealed class AuthDatabase {
 
     public SqliteConnection CreateConnection() => new(_connectionString);
 
+    // Tao 2 bang AuthUsers va AuthSessions neu chua ton tai.
     public async Task InitializeAsync(CancellationToken cancellationToken = default) {
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -106,6 +113,7 @@ internal sealed class AuthDatabase {
     }
 }
 
+// Repository SQLite cho user: phuc vu login, seed va cap nhat lan dang nhap cuoi.
 internal sealed class SqliteUserRepository : IUserRepository {
     private readonly AuthDatabase _database;
 
@@ -113,6 +121,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         _database = database;
     }
 
+    // Tim user theo username de auth service so khop password va role.
     public async Task<UserRecord?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(username)) {
             return null;
@@ -134,6 +143,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         return await ReadUserAsync(reader, cancellationToken).ConfigureAwait(false);
     }
 
+    // Tim user theo Id khi can tham chieu lai record da co.
     public async Task<UserRecord?> GetByIdAsync(string userId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(userId)) {
             return null;
@@ -155,6 +165,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         return await ReadUserAsync(reader, cancellationToken).ConfigureAwait(false);
     }
 
+    // Dem so ban ghi user trong DB, dung cho smoke check hoac seed logic.
     public async Task<int> CountAsync(CancellationToken cancellationToken = default) {
         await using var connection = _database.CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -165,6 +176,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         return Convert.ToInt32(result, CultureInfo.InvariantCulture);
     }
 
+    // Chen moi hoac ghi de record user theo Id.
     public async Task AddAsync(UserRecord user, CancellationToken cancellationToken = default) {
         ArgumentNullException.ThrowIfNull(user);
 
@@ -208,6 +220,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Cap nhat thoi diem dang nhap cuoi cua user.
     public async Task UpdateLastLoginAtAsync(string userId, DateTimeOffset lastLoginAtUtc, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(userId)) {
             return;
@@ -228,6 +241,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Kiem tra username da ton tai de tranh seed trung lap.
     public async Task<bool> UsernameExistsAsync(string username, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(username)) {
             return false;
@@ -249,6 +263,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
         return result is not null;
     }
 
+    // Doc dong SQLite va map ve UserRecord.
     private static async Task<UserRecord?> ReadUserAsync(SqliteDataReader reader, CancellationToken cancellationToken) {
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) {
             return null;
@@ -266,6 +281,7 @@ internal sealed class SqliteUserRepository : IUserRepository {
     }
 }
 
+// Repository SQLite cho session: tao session moi, lay session active, va dong/revoke session.
 internal sealed class SqliteSessionRepository : ISessionRepository {
     private readonly AuthDatabase _database;
 
@@ -273,6 +289,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         _database = database;
     }
 
+    // Luu session moi khi login thanh cong.
     public async Task AddAsync(SessionRecord session, CancellationToken cancellationToken = default) {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -316,6 +333,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Lay session active moi nhat cua mot user.
     public async Task<SessionRecord?> GetActiveByUserIdAsync(string userId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(userId)) {
             return null;
@@ -339,6 +357,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
     }
 
+    // Lay session theo Id de phuc vu dong session hoac debug.
     public async Task<SessionRecord?> GetByIdAsync(string sessionId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(sessionId)) {
             return null;
@@ -360,6 +379,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
     }
 
+    // Huy tat ca session active cu cua user truoc khi mo session moi.
     public async Task RevokeActiveSessionsByUserIdAsync(string userId, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(userId)) {
             return;
@@ -383,6 +403,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Cap nhat trang thai session va thoi diem ket thuc.
     public async Task UpdateStateAsync(string sessionId, SessionState state, DateTimeOffset endedAtUtc, CancellationToken cancellationToken = default) {
         if (string.IsNullOrWhiteSpace(sessionId)) {
             return;
@@ -405,6 +426,7 @@ internal sealed class SqliteSessionRepository : ISessionRepository {
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Parse ket qua query thanh SessionRecord domain object.
     private static async Task<SessionRecord?> ReadSessionAsync(SqliteDataReader reader, CancellationToken cancellationToken) {
         if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false)) {
             return null;

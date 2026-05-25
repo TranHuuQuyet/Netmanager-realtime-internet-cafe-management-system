@@ -1,96 +1,78 @@
-# DEMO CHECKLIST
+# DEMO CHECKLIST - RECOVERY RELEASE
 
-This checklist defines the final demo path and fallback plan. Member 6 owns the checklist, and Member 1 approves final demo readiness.
+Deadline: `2026-07-05`
+Primary acceptance mode: `Local Multi-Instance Core Demo`
+Extension policy: retained features may be shown only when their gate has passed.
 
-## 1. Primary Demo Goal
+## Core Demo Goal
 
-Show a LAN-based internet cafe management flow:
+Demonstrate stable internet-cafe control behavior on one machine using the server app and local client instances:
 
-1. Start server.
-2. Start one or more clients.
-3. Login admin.
-4. Login clients with bound `machineId`.
-5. Show realtime machine status.
-6. Lock one client.
-7. Show client lock screen.
-8. Unlock that client.
-9. Send notification.
-10. Show timer update.
-11. Send one 1-1 chat message.
+1. Start the approved server build.
+2. Start two client instances.
+3. Login with machine-bound client accounts.
+4. Show online/offline state.
+5. Lock one selected client.
+6. Show ACK/result and unlock it.
+7. Show the other client was not affected.
+8. Demonstrate disconnect without server crash.
 
-## 2. Core Demo Path
+## Mandatory Core Checklist
 
-This path must work even if secondary features are reduced.
+| Step | Expected result | Related gate | Current status |
+| --- | --- | --- | --- |
+| Build RC | Solution builds and approved binaries are identifiable | `G0`, `G5` | `Blocked` |
+| Start server | Server listens locally and UI remains responsive | `G1` | `Blocked` |
+| Start clients | Two client instances connect distinctly | `G1`, `G4` | `Blocked` |
+| Valid login | `client01/PC-01` and `client02/PC-02` succeed | `G2`, `G4` | `Blocked` |
+| Wrong-machine check | Wrong `machineId` fails visibly | `G2` | `Blocked` |
+| Status view | Server displays real online/offline state | `G2` | `Blocked` |
+| Lock selected client | Selected client enters lock state only | `G3`, `G4` | `Blocked` |
+| ACK result | Admin sees command result/error | `G3` | `Blocked` |
+| Unlock selected client | Client exits lock state | `G3` | `Blocked` |
+| Disconnect | Server remains running and state is controlled | `G4` | `Blocked` |
+| Rehearsal twice | Same path passes twice on RC build | `G5` | `Blocked` |
 
-| Step | Expected Result | Status |
-| --- | --- | --- |
-| Start server | Server is listening and UI is responsive | Pending |
-| Start client | Client can connect to server | Pending |
-| Client login | Correct account and `machineId` succeed | Pending |
-| Wrong machine test | Wrong `machineId` is rejected clearly | Pending |
-| Status sync | Server dashboard shows client online | Pending |
-| Lock command | Client enters locked state | Pending |
-| ACK after lock | Server can see command result | Pending |
-| Unlock command | Client exits locked state | Pending |
-| Disconnect test | Server remains running | Pending |
+## Retained Extension Demonstrations
 
-## 3. Secondary Demo Path
+These are important project features and remain reportable. They do not replace mandatory core acceptance.
 
-These features should be demonstrated only after the core path is stable.
+| Extension | Expected demo when opened | Gate to open | Current status |
+| --- | --- | --- | --- |
+| Direct notification | Selected client receives an admin message | `G3` pass | `Conditional` |
+| Timer display | Client displays issued remaining time | Notification stable; no core blocker | `Conditional` |
+| 1-1 text chat | Admin and one client exchange text | `G4` pass on time | `Conditional` |
+| Real LAN smoke | One client connects through server LAN IP | Local rehearsal pass | `Conditional` |
+| Broadcast/timer persistence/reconnect | Additional verified extension evidence | Extension prerequisite pass | `Conditional` |
 
-| Feature | Expected Result | Status |
-| --- | --- | --- |
-| Notification | Client receives message with severity | Pending |
-| Timer | Client sees remaining time update | Pending |
-| Chat | Admin and one client exchange text | Pending |
-| Two clients | Server tracks both clients separately | Pending |
-| Real LAN | Client machine connects through LAN IP | Pending |
+At final reporting, each extension is marked `Verified Pass Before Release`, `Opened but Incomplete`, or `Retained - Continue After Core Release`.
 
-## 4. Fallback Scope
+## Fallback And Guardrails
 
-If the team is behind schedule, preserve these features:
+- Local multi-instance is the approved primary/fallback platform for core release.
+- If two-client core cannot pass by `2026-06-21`, M1 may demonstrate one-client core and retain two-client work after release, with the limitation stated explicitly.
+- Real LAN never replaces a failing local core path.
+- No extension may enter the demo script if it introduces an open High/Critical blocker.
 
-- login
-- machine-bound client identity
-- status sync
-- lock/unlock
-- ACK
-- local multi-instance demo
+## Pre-Demo Environment Checklist
 
-Cut or simplify in this order:
-
-1. chat polish
-2. timer persistence
-3. notification broadcast
-4. reconnect polish
-5. real LAN demo, if local multi-instance is stable and accepted as fallback
-
-Do not cut:
-
-- correct `machineId` validation
-- server/client connection
-- lock/unlock demo path
-
-## 5. Pre-Demo Environment Check
-
-Before the final demo:
-
-- server machine has .NET 8 installed
-- server port is known
-- firewall rule is checked
-- demo accounts are seeded
-- local multi-instance fallback is tested
-- database reset path is known
-- latest build matches `RUN_GUIDE.md`
-- high-severity bugs are closed or explicitly accepted by Member 1
-
-## 6. Demo Roles
-
-| Role | Responsibility |
+| Item | Status |
 | --- | --- |
-| Member 1 | leads demo, decides fallback |
-| Member 2 | supports network setup |
-| Member 3 | demonstrates server dashboard |
-| Member 4 | demonstrates client behavior |
-| Member 5 | explains auth, session, and database |
-| Member 6 | controls checklist and bug notes |
+| Approved `.NET 8` environment available | To verify |
+| RC build identity recorded | Blocked until `G5` |
+| Approved local endpoint known | Blocked until network runtime exists |
+| Canonical SQLite database/seed reset instructions verified | Blocked until `G0/G2` |
+| Demo accounts `admin`, `client01`, `client02` tested | Blocked until `G2` |
+| Two local client instances rehearsed | Blocked until `G4/G5` |
+| Known limitations and retained extension report prepared | Not started |
+
+## Demo Roles
+
+| Member | Responsibility |
+| --- | --- |
+| M1 | Approves release, leads demo, selects documented fallback |
+| M2 | Supports network/runtime routing and any opened extension |
+| M3 | Demonstrates server status and control result |
+| M4 | Demonstrates client reaction and any opened client extension |
+| M5 | Explains auth/session/database decisions and machine validation |
+| M6 | Operates checklist, captures evidence and reports retained features |

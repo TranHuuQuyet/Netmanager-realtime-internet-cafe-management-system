@@ -1,47 +1,43 @@
-# API
+# API - RECOVERY CONTRACT
 
 ## Contract Baseline
 
-Version: `v0.1`
+Version: `v0.2`
+Decision date: `2026-05-25`
+Verification status: `Blocked until G0 tests pass`
 
-This document is the shared contract reference for `W1.P2 API Contract`.
-Server, client, and shared models must follow this file until the team formally changes the contract.
+This contract is the required runtime target for the recovery roadmap. Existing code artifacts must be corrected and tested against it before integration is considered complete.
 
-## Scope
+## Scope And Scheduling
 
-Core packet types in this baseline:
+### Core packet types required for delivery
 
 - `LOGIN`
 - `STATUS`
 - `LOCK`
 - `UNLOCK`
 - `ACK`
-- `NOTIFICATION`
-- `TIMER`
-- `CHAT`
 
-## Confirmed Project Rules
+### Retained extension packet types
 
-- The project targets `.NET 8`, C#, Windows Forms, TCP, SQLite, and `System.Text.Json`.
-- Each client account is mapped to one `machineId`.
-- The server must validate `username`, `password`, and `machineId` on login.
-- A correct account with the wrong `machineId` must be rejected.
-- Chat is minimal 1-1 text only.
-- Chat has no emoji, no history, no file/image, and no group room behavior.
-- The project must work in both real LAN mode and local multi-instance mode.
+- `NOTIFICATION` - open after `G3`
+- `TIMER` - open after notification and stable core
+- `CHAT` - open only after timely `G4`
+
+Extension packet types remain part of the product contract; scheduling gates prevent them from blocking core delivery.
 
 ## Transport Rules
 
 - Transport is TCP.
-- Payloads are UTF-8 JSON.
-- One packet is one JSON object per line.
-- Fields are case-sensitive.
-- Unknown fields should be ignored for forward compatibility.
-- Invalid packets must fail gracefully instead of crashing the app.
+- One packet is one UTF-8 JSON object followed by a line terminator.
+- `type` is a JSON string enum, for example `"LOGIN"`.
+- Field names are case-sensitive.
+- Unknown fields are ignored where safe for forward compatibility.
+- Invalid JSON and unsupported packet types must produce a controlled error or disconnect result, never crash a receiver.
 
 ## Packet Envelope
 
-All packets use the same envelope shape.
+All request and response packets use this envelope:
 
 ```json
 {
@@ -49,32 +45,24 @@ All packets use the same envelope shape.
   "source": "client01",
   "target": "server",
   "requestId": "req-0001",
-  "timestamp": "2026-05-13T10:00:00Z",
-  "success": true,
-  "message": "optional human readable note",
-  "error": {
-    "code": "optional_error_code",
-    "details": "optional error details"
-  },
+  "timestamp": "2026-05-25T10:00:00Z",
+  "success": null,
+  "message": null,
+  "error": null,
   "payload": {}
 }
 ```
 
-### Envelope Rules
+Rules:
 
-- `type` is required.
-- `source` and `target` help routing and debugging.
-- `requestId` is optional but recommended for request/response matching.
-- `success` is used on responses.
-- `error` is only present when a request fails.
-- `payload` contains the packet-specific body.
-- `timestamp` is recommended on all requests and responses.
-- Clients should use the account name or `machineId` as `source`.
-- The server should use a stable server identifier such as `server`.
+- `type`, `source`, `target`, `timestamp` and `payload` are required.
+- `requestId` is required for `LOGIN`, command and `ACK` matching in the recovery implementation.
+- Requests set `success`, `message` and `error` to `null` or omit nullable values during serialization.
+- Responses set `success` to `true` or `false`.
+- Failure responses put the machine-readable error in top-level `error.code`; UI must not depend on a competing payload-specific error shape.
+- Server uses `source: "server"`; a logged-in client uses its account or machine identifier consistently as agreed in the dispatcher.
 
-## Common Response Pattern
-
-Successful response:
+Successful response example:
 
 ```json
 {
@@ -82,13 +70,19 @@ Successful response:
   "source": "server",
   "target": "client01",
   "requestId": "req-0001",
+  "timestamp": "2026-05-25T10:00:01Z",
   "success": true,
   "message": "Login accepted",
-  "payload": {}
+  "payload": {
+    "sessionId": "session-id",
+    "username": "client01",
+    "role": "Client",
+    "machineId": "PC-01"
+  }
 }
 ```
 
-Failed response:
+Failed response example:
 
 ```json
 {
@@ -96,94 +90,97 @@ Failed response:
   "source": "server",
   "target": "client01",
   "requestId": "req-0001",
+  "timestamp": "2026-05-25T10:00:01Z",
   "success": false,
   "message": "Login rejected",
   "error": {
-    "code": "INVALID_CREDENTIALS",
-    "details": "Username or password is not valid"
+    "code": "ACCOUNT_MACHINE_MISMATCH",
+    "details": "Account is not assigned to the requested machine"
   },
   "payload": {}
 }
 ```
 
-### Minimum Error Codes
+## Error Codes
 
-The baseline error codes should include:
+| Code | Meaning |
+| --- | --- |
+| `INVALID_CREDENTIALS` | Username or password invalid |
+| `INVALID_MACHINE_ID` | Required machine ID missing or invalid |
+| `ACCOUNT_MACHINE_MISMATCH` | Account is bound to another machine |
+| `ACCOUNT_DISABLED` | User is disabled |
+| `MACHINE_ALREADY_ACTIVE` | Duplicate active login is rejected, if selected at `G4` |
+| `INVALID_PACKET` | JSON/envelope/payload cannot be accepted |
+| `UNSUPPORTED_PACKET` | Packet type is unknown or not open for routing |
+| `UNAUTHORIZED_COMMAND` | Session/machine cannot receive the command |
+| `SERVER_ERROR` | Controlled unexpected server failure |
 
-- `INVALID_CREDENTIALS`
-- `INVALID_MACHINE_ID`
-- `ACCOUNT_MACHINE_MISMATCH`
-- `ACCOUNT_DISABLED`
-- `MACHINE_ALREADY_ACTIVE`
-- `INVALID_PACKET`
-- `UNSUPPORTED_PACKET`
-- `SERVER_ERROR`
+## Identity And Authentication
 
-## Packet Payloads
+Recovery runtime seed baseline:
 
-### `LOGIN`
+| Role | Username | Password | MachineId |
+| --- | --- | --- | --- |
+| Admin | `admin` | `123` | `PC00` |
+| Client | `client01` | `123` | `PC-01` |
+| Client | `client02` | `123` | `PC-02` |
 
-Used by admin and client login flows.
-For client login, `machineId` is mandatory and must match the assigned account.
+Rules:
+
+- Recovery admin login requires `machineId: "PC00"` to match the selected canonical auth implementation.
+- Client login must validate `username`, `password` and bound `machineId`.
+- Correct client credentials with wrong `machineId` return failure with `ACCOUNT_MACHINE_MISMATCH` or `INVALID_MACHINE_ID`.
+- Duplicate active login behavior must be fixed and documented during `G4`; until then it is not assumed.
+
+## Core Payloads
+
+### `LOGIN` request
 
 ```json
 {
   "username": "client01",
-  "password": "123456",
+  "password": "123",
   "role": "Client",
   "machineId": "PC-01"
 }
 ```
 
-Expected login behavior:
+### `LOGIN` success response payload
 
-- admin login may not require a bound client machine
-- client login must validate the bound `machineId`
-- wrong `machineId` must return `success: false` and an error code such as `INVALID_MACHINE_ID` or `ACCOUNT_MACHINE_MISMATCH`
+```json
+{
+  "sessionId": "session-id",
+  "username": "client01",
+  "role": "Client",
+  "machineId": "PC-01"
+}
+```
 
 ### `STATUS`
 
-Used for machine state updates and heartbeat-style sync.
-Clients should send it on a regular interval, and also when local state changes.
+Sent after authenticated login and on visible state/disconnect-related updates.
 
 ```json
 {
   "machineId": "PC-01",
   "machineName": "Computer 01",
   "status": "Online",
-  "ipAddress": "192.168.1.10",
-  "lastSeen": "2026-05-13T10:00:00Z"
+  "ipAddress": "127.0.0.1",
+  "lastSeen": "2026-05-25T10:00:02Z"
 }
 ```
 
-### `LOCK`
-
-Used to request or notify a lock action.
+### `LOCK` / `UNLOCK`
 
 ```json
 {
   "machineId": "PC-01",
-  "issuedBy": "admin01",
-  "reason": "time_expired"
-}
-```
-
-### `UNLOCK`
-
-Used to request or notify an unlock action.
-
-```json
-{
-  "machineId": "PC-01",
-  "issuedBy": "admin01",
-  "reason": "manual_unlock"
+  "issuedBy": "admin",
+  "reason": "manual_control"
 }
 ```
 
 ### `ACK`
-
-Used by the client to confirm that a server command was received and executed.
-The client should return `ACK` after `LOCK`, `UNLOCK`, and other command-style packets when execution result matters.
 
 ```json
 {
@@ -194,116 +191,63 @@ The client should return `ACK` after `LOCK`, `UNLOCK`, and other command-style p
 }
 ```
 
-Recommended `ACK.status` values:
+Accepted `ACK.status`: `Success`, `Failed`, `Ignored`.
 
-- `Success`
-- `Failed`
-- `Ignored`
+## Retained Extension Payloads
 
 ### `NOTIFICATION`
-
-Used to send a simple message to one machine or to all machines.
 
 ```json
 {
   "message": "Server restart after 10 minutes",
   "severity": "Info",
-  "scope": "Broadcast"
+  "scope": "Direct"
 }
 ```
 
-### `TIMER`
+Direct message is `E1`; broadcast scope is `E5`.
 
-Used for session timer updates.
+### `TIMER`
 
 ```json
 {
   "machineId": "PC-01",
   "remainingSeconds": 1800,
-  "startedAt": "2026-05-13T09:30:00Z",
-  "expiresAt": "2026-05-13T10:00:00Z"
+  "startedAt": "2026-05-25T09:30:00Z",
+  "expiresAt": "2026-05-25T10:00:00Z"
 }
 ```
 
-### `CHAT`
+Display is `E2`; persistence is `E6`.
 
-Used for basic 1-1 text chat.
-This packet is intentionally minimal for the MVP.
+### `CHAT`
 
 ```json
 {
   "sender": "PC-01",
-  "receiver": "admin01",
+  "receiver": "admin",
   "message": "May em bi lag"
 }
 ```
 
-Chat scope rules:
+Chat remains direct 1-1 text only: no history, group, file/image, delivery queue or emoji-specific behavior.
 
-- only direct 1-1 text
-- no room field is required in the MVP
-- no history loading
-- no emoji-specific handling
-- no file or image payload
-- no delivery queue after reconnect
+## Data And Session Baseline
 
-## Shared Models
+- Canonical recovery SQLite tables are `AuthUsers` and `AuthSessions`, as owned by M5's selected auth runtime.
+- Broader `Users/Machines/Sessions` consolidation is retained future work and must not be integrated in parallel before core release.
+- Online/offline and command target state are maintained by an in-memory authenticated connection registry for core delivery.
+- Timer persistence is an extension, not a core database requirement.
 
-Recommended shared types for the `Shared` project:
+## Runtime Boundary
 
-- `PacketType`
-- `AuthResult`
-- `MachineStatus`
-- `CommandType`
-- `NotificationMessage`
-- `AckInfo`
-- `ChatMessage`
-- `TimerInfo`
-- `SessionInfo`
-- `ErrorInfo`
+- M2 owns packet serialization, TCP framing, dispatcher and routing.
+- M5 owns authentication/session/database behavior returned to the dispatcher.
+- M3/M4 consume typed services/events and never parse wire JSON in forms.
+- M6 verifies JSON samples, auth error outcomes and feature gates.
 
-## Database Summary
+## Change And Verification Rule
 
-### `Users`
-
-Suggested fields:
-
-- `Id`
-- `Username`
-- `PasswordHash`
-- `Role`
-- `MachineId`
-- `IsActive`
-- `LastLogin`
-
-Rules:
-
-- client accounts should be bound to one `MachineId`
-- the bound machine must be validated during login
-
-### `Sessions`
-
-Suggested fields:
-
-- `Id`
-- `UserId`
-- `MachineId`
-- `Status`
-- `StartTime`
-- `EndTime`
-
-### `Machines`
-
-Suggested fields:
-
-- `Id`
-- `MachineName`
-- `IpAddress`
-- `Status`
-- `LastSeen`
-
-## Change Rule
-
-- If a field name, packet shape, or response rule changes, update this file in the same session.
-- Do not let server and client drift into different packet schemas.
-- Do not widen chat scope or machine identity rules without updating `LEADER_FLOW.md` and `TASKS.md`.
+- Any field/packet/error change updates this file and its tests in the same review batch.
+- `G0` cannot pass until serialization produces string packet types, LOGIN request/response are distinguishable, and top-level error handling matches this contract.
+- Retained extension models remain documented even while their routing is gated closed.

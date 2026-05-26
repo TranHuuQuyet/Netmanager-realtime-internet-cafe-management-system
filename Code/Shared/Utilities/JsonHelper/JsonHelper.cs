@@ -5,6 +5,7 @@ using NETManager.Shared.Models;
 using NETManager.Shared.DTOs.Bidrectional;
 using NETManager.Shared.DTOs.CommandPayloads;
 using NETManager.Shared.DTOs.RequestPayloads;
+using NETManager.Shared.DTOs.ResponsePayloads;
 using NETManager.Shared.Packets;
 using System.IO;
 using System.Text.Json.Serialization;
@@ -43,7 +44,7 @@ public static class JsonHelper
 
         return type switch
         {
-            PacketType.LOGIN => DeserializeFromJson<Packet<LoginPayload>>(json),
+            PacketType.LOGIN => DeserializeLoginPacket(json),
             PacketType.STATUS => DeserializeFromJson<Packet<StatusPayload>>(json),
             PacketType.LOCK => DeserializeFromJson<Packet<LockPayload>>(json),
             PacketType.UNLOCK => DeserializeFromJson<Packet<UnlockPayload>>(json),
@@ -52,6 +53,24 @@ public static class JsonHelper
             PacketType.TIMER => DeserializeFromJson<Packet<TimerPayload>>(json),
             PacketType.CHAT => DeserializeFromJson<Packet<ChatPayload>>(json),
             _ => throw new InvalidDataException($"Unsupported packet type: {type}")
+        };
+    }
+
+    private static object DeserializeLoginPacket(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+
+        if (!doc.RootElement.TryGetProperty("success", out var successElement) ||
+            successElement.ValueKind == JsonValueKind.Null)
+        {
+            return DeserializeFromJson<Packet<LoginPayload>>(json);
+        }
+
+        return successElement.ValueKind switch
+        {
+            JsonValueKind.True => DeserializeFromJson<Packet<LoginResultPayload>>(json),
+            JsonValueKind.False => DeserializeFromJson<Packet<LoginFailedPayload>>(json),
+            _ => DeserializeFromJson<Packet<LoginPayload>>(json)
         };
     }
 }

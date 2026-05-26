@@ -2,63 +2,72 @@ namespace ClientApp.Forms;
 
 public sealed class LockScreenForm : Form
 {
+    private bool _unlockedByServer;
+
     public LockScreenForm()
     {
-        ClientUiTheme.ApplyClassicWindow(this, "MÁY TRẠM", new Size(258, 190));
-        StartPosition = FormStartPosition.CenterParent;
+        Text = "Máy trạm bị khóa";
+        ClientSize = new Size(258, 190);
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = false;
         MinimizeBox = false;
+        ControlBox = false;
+        StartPosition = FormStartPosition.CenterParent;
+        TopMost = true;
+        Padding = new Padding(12);
 
-        var root = new TableLayoutPanel
+        var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
-            Padding = new Padding(4),
-            BackColor = ClientUiTheme.Window
+            RowCount = 3
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 37F));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
 
-        root.Controls.Add(ClientUiTheme.HeaderLabel("Máy đang khóa"), 0, 0);
-
-        var messagePanel = ClientUiTheme.ClassicPanel(9);
-        messagePanel.Margin = new Padding(0, 4, 0, 3);
-        messagePanel.Controls.Add(new Label
+        layout.Controls.Add(new Label
         {
             Dock = DockStyle.Fill,
-            Text = "Máy trạm đang tạm khóa. Vui lòng liên hệ máy chủ để tiếp tục sử dụng.",
-            Font = ClientUiTheme.BoldFont,
-            ForeColor = ClientUiTheme.Ink,
+            Text = "MÁY ĐANG BỊ KHÓA",
+            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleCenter
-        });
-        root.Controls.Add(messagePanel, 0, 1);
-
-        var buttonPanel = new TableLayoutPanel
+        }, 0, 0);
+        layout.Controls.Add(new Label
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 1,
-            BackColor = ClientUiTheme.Window
-        };
-        buttonPanel.Controls.Add(ClientUiTheme.CommandButton("Đóng xem trước", (_, _) => Close()), 0, 0);
-        root.Controls.Add(buttonPanel, 0, 2);
-
-        root.Controls.Add(new Label
-        {
-            Dock = DockStyle.Fill,
-            Text = "LOCK/UNLOCK thật đang chờ route điều khiển.",
-            ForeColor = ClientUiTheme.MutedInk,
-            Font = ClientUiTheme.SmallFont,
+            Text = "Máy trạm đã bị quản trị viên khóa.\nVui lòng liên hệ quầy để tiếp tục sử dụng.",
             TextAlign = ContentAlignment.MiddleCenter
-        }, 0, 3);
+        }, 0, 1);
+        layout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "Đang chờ lệnh mở khóa từ máy chủ.",
+            TextAlign = ContentAlignment.MiddleCenter
+        }, 0, 2);
 
-        Controls.Add(root);
+        Controls.Add(layout);
+        FormClosing += LockScreenForm_FormClosing;
     }
 
-    private void InitializeComponent()
+    // The runtime command handler will call this after receiving UNLOCK from the server.
+    public void UnlockFromServer()
     {
+        if (InvokeRequired)
+        {
+            BeginInvoke(UnlockFromServer);
+            return;
+        }
 
+        _unlockedByServer = true;
+        Close();
+    }
+
+    private void LockScreenForm_FormClosing(object? sender, FormClosingEventArgs e)
+    {
+        if (!_unlockedByServer && e.CloseReason == CloseReason.UserClosing)
+        {
+            e.Cancel = true;
+        }
     }
 }

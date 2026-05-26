@@ -3,6 +3,7 @@ using NETManager.Shared.DTOs.RequestPayloads;
 using NETManager.Shared.DTOs.CommandPayloads;
 using NETManager.Shared.DTOs.ResponsePayloads;
 using NETManager.Shared.DTOs.Bidrectional;
+using NETManager.Shared.Models;
 
 namespace NETManager.Shared.Packets;
 
@@ -13,6 +14,7 @@ public static class PacketFactory
     {
         return new Packet<LoginPayload>(PacketType.LOGIN, source, target, payload, requestId);
     }
+
 
     public static Packet<StatusPayload> CreateStatus(
         string source, string target, StatusPayload payload, string? requestId = null)
@@ -57,14 +59,27 @@ public static class PacketFactory
     }
 
     public static Packet<LoginResultPayload> CreateLoginSuccess(
-        string source, string target, LoginResultPayload payload, string? requestId = null)
+        string source, string target, LoginResultPayload payload, string? requestId = null, string? message = "Login accepted")
     {
-        return new Packet<LoginResultPayload>(PacketType.LOGIN, source, target, payload, requestId);
+        return new Packet<LoginResultPayload>(PacketType.LOGIN, source, target, payload, requestId)
+        {
+            Success = true,
+            Message = message
+        };
     }
 
-    public static Packet<LoginFailedPayload> CreateLoginFailed(
-        string source, string target, LoginFailedPayload payload, string? requestId = null)
+    public static Packet<EmptyPayload> CreateLoginFailed(
+        string source, string target, string errorCode, string? details = null, string? requestId = null, string? message = "Login rejected")
     {
-        return new Packet<LoginFailedPayload>(PacketType.LOGIN, source, target, payload, requestId);
+        return new Packet<EmptyPayload>(PacketType.LOGIN, source, target, new EmptyPayload(), requestId)
+        {
+            Success = false,
+            Message = message,
+            Error = new ErrorInfo
+            {
+                Code = errorCode,
+                Details = details
+            }
+        };
     }
 }

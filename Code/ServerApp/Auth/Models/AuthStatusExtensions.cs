@@ -1,3 +1,6 @@
+using NETManager.Shared.DTOs.ResponsePayloads;
+using NETManager.Shared.Models;
+
 namespace ServerApp.Auth.Models;
 
 public static class AuthStatusExtensions {
@@ -13,4 +16,30 @@ public static class AuthStatusExtensions {
         AuthStatus.ServerError => "SERVER_ERROR",
         _ => "SERVER_ERROR"
     };
+
+    // Gom envelope top-level cho dispatcher/UI de khong phai tu map status va message.
+    public static ErrorInfo? ToErrorInfo(this AuthResult result) {
+        if (result.IsSuccess) {
+            return null;
+        }
+
+        return new ErrorInfo {
+            Code = result.Status.ToApiErrorCode(),
+            Details = result.Message
+        };
+    }
+
+    // Gom payload fail LOGIN theo dung contract shared, giu ui khong can doc status noi bo.
+    public static LoginFailedPayload ToLoginFailedPayload(this AuthResult result, DateTime? issuedAtUtc = null) {
+        if (result.IsSuccess) {
+            throw new InvalidOperationException("A successful auth result cannot be mapped to a failed login payload.");
+        }
+
+        return new LoginFailedPayload {
+            ErrorCode = result.Status.ToApiErrorCode(),
+            ErrorMessage = result.Message,
+            Retryable = result.Status is not AuthStatus.AccountDisabled and not AuthStatus.ServerError,
+            IssuedAt = issuedAtUtc ?? DateTime.UtcNow
+        };
+    }
 }

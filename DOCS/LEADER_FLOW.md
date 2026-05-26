@@ -9,7 +9,7 @@ Important secondary features remain in the `Retained Extension Track`.
 Source of truth:
 
 - `DOCS/LEADER_FLOW.md`: active flow, ownership, gates, stop-work and release rules.
-- `DOCS/TASKS.md`: active recovery tracker and status.
+- `DOCS/TASKS.md`: active checklist for member work submitted with required evidence.
 - `DOCS/RECOVERY_REPORT_2026-05-25.md`: audit baseline and disposition of previous checkbox progress.
 - `DOCS/DECISIONS.md`: approved scope/contract/delivery decisions.
 - `DOCS/API.md`: packet, auth, error and recovery persistence contract.
@@ -22,7 +22,8 @@ Source of truth:
 Rules:
 
 - Previous 8-week checkboxes are historical evidence only; they no longer express active delivery completion.
-- Only `Verified Pass` in the tracker, supported by test evidence, counts toward delivery.
+- A checked item in `DOCS/TASKS.md` records submitted member work; it is not a runtime or gate pass.
+- Delivery pass is counted only from verified results in `DOCS/TEST_MATRIX.md` and `DOCS/DEMO_CHECKLIST.md`, with M1 approval where a gate requires it.
 - If code and docs differ, runtime is not approved until the owning contract/docs and tests are aligned.
 - If a core gate is red, extension work cannot begin unless M1 records an exception that does not delay core recovery.
 

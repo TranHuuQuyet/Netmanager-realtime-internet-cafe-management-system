@@ -8,7 +8,7 @@ Core delivery deadline: `2026-07-05`
 1. `RECOVERY_REPORT_2026-05-25.md` - audit evidence and old-checkbox disposition.
 2. `DECISIONS.md` - approved recovery decisions and remaining gate-time decisions.
 3. `LEADER_FLOW.md` - active six-week workflow, ownership and gate controls.
-4. `TASKS.md` - active status tracker; only `Verified Pass` counts.
+4. `TASKS.md` - checklist phan viec member da nop; runtime pass duoc xac nhan trong test/demo docs.
 5. `API.md` - packet/auth/data contract target.
 6. `TEST_MATRIX.md`, `BUGS.md`, `DEMO_CHECKLIST.md`, `RUN_GUIDE.md`.
 7. `members/` - recovery assignments for each member.

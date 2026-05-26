@@ -130,9 +130,8 @@ Guardrails:
 
 ## 9. Reporting Rule
 
-- `DOCS/TASKS.md` la active tracker duy nhat sau recovery reset.
-- Chi `Verified Pass` duoc tinh vao delivery completion.
+- `DOCS/TASKS.md` la active checklist nop viec cua member sau recovery reset; `[x]` chi ghi nhan phan viec/evidence da nop.
+- Delivery completion chi duoc tinh tu runtime/test gate da verify trong `DOCS/TEST_MATRIX.md` va `DOCS/DEMO_CHECKLIST.md`.
 - Moi evidence phai co ngay, owner va link/log/test result.
 - Moi blocker High/Critical phai co owner va due date.
-- Bao cao cu hoac local artifacts chi la context, khong duoc dung de tick runtime completion.
-
+- Bao cao cu hoac local artifacts chi la context, khong duoc dung de claim runtime completion.

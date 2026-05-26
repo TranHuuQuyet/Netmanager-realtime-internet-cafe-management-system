@@ -15,7 +15,7 @@ Ban own evidence, test status, bug tracking, run/demo docs va final continuation
 
 ## Verification Rules
 
-- Chi danh dau tracker `Verified Pass` sau khi chay test/evidence cua current build.
+- Danh dau `[x]` trong tracker khi member da nop task/evidence; ghi ket qua verify cua current build trong test/demo docs.
 - Moi `Fail` phai co bug ID, steps, actual/expected, severity va owner.
 - `Blocked` phai ghi dependency dang thieu; khong de pending mo ho.
 - Extension khong xong van duoc bao cao `Retained - Continue After Core Release`.

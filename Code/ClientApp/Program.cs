@@ -1,3 +1,5 @@
+using ClientApp.Forms;
+
 namespace ClientApp;
 
 static class Program
@@ -6,11 +8,21 @@ static class Program
     ///  The main entry point for the application.
     /// </summary>
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
         ApplicationConfiguration.Initialize();
-        Application.Run(new ConnectForm());
-    }    
+
+        if (!ClientLaunchOptions.TryParse(args, out ClientLaunchOptions options, out string error))
+        {
+            MessageBox.Show(
+                $"Không thể khởi động máy trạm.\n\n{error}\n\n"
+                + "Tham số hỗ trợ: --machine-id, --server-host, --server-port.",
+                "Cấu hình NetManager Client",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+            return;
+        }
+
+        Application.Run(new ConnectForm(options));
+    }
 }

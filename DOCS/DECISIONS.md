@@ -74,8 +74,8 @@ Each decision should include:
 
 - Owner: Member 1 + Member 6
 - Affected docs/code: `DOCS/TASKS.md`, `DOCS/TEST_MATRIX.md`, `DOCS/BUGS.md`
-- Decision: only status `Verified Pass`, backed by runtime/test evidence, counts as delivery completion; existing shells, drafts and unverified skeletons are historical artifacts or partial work
-- Reason: prevent checklist completion from overstating demo readiness
+- Decision: `DOCS/TASKS.md` uses checkboxes for submitted member work/evidence; delivery completion still requires verified runtime/test results in `DOCS/TEST_MATRIX.md` and `DOCS/DEMO_CHECKLIST.md`; existing shells, drafts and unverified skeletons are historical artifacts or partial work
+- Reason: allow simple member checklist updates without overstating demo readiness
 
 ### 2026-05-25 - Select Canonical Recovery Auth And Persistence Path
 

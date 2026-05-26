@@ -3,6 +3,7 @@ using NETManager.Shared.DTOs.RequestPayloads;
 using NETManager.Shared.DTOs.CommandPayloads;
 using NETManager.Shared.DTOs.ResponsePayloads;
 using NETManager.Shared.DTOs.Bidrectional;
+using NETManager.Shared.Models;
 
 namespace NETManager.Shared.Packets;
 
@@ -59,12 +60,25 @@ public static class PacketFactory
     public static Packet<LoginResultPayload> CreateLoginSuccess(
         string source, string target, LoginResultPayload payload, string? requestId = null)
     {
-        return new Packet<LoginResultPayload>(PacketType.LOGIN, source, target, payload, requestId);
+        return new Packet<LoginResultPayload>(PacketType.LOGIN, source, target, payload, requestId)
+        {
+            Success = true,
+            Message = "Login accepted"
+        };
     }
 
     public static Packet<LoginFailedPayload> CreateLoginFailed(
         string source, string target, LoginFailedPayload payload, string? requestId = null)
     {
-        return new Packet<LoginFailedPayload>(PacketType.LOGIN, source, target, payload, requestId);
+        return new Packet<LoginFailedPayload>(PacketType.LOGIN, source, target, payload, requestId)
+        {
+            Success = false,
+            Message = "Login rejected",
+            Error = new ErrorInfo
+            {
+                Code = payload.ErrorCode,
+                Details = payload.ErrorMessage
+            }
+        };
     }
 }

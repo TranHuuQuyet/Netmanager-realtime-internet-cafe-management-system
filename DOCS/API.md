@@ -235,6 +235,7 @@ Chat remains direct 1-1 text only: no history, group, file/image, delivery queue
 ## Data And Session Baseline
 
 - Canonical recovery SQLite tables are `AuthUsers` and `AuthSessions`, as owned by M5's selected auth runtime.
+- Canonical recovery runtime is `AuthBootstrapper` backed by `internet_cafe.db` in the repository root; this is the only approved SQLite path for the recovery baseline.
 - Broader `Users/Machines/Sessions` consolidation is retained future work and must not be integrated in parallel before core release.
 - Online/offline and command target state are maintained by an in-memory authenticated connection registry for core delivery.
 - Timer persistence is an extension, not a core database requirement.

@@ -15,12 +15,15 @@ Core delivery deadline: `2026-07-05`
 
 Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tables below are the active recovery matrix.
 
-## Current Evidence Submissions - `2026-05-25`
+## Current Evidence Submissions
 
 | Test | Candidate result | Evidence | Acceptance state |
 | --- | --- | --- | --- |
 | `G0-01` Full solution builds | `Pass` on implementation working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors after server login/client shell restoration | Submitted for M6 verification; gate remains blocked until required `G0` cases pass |
 | Server UI startup smoke | `Pass` on implementation working tree | Launching `ServerApp.exe` after correcting the `UiStrings` resource base name produced a responsive `Dang nhap` window | Supporting evidence only; it does not prove listener, authentication result or `G1/G2` |
+| Client UI startup smoke (`R1-U01`, `2026-05-26`, `6583b48`) | `Pass` on implementation working tree | On branch `quyet-clientapp-member4`, automated UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; source boundary check finds no JSON/network service references in client forms | Supporting evidence for M4 shell submission only; it does not prove connection, auth result, status, control routing or ACK |
+| Client customer-flow shell smoke (`R1-U01`, `2026-05-26`, working tree) | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke inspects the updated login/lock surfaces, launch option validation and `PC-02` multi-instance configuration without connecting to a server | Supporting evidence for corrected client UX only; it does not prove TCP login, status, command routing or ACK |
+| Client plain WinForms smoke (`R1-U01`, `2026-05-26`, working tree) | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke verifies the compact server-style login dialog, default-control main/lock forms, launch identities and removal of custom theme dependencies | Supporting evidence for client presentation only; real login/status/command routing and ACK remain blocked |
 
 ## G0 - Build And Contract (`R1`)
 

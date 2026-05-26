@@ -35,13 +35,16 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | Demo path | `Blocked` | `14/14` legacy demo steps van pending tai baseline audit |
 | M4 client forms | `Historical Artifact` | Forms local/uncommitted ton tai, chua consume runtime service |
 
-## Current Evidence Submission - `2026-05-25`
+## Current Evidence Submissions
 
 | Item | Submitted evidence | Current disposition |
 | --- | --- | --- |
 | Full solution build candidate | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors after restoring the server login path and adding an explicit client shell entry form | `Evidence Submitted`; pending M6 verification and M1 gate approval |
 | Server login path | `Program` initializes typed auth off the UI thread and passes `IAuthService` into `LoginForm`; the resource manifest lookup is corrected and a startup smoke opens the `Dang nhap` dialog responsively | `Evidence Submitted`; local admin authentication interaction still requires verification |
 | Client startup path | `ConnectForm` is present as a buildable shell and explicitly states that network login binding remains pending `G1/G2` | Build blocker removed only; no runtime integration claim |
+| `R1-U01` client UI shell - `2026-05-26`, commit `6583b48` | On branch `quyet-clientapp-member4`, `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors; UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; boundary search finds no JSON/network service references in client forms | `Evidence Submitted`; UI shell buildable; network login, `LOCK`/`UNLOCK` and `ACK` runtime are not integrated; M6 verification pending |
+| `R1-U01` customer-flow shell correction - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; a temporary .NET 8 smoke verifies username/password-only login, read-only configured machine identity, hidden endpoint, no local lock action, `--machine-id PC-02` launch configuration, rejected invalid launch configuration, honest pending-login status and passive lock surface with `UnlockFromServer()` release hook | `Evidence Submitted`; corrects client shell ownership/UX only; TCP login and server-routed `LOCK`/`UNLOCK`/`ACK` remain unintegrated; M6 verification pending |
+| `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Evidence Submitted`; presentation refinement only; login/status/control routing and ACK remain pending their runtime gates; M6 verification pending |
 
 `G0` is not passed by this submission: API `v0.2` contract checks, auth runtime verification and M6/M1 acceptance remain outstanding.
 
@@ -55,7 +58,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `R1-A01` | M5 + M1 | Declare SQLite auth path, seed/admin rule va runtime schema canonical | `R1-L01` | Decision + auth handoff note | [x] |
 | `R1-N01` | M2 | Implement server listener, typed dispatcher baseline va local JSON-line round-trip | `R1-C01`, `R1-C02` | Trace valid request/response | [ ] |
 | `R1-N02` | M2 + M6 | Validate invalid/unsupported packet does not crash receiver | `R1-N01` | `G1` test result | [ ] |
-| `R1-U01` | M4 | Integrate client form artifacts into buildable branch without claiming runtime integration | `R1-C01` | Build/UI smoke note | [ ] |
+| `R1-U01` | M4 | Integrate client form artifacts into buildable branch without claiming runtime integration | `R1-C01` | Build/UI smoke note | [x] |
 | `R1-Q01` | M6 | Record initial fail/blocked statuses and high-severity blockers | Audit evidence | Updated tests/bugs docs | [x] |
 
 ## R2 - Authenticated Status (`2026-06-01` to `2026-06-07`)

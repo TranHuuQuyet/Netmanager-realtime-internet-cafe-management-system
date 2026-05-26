@@ -1,14 +1,11 @@
-
 using System.Text.Json;
 using NETManager.Shared.Enums;
-using NETManager.Shared.Models;
 using NETManager.Shared.DTOs.Bidrectional;
 using NETManager.Shared.DTOs.CommandPayloads;
 using NETManager.Shared.DTOs.RequestPayloads;
+using NETManager.Shared.DTOs.ResponsePayloads;
 using NETManager.Shared.Packets;
 using System.IO;
-using System.Text.Json.Serialization;
-
 
 namespace NETManager.Shared.Utilities.JsonHelper;
 
@@ -39,18 +36,70 @@ public static class JsonHelper
 
     public static object DeserializePacket(string json)
     {
-        var type = DeserializePacketType(json);
+        using var doc = JsonDocument.Parse(json);
+        PacketType type = ReadPacketType(doc);
+        bool? success = ReadSuccess(doc);
+
+        Type payloadType = ResolvePayloadType(type, success);
+        Type packetType = typeof(Packet<>).MakeGenericType(payloadType);
+
+        return JsonSerializer.Deserialize(json, packetType, JsonSerializerOptions.Shared)
+            ?? throw new InvalidDataException("Invalid JSON payload.");
+    }
+
+    private static PacketType ReadPacketType(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("type", out var typeElement))
+        {
+            throw new InvalidDataException("Packet missing required field: type");
+        }
+
+        return typeElement.Deserialize<PacketType>(JsonSerializerOptions.Shared);
+    }
+
+    private static bool? ReadSuccess(JsonDocument doc)
+    {
+        if (!doc.RootElement.TryGetProperty("success", out var successElement))
+        {
+            return null;
+        }
+
+        if (successElement.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (successElement.ValueKind != JsonValueKind.True
+            && successElement.ValueKind != JsonValueKind.False)
+        {
+            throw new InvalidDataException("Packet field 'success' must be boolean or null.");
+        }
+
+        return successElement.GetBoolean();
+    }
+
+    // LOGIN uses the same packet type for request and response, so the envelope decides the payload.
+    private static Type ResolvePayloadType(PacketType type, bool? success)
+    {
+        if (type == PacketType.LOGIN)
+        {
+            return success switch
+            {
+                null => typeof(LoginPayload),
+                true => typeof(LoginResultPayload),
+                false => typeof(EmptyPayload),
+            };
+        }
 
         return type switch
         {
-            PacketType.LOGIN => DeserializeFromJson<Packet<LoginPayload>>(json),
-            PacketType.STATUS => DeserializeFromJson<Packet<StatusPayload>>(json),
-            PacketType.LOCK => DeserializeFromJson<Packet<LockPayload>>(json),
-            PacketType.UNLOCK => DeserializeFromJson<Packet<UnlockPayload>>(json),
-            PacketType.ACK => DeserializeFromJson<Packet<AckPayload>>(json),
-            PacketType.NOTIFICATION => DeserializeFromJson<Packet<NotificationPayload>>(json),
-            PacketType.TIMER => DeserializeFromJson<Packet<TimerPayload>>(json),
-            PacketType.CHAT => DeserializeFromJson<Packet<ChatPayload>>(json),
+            PacketType.STATUS => typeof(StatusPayload),
+            PacketType.LOCK => typeof(LockPayload),
+            PacketType.UNLOCK => typeof(UnlockPayload),
+            PacketType.ACK => typeof(AckPayload),
+            PacketType.NOTIFICATION => typeof(NotificationPayload),
+            PacketType.TIMER => typeof(TimerPayload),
+            PacketType.CHAT => typeof(ChatPayload),
             _ => throw new InvalidDataException($"Unsupported packet type: {type}")
         };
     }

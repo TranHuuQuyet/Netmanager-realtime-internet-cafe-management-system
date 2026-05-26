@@ -84,11 +84,33 @@ internal sealed class AuthDatabase {
 
     // Dung mot duong dan DB on dinh theo application base directory de UI va runtime khong lech working directory.
     public static string ResolveDatabasePath(string? databasePath = null) {
+        var repositoryRoot = ResolveRepositoryRoot();
         var path = string.IsNullOrWhiteSpace(databasePath)
-            ? Path.Combine(AppContext.BaseDirectory, "internet_cafe.db")
+            ? "internet_cafe.db"
             : databasePath.Trim();
 
-        return Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
+        if (Path.IsPathRooted(path)) {
+            return path;
+        }
+
+        return Path.GetFullPath(Path.Combine(repositoryRoot, path));
+    }
+
+    // Tim repo root de SQLite o dung vi tri canonical trong recovery guide.
+    private static string ResolveRepositoryRoot() {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null) {
+            var candidate = directory.FullName;
+            if (Directory.Exists(Path.Combine(candidate, ".git")) ||
+                (Directory.Exists(Path.Combine(candidate, "Code")) && Directory.Exists(Path.Combine(candidate, "DOCS")))) {
+                return candidate;
+            }
+
+            directory = directory.Parent;
+        }
+
+        return AppContext.BaseDirectory;
     }
 
     // Tao 2 bang AuthUsers va AuthSessions neu chua ton tai.

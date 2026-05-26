@@ -37,7 +37,7 @@ static async Task RunServerOnceAsync(TcpListener listener)
 
     Console.WriteLine($"SERVER IN : {inboundLine}");
 
-   string outboundLine = DispatchPacket(inboundLine);
+    string outboundLine = DispatchPacket(inboundLine);
 
     Console.WriteLine($"SERVER OUT: {outboundLine}");
 

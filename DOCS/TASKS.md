@@ -51,67 +51,253 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 
 ## R1 - Foundation Repair (`2026-05-25` to `2026-05-31`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R1-L01` | M1 | Approve recovery scope, deadline, core/extension lanes va merge gates | Recovery report | Decision entry + team notice | [x] |
-| `R1-C01` | M3 + M5 | Restore buildable server login path va full solution build | Current broken form state | `dotnet build Code/NetManager.sln` pass | [x] |
-| `R1-C02` | M2 + M1 | Freeze API `v0.2`; align string packet type, LOGIN response va error envelope | Contract review | API approval + serialization tests | [ ] |
-| `R1-A01` | M5 + M1 | Declare SQLite auth path, seed/admin rule va runtime schema canonical | `R1-L01` | Decision + auth handoff note | [x] |
-| `R1-N01` | M2 | Implement server listener, typed dispatcher baseline va local JSON-line round-trip | `R1-C01`, `R1-C02` | Trace valid request/response | [ ] |
-| `R1-N02` | M2 + M6 | Validate invalid/unsupported packet does not crash receiver | `R1-N01` | `G1` test result | [ ] |
-| `R1-U01` | M4 | Integrate client form artifacts into buildable branch without claiming runtime integration | `R1-C01` | Build/UI smoke note | [x] |
-| `R1-Q01` | M6 | Record initial fail/blocked statuses and high-severity blockers | Audit evidence | Updated tests/bugs docs | [x] |
+`R1-L01`
+Owner: `M1`
+Task: Approve recovery scope, deadline, core/extension lanes va merge gates
+Dependency: Recovery report
+Required evidence: Decision entry + team notice
+Member done: [x]
+
+`R1-C01`
+Owner: `M3 + M5`
+Task: Restore buildable server login path va full solution build
+Dependency: Current broken form state
+Required evidence: `dotnet build Code/NetManager.sln` pass
+Member done: [x]
+
+`R1-C02`
+Owner: `M2 + M1`
+Task: Freeze API `v0.2`; align string packet type, LOGIN response va error envelope
+Dependency: Contract review
+Required evidence: API approval + serialization tests
+Member done: [ ]
+
+`R1-A01`
+Owner: `M5 + M1`
+Task: Declare SQLite auth path, seed/admin rule va runtime schema canonical
+Dependency: `R1-L01`
+Required evidence: Decision + auth handoff note
+Member done: [x]
+
+`R1-N01`
+Owner: `M2`
+Task: Implement server listener, typed dispatcher baseline va local JSON-line round-trip
+Dependency: `R1-C01`, `R1-C02`
+Required evidence: Trace valid request/response
+Member done: [ ]
+
+`R1-N02`
+Owner: `M2 + M6`
+Task: Validate invalid/unsupported packet does not crash receiver
+Dependency: `R1-N01`
+Required evidence: `G1` test result
+Member done: [ ]
+
+`R1-U01`
+Owner: `M4`
+Task: Integrate client form artifacts into buildable branch without claiming runtime integration
+Dependency: `R1-C01`
+Required evidence: Build/UI smoke note
+Member done: [x]
+
+`R1-Q01`
+Owner: `M6`
+Task: Record initial fail/blocked statuses and high-severity blockers
+Dependency: Audit evidence
+Required evidence: Updated tests/bugs docs
+Member done: [x]
 
 ## R2 - Authenticated Status (`2026-06-01` to `2026-06-07`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R2-N01` | M2 + M5 | Route `LOGIN` from TCP dispatcher to canonical auth service | `G0`, `G1` pass | Request/response trace | [ ] |
-| `R2-A01` | M5 + M6 | Verify admin/client valid login, bad password va wrong `machineId` | `R2-N01` | `G2` auth cases pass | [ ] |
-| `R2-U01` | M4 | Bind client login screen to real network/auth result | `R2-N01` | Visible success/error result | [ ] |
-| `R2-N02` | M2 + M4 | Emit `STATUS` after authenticated client login va disconnect | `R2-A01` | Status packet trace | [ ] |
-| `R2-U02` | M3 | Render real one-client online/offline state | `R2-N02` | Dashboard evidence + M6 pass | [ ] |
-| `R2-L01` | M1 + M6 | Review `G2` va block control work neu login/status fail | All R2 core tasks | Gate review note | [ ] |
+`R2-N01`
+Owner: `M2 + M5`
+Task: Route `LOGIN` from TCP dispatcher to canonical auth service
+Dependency: `G0`, `G1` pass
+Required evidence: Request/response trace
+Member done: [ ]
+
+`R2-A01`
+Owner: `M5 + M6`
+Task: Verify admin/client valid login, bad password va wrong `machineId`
+Dependency: `R2-N01`
+Required evidence: `G2` auth cases pass
+Member done: [ ]
+
+`R2-U01`
+Owner: `M4`
+Task: Bind client login screen to real network/auth result
+Dependency: `R2-N01`
+Required evidence: Visible success/error result
+Member done: [ ]
+
+`R2-N02`
+Owner: `M2 + M4`
+Task: Emit `STATUS` after authenticated client login va disconnect
+Dependency: `R2-A01`
+Required evidence: Status packet trace
+Member done: [ ]
+
+`R2-U02`
+Owner: `M3`
+Task: Render real one-client online/offline state
+Dependency: `R2-N02`
+Required evidence: Dashboard evidence + M6 pass
+Member done: [ ]
+
+`R2-L01`
+Owner: `M1 + M6`
+Task: Review `G2` va block control work neu login/status fail
+Dependency: All R2 core tasks
+Required evidence: Gate review note
+Member done: [ ]
 
 ## R3 - Core Control (`2026-06-08` to `2026-06-14`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R3-N01` | M2 + M3 | Route real `LOCK`/`UNLOCK` commands from selected client action | `G2` pass | Command packet trace | [ ] |
-| `R3-U01` | M4 | Apply lock/unlock client state through runtime command handler | `R3-N01` | Visible client reaction | [ ] |
-| `R3-N02` | M2 + M4 | Send typed `ACK` and deterministic command error | `R3-U01` | ACK/error trace | [ ] |
-| `R3-U02` | M3 | Show ACK/error result in admin UI | `R3-N02` | Dashboard result evidence | [ ] |
-| `R3-A01` | M5 | Enforce active session/machine guard for command target | `G2` pass | Auth/session test result | [ ] |
-| `R3-Q01` | M6 + M1 | Run repeat one-client core demo and approve `G3` | All R3 tasks | `G3` pass/bug list | [ ] |
+`R3-N01`
+Owner: `M2 + M3`
+Task: Route real `LOCK`/`UNLOCK` commands from selected client action
+Dependency: `G2` pass
+Required evidence: Command packet trace
+Member done: [ ]
+
+`R3-U01`
+Owner: `M4`
+Task: Apply lock/unlock client state through runtime command handler
+Dependency: `R3-N01`
+Required evidence: Visible client reaction
+Member done: [ ]
+
+`R3-N02`
+Owner: `M2 + M4`
+Task: Send typed `ACK` and deterministic command error
+Dependency: `R3-U01`
+Required evidence: ACK/error trace
+Member done: [ ]
+
+`R3-U02`
+Owner: `M3`
+Task: Show ACK/error result in admin UI
+Dependency: `R3-N02`
+Required evidence: Dashboard result evidence
+Member done: [ ]
+
+`R3-A01`
+Owner: `M5`
+Task: Enforce active session/machine guard for command target
+Dependency: `G2` pass
+Required evidence: Auth/session test result
+Member done: [ ]
+
+`R3-Q01`
+Owner: `M6 + M1`
+Task: Run repeat one-client core demo and approve `G3`
+Dependency: All R3 tasks
+Required evidence: `G3` pass/bug list
+Member done: [ ]
 
 ## R4 - Multi-Client And Notification (`2026-06-15` to `2026-06-21`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R4-N01` | M2 + M5 | Route two authenticated clients distinctly and decide duplicate-login behavior | `G3` pass | Routing/session test | [ ] |
-| `R4-U01` | M3 + M4 | Render/maintain distinct local client instances | `R4-N01` | Two-client UI evidence | [ ] |
-| `R4-N02` | M2 + M6 | Verify disconnect does not crash server | `R4-N01` | `G4` disconnect case | [ ] |
-| `R4-E01` | M2 + M3 + M4 | Implement direct notification if `G3` passed | `G3` pass | `E1` test | [ ] |
-| `R4-Q01` | M6 + M1 | Approve `G4` and determine which retained extensions open | Core R4 tasks | Gate/extension decision | [ ] |
+`R4-N01`
+Owner: `M2 + M5`
+Task: Route two authenticated clients distinctly and decide duplicate-login behavior
+Dependency: `G3` pass
+Required evidence: Routing/session test
+Member done: [ ]
+
+`R4-U01`
+Owner: `M3 + M4`
+Task: Render/maintain distinct local client instances
+Dependency: `R4-N01`
+Required evidence: Two-client UI evidence
+Member done: [ ]
+
+`R4-N02`
+Owner: `M2 + M6`
+Task: Verify disconnect does not crash server
+Dependency: `R4-N01`
+Required evidence: `G4` disconnect case
+Member done: [ ]
+
+`R4-E01`
+Owner: `M2 + M3 + M4`
+Task: Implement direct notification if `G3` passed
+Dependency: `G3` pass
+Required evidence: `E1` test
+Member done: [ ]
+
+`R4-Q01`
+Owner: `M6 + M1`
+Task: Approve `G4` and determine which retained extensions open
+Dependency: Core R4 tasks
+Required evidence: Gate/extension decision
+Member done: [ ]
 
 ## R5 - Stabilization And Opened Extensions (`2026-06-22` to `2026-06-28`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R5-Q01` | M6 + all owners | Run core regression, bug triage and clean setup verification | `G4` pass | Regression report | [ ] |
-| `R5-D01` | M1 + M6 | Rehearse local multi-instance primary/fallback demo | `R5-Q01` | Rehearsal result | [ ] |
-| `R5-E01` | M2 + M4 | Implement timer display if extension is opened | `E1` pass; no High/Critical bug | `E2` test | [ ] |
-| `R5-E02` | M2 + M3 + M4 | Implement 1-1 chat only if opened by M1 | `G4` pass by `2026-06-21` | `E3` test | [ ] |
-| `R5-E03` | M2 + M6 | Execute Real LAN smoke only after local rehearsal pass | `R5-D01` pass | `E4` smoke note | [ ] |
+`R5-Q01`
+Owner: `M6 + all owners`
+Task: Run core regression, bug triage and clean setup verification
+Dependency: `G4` pass
+Required evidence: Regression report
+Member done: [ ]
+
+`R5-D01`
+Owner: `M1 + M6`
+Task: Rehearse local multi-instance primary/fallback demo
+Dependency: `R5-Q01`
+Required evidence: Rehearsal result
+Member done: [ ]
+
+`R5-E01`
+Owner: `M2 + M4`
+Task: Implement timer display if extension is opened
+Dependency: `E1` pass; no High/Critical bug
+Required evidence: `E2` test
+Member done: [ ]
+
+`R5-E02`
+Owner: `M2 + M3 + M4`
+Task: Implement 1-1 chat only if opened by M1
+Dependency: `G4` pass by `2026-06-21`
+Required evidence: `E3` test
+Member done: [ ]
+
+`R5-E03`
+Owner: `M2 + M6`
+Task: Execute Real LAN smoke only after local rehearsal pass
+Dependency: `R5-D01` pass
+Required evidence: `E4` smoke note
+Member done: [ ]
 
 ## R6 - Release And Demo (`2026-06-29` to `2026-07-05`)
 
-| ID | Owner | Task | Dependency | Required evidence | Member done |
-| --- | --- | --- | --- | --- | --- |
-| `R6-L01` | M1 | Approve release candidate and freeze on `2026-06-30` | `G5` candidate | RC/freeze note | [ ] |
-| `R6-Q01` | M6 + all owners | Run two core rehearsals on RC build | `R6-L01` | Two pass records | [ ] |
-| `R6-D01` | M1 + team | Deliver core demo by `2026-07-05` | `G0-G5` pass | Final demo checklist | [ ] |
-| `R6-D02` | M6 | Publish extension status: pass, opened/incomplete, or retained | Extension evidence | Final continuation report | [ ] |
+`R6-L01`
+Owner: `M1`
+Task: Approve release candidate and freeze on `2026-06-30`
+Dependency: `G5` candidate
+Required evidence: RC/freeze note
+Member done: [ ]
+
+`R6-Q01`
+Owner: `M6 + all owners`
+Task: Run two core rehearsals on RC build
+Dependency: `R6-L01`
+Required evidence: Two pass records
+Member done: [ ]
+
+`R6-D01`
+Owner: `M1 + team`
+Task: Deliver core demo by `2026-07-05`
+Dependency: `G0-G5` pass
+Required evidence: Final demo checklist
+Member done: [ ]
+
+`R6-D02`
+Owner: `M6`
+Task: Publish extension status: pass, opened/incomplete, or retained
+Dependency: Extension evidence
+Required evidence: Final continuation report
+Member done: [ ]
 
 ## Retained Extension Track
 

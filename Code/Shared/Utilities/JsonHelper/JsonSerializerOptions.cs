@@ -12,9 +12,9 @@ public static class JsonSerializerOptions
         PropertyNameCaseInsensitive = false,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = null,
-        converters =
+        Converters =
         {
-            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase)
+            new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false)
         }
 
     };

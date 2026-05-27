@@ -13,7 +13,19 @@ Ban own evidence, test status, bug tracking, run/demo docs va final continuation
 - `README.md`
 - Tracker updates khi M1 yeu cau
 
-## Verification Rules
+## Non-Owned Scope
+
+- Runtime implementation cua M2-M5.
+- API/auth/scope decision approval cua M1.
+- Extension implementation khi feature chua duoc mo.
+
+## Dependencies
+
+- Can owner nop build/test evidence kem build identity va affected gate.
+- Can M1 ghi gate, exception va release decisions truoc khi reporting.
+- Can current integration build runnable de nang status tu `Blocked` sang `Pass` hoac `Fail`.
+
+## Boundary Rules
 
 - Danh dau `[x]` trong tracker khi member da nop task/evidence; ghi ket qua verify cua current build trong test/demo docs.
 - Moi `Fail` phai co bug ID, steps, actual/expected, severity va owner.

@@ -12,6 +12,21 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 - Packet/schema changes follow `../API.md` and require owner approval.
 - Feature work must follow the dependency and gate order in `../LEADER_FLOW.md`.
 
+## Standard Playbook Form
+
+Every member playbook uses the same planning form in this order:
+
+1. `Recovery Role` - delivery responsibility for the recovery window.
+2. `Write Scope` - files or areas the member may change.
+3. `Non-Owned Scope` - boundaries that require handoff rather than silent edits.
+4. `Dependencies` - upstream inputs or approvals needed before delivery.
+5. `Boundary Rules` - contract, evidence and integration limits.
+6. `Core Assignments` - a table with `Due`, `Task`, `Dependency` and `Required evidence`.
+7. `Retained Extension Ownership` - gated secondary scope only.
+8. `Definition Of Done` - evidence-based completion criteria for the member.
+
+The playbooks describe ownership and handoff. Current submission status remains in `../TASKS.md`; runtime pass/fail status remains in `../TEST_MATRIX.md` and `../DEMO_CHECKLIST.md`.
+
 ## Files
 
 - `member-1-team-leader-system-architect.md`

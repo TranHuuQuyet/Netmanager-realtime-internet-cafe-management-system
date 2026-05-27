@@ -1,6 +1,6 @@
 using ServerApp.Auth.Contracts;
 using ServerApp.Database;
-using ServerApp.Database.Repositories;
+using ServerApp.Database.Contracts;
 
 namespace ServerApp.Auth.Services;
 
@@ -12,22 +12,14 @@ public sealed record AuthRuntime(
     IAuthService Auth);
 
 public static class AuthBootstrapper {
-    // Composition root cho auth/database runtime.
+    // Composition root cho auth runtime; persistence bootstrap nam trong DatabaseBootstrapper.
     public static async Task<AuthRuntime> CreateAsync(string? databasePath = null, CancellationToken cancellationToken = default) {
-        var options = new DatabaseOptions(databasePath);
-        var connections = new SqliteConnectionFactory(options);
-        var initializer = new DbInitializer(options, connections);
+        DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(databasePath, cancellationToken).ConfigureAwait(false);
 
-        await initializer.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        ISessionService sessionService = new SessionService(database.Sessions);
+        IAuthService auth = new AuthService(database.Users, sessionService);
 
-        IUserRepository users = new SqliteUserRepository(connections);
-        ISessionRepository sessionRepository = new SqliteSessionRepository(connections);
-        ISessionService sessionService = new SessionService(sessionRepository);
-        IAuthService auth = new AuthService(users, sessionService);
-
-        await initializer.SeedAsync(users, cancellationToken).ConfigureAwait(false);
-
-        return new AuthRuntime(users, sessionRepository, sessionService, auth);
+        return new AuthRuntime(database.Users, database.Sessions, sessionService, auth);
     }
 
     // Helper cho UI form khi chi can IAuthService, khong can dereference AuthRuntime.

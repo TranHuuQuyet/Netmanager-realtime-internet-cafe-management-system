@@ -1,5 +1,7 @@
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
+using ServerApp.Database.Contracts;
+using ServerApp.Database.Models;
 
 namespace ServerApp.Auth.Services;
 

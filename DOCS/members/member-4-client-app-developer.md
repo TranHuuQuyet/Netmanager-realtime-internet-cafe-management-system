@@ -31,6 +31,7 @@ Ban own client UI va client reaction trong core demo. Connect/login/main/lock fo
 - Khong parse raw JSON trong form va khong invent packet shape.
 - Form shell chi la artifact den khi duoc bind vao real client service.
 - UI result phai dua tren auth/command event that, khong dung dialog placeholder lam evidence.
+- Nop client feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

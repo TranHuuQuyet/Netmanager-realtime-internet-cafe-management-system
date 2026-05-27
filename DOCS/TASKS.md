@@ -11,6 +11,8 @@ Roadmap 8 tuan cu da bi supersede boi recovery roadmap vi build va runtime gate 
 - Trong cac bang task `R1-R6`, `[x]` nghia la owner da nop phan viec/evidence duoc yeu cau; `[ ]` nghia la chua nop, dang bi block hoac chua mo.
 - Checkbox la checklist nop viec cua member, khong phai ket qua runtime verification hay gate approval.
 - Runtime/release pass duoc xac nhan trong `DOCS/TEST_MATRIX.md` va `DOCS/DEMO_CHECKLIST.md`; M6 verify evidence va M1 approve gate khi can.
+- Moi feature/fix cua member duoc tao tu `develop` va PR/merge vao `develop` de integration va test; khong merge truc tiep vao `main`.
+- Chi candidate tren `develop` co `Pass` do M6 ghi nhan va duoc M1 approve moi duoc promote/merge vao `main`.
 
 Cac status chu sau van dung cho baseline, evidence submission va retained extension tracking:
 
@@ -55,7 +57,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 Owner: `M1`
 Task: Approve recovery scope, deadline, core/extension lanes va merge gates
 Dependency: Recovery report
-Required evidence: Decision entry + team notice
+Required evidence: Decision entry + team notice + `develop` -> tester `Pass` -> `main` promotion rule
 Member done: [x]
 
 `R1-C01`
@@ -323,3 +325,5 @@ Member done: [ ]
 ## Gate Counting Rule
 
 Core delivery is complete only when `G0` through `G5` in `DOCS/TEST_MATRIX.md` are `Pass`, final local rehearsal passes twice, and no unaccepted High/Critical blocker remains. Retained extensions remain part of NetManager regardless of whether they are finished by core release.
+
+Branch promotion does not replace gate counting: work merged into `develop` is only an integration candidate. It enters `main` only after the applicable M6 `Pass` evidence is recorded and M1 approves promotion.

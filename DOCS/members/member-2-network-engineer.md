@@ -36,6 +36,7 @@ Ban khong own:
 - Packet/schema doi thi update `DOCS/API.md` cung ngay.
 - Auth duoc goi qua interface, khong embed SQL vao network layer.
 - GUI khong parse packet truc tiep trong form khi da co service boundary.
+- Nop thay doi networking/contract qua feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

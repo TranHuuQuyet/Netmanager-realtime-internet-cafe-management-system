@@ -32,6 +32,7 @@ Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineI
 - Provide `IAuthService`/session result behavior for M2; do not move socket logic into auth.
 - Wrong machine, disabled account and server error must map deterministically to API error codes.
 - Changes to seed/schema/session contract need M1 approval and M6 test updates.
+- Nop auth/database feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

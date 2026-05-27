@@ -24,6 +24,7 @@ Ban own evidence, test status, bug tracking, run/demo docs va final continuation
 - Can owner nop build/test evidence kem build identity va affected gate.
 - Can M1 ghi gate, exception va release decisions truoc khi reporting.
 - Can current integration build runnable de nang status tu `Blocked` sang `Pass` hoac `Fail`.
+- Can candidate da duoc integrate vao `develop` va co commit/build identity ro truoc khi xac nhan de promote vao `main`.
 
 ## Boundary Rules
 
@@ -31,6 +32,8 @@ Ban own evidence, test status, bug tracking, run/demo docs va final continuation
 - Moi `Fail` phai co bug ID, steps, actual/expected, severity va owner.
 - `Blocked` phai ghi dependency dang thieu; khong de pending mo ho.
 - Extension khong xong van duoc bao cao `Retained - Continue After Core Release`.
+- Test tren candidate cua `develop`; chi ghi `Pass` kem tested commit/build identity moi duoc dung lam dieu kien M1 merge vao `main`.
+- Neu test `Fail` hoac `Blocked`, ghi evidence/blocker va khong chap nhan promotion vao `main`.
 
 ## Core Assignments
 
@@ -52,5 +55,6 @@ Ban own evidence, test status, bug tracking, run/demo docs va final continuation
 ## Definition Of Done
 
 - Tests reflect executable truth rather than claimed progress.
+- Moi promotion vao `main` co `Pass` evidence cua candidate tuong ung tren `develop`.
 - Demo can be followed from current run guide.
 - Final report separates passed core capability from retained extension continuation.

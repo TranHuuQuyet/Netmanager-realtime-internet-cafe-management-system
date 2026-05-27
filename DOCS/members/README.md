@@ -11,6 +11,8 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 - Do not claim shell, draft or local uncommitted artifact as runtime delivery.
 - Packet/schema changes follow `../API.md` and require owner approval.
 - Feature work must follow the dependency and gate order in `../LEADER_FLOW.md`.
+- Moi member tao feature/fix branch tu `develop` va nop PR/merge vao `develop`; khong merge feature truc tiep vao `main`.
+- `develop` la nhanh integration de M6 test; chi candidate duoc M6 ghi `Pass` va M1 approve moi duoc merge/promote vao `main`.
 
 ## Standard Playbook Form
 
@@ -38,4 +40,4 @@ The playbooks describe ownership and handoff. Current submission status remains 
 
 ## Handoff Checklist
 
-Each handoff includes interface/result shape, evidence or blocker, consumer, due date and affected gate. M6 verifies pass status; M1 approves gate transitions and extension opening.
+Each handoff includes interface/result shape, evidence or blocker, consumer, due date and affected gate. M6 verifies pass status on `develop`; M1 approves gate transitions, extension opening and promotion from `develop` to `main`.

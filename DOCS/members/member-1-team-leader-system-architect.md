@@ -30,12 +30,13 @@ Ban own scope, decision, dependency, gate approval va release control cho deadli
 - Khong approve progress dua tren shell/skeleton ma khong co runtime evidence.
 - Chan extension neu core gate chua pass.
 - Approve release candidate, freeze va fallback decision.
+- Bao ve `main`: chi approve/promotion tu `develop` sau khi M6 da ghi `Pass` cho candidate tich hop; tu choi feature branch merge truc tiep vao `main`.
 
 ## Core Assignments
 
 | Due | Task | Dependency | Required evidence |
 | --- | --- | --- | --- |
-| `2026-05-27` | Confirm recovery scope, canonical auth/API/DB va retained extension rule | Recovery report | Approved decision entries |
+| `2026-05-27` | Confirm recovery scope, canonical auth/API/DB, retained extension va `develop` -> test -> `main` rule | Recovery report | Approved decision entries and team branch notice |
 | `2026-05-31` | Review `G0/G1` foundation gate | Owner submissions; M6 verification | Build, contract and TCP evidence |
 | `2026-06-07` | Review `G2` auth/status | `G0/G1` pass; M6 report | Gate approval note |
 | `2026-06-14` | Review `G3` control and decide whether `E1` opens | `G2` pass; M6 report | Gate/extension decision |
@@ -53,4 +54,5 @@ Ban own scope, decision, dependency, gate approval va release control cho deadli
 
 - Core gates co decision ro va evidence.
 - Khong co High/Critical blocker bi bo qua khong co owner.
+- `main` chi chua candidate da duoc M6 verify `Pass` tren `develop` va duoc M1 approve.
 - Release docs phan anh dung core pass va extension continuation.

@@ -102,5 +102,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 ## Evidence Rule
 
 - Every `Fail` must create or reference a bug in `DOCS/BUGS.md`.
-- Every `Pass` must record test date, build/commit identity, mode and tester.
+- Every `Pass` must record test date, tested `develop` commit/build identity, mode and tester.
+- M6 `Pass` evidence on the integrated `develop` candidate is required before M1 may approve a merge/promotion into `main`.
+- A `Fail` or `Blocked` candidate remains outside `main` and is corrected through the feature/fix to `develop` flow.
 - Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting.

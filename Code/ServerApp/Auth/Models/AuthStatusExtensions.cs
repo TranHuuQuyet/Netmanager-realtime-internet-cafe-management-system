@@ -1,11 +1,13 @@
-using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.Models;
+using Shared.DTOs.ResponsePayloads;
+using Shared.Models;
 
 namespace ServerApp.Auth.Models;
 
-public static class AuthStatusExtensions {
+public static class AuthStatusExtensions
+{
     // Map trang thai noi bo sang ma loi API de networking/UI co the hien thi dong nhat.
-    public static string ToApiErrorCode(this AuthStatus status) => status switch {
+    public static string ToApiErrorCode(this AuthStatus status) => status switch
+    {
         AuthStatus.Success => string.Empty,
         AuthStatus.InvalidInput => "INVALID_PACKET",
         AuthStatus.InvalidCredentials => "INVALID_CREDENTIALS",
@@ -18,28 +20,28 @@ public static class AuthStatusExtensions {
     };
 
     // Gom envelope top-level cho dispatcher/UI de khong phai tu map status va message.
-    public static ErrorInfo? ToErrorInfo(this AuthResult result) {
-        if (result.IsSuccess) {
+    public static ErrorInfo? ToErrorInfo(this AuthResult result)
+    {
+        if (result.IsSuccess)
+        {
             return null;
         }
 
-        return new ErrorInfo {
+        return new ErrorInfo
+        {
             Code = result.Status.ToApiErrorCode(),
             Details = result.Message
         };
     }
 
     // Gom payload fail LOGIN theo dung contract shared, giu ui khong can doc status noi bo.
-    public static LoginFailedPayload ToLoginFailedPayload(this AuthResult result, DateTime? issuedAtUtc = null) {
-        if (result.IsSuccess) {
+    public static EmptyPayload ToLoginFailedPayload(this AuthResult result, DateTime? issuedAtUtc = null)
+    {
+        if (result.IsSuccess)
+        {
             throw new InvalidOperationException("A successful auth result cannot be mapped to a failed login payload.");
         }
 
-        return new LoginFailedPayload {
-            ErrorCode = result.Status.ToApiErrorCode(),
-            ErrorMessage = result.Message,
-            Retryable = result.Status is not AuthStatus.AccountDisabled and not AuthStatus.ServerError,
-            IssuedAt = issuedAtUtc ?? DateTime.UtcNow
-        };
+        return new EmptyPayload();
     }
 }

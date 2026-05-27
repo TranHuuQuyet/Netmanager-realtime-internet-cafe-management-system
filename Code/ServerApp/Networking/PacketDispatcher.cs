@@ -1,7 +1,7 @@
 using System.IO;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.Packets;
-using NETManager.Shared.Utilities.JsonHelper;
+using Shared.DTOs.RequestPayloads;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
 
 namespace ServerApp.Networking;
 
@@ -22,7 +22,7 @@ public sealed class PacketDispatcher
     private static string DispatchLoginBaseline(Packet<LoginPayload> loginPacket)
     {
         var ackPacket = PacketFactory.CreateAck(
-            source: NETManager.Shared.Networking.NetworkProtocol.ServerSource,
+            source: Shared.Networking.NetworkProtocol.ServerSource,
             target: loginPacket.Source,
             payload: new AckPayload
             {
@@ -33,7 +33,7 @@ public sealed class PacketDispatcher
             },
             requestId: loginPacket.RequestId);
 
-        return NETManager.Shared.Networking.NetworkProtocol.ValidateOutgoingMessage(
+        return Shared.Networking.NetworkProtocol.ValidateOutgoingMessage(
             JsonHelper.SerializeToJson(ackPacket));
     }
 }

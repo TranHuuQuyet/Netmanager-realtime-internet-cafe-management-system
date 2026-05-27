@@ -1,23 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <Compile Include="..\Auth\Contracts\*.cs" LinkBase="Auth\Contracts" />
-    <Compile Include="..\Auth\Models\AuthModels.cs" Link="Auth\Models\AuthModels.cs" />
-    <Compile Include="..\Auth\Services\PasswordHasher.cs" Link="Auth\Services\PasswordHasher.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="Schema\AuthSchema.sql">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>

@@ -1,5 +1,7 @@
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
+using ServerApp.Database.Contracts;
+using ServerApp.Database.Models;
 
 namespace ServerApp.Auth.Services;
 
@@ -13,37 +15,52 @@ public sealed class SessionService : ISessionService {
 
     // Khi user login thanh cong, revoke session cu roi tao session moi de tranh dang nhap tron.
     public async Task<SessionInfo> OpenSessionAsync(UserRecord user, CancellationToken cancellationToken = default) {
-        var startedAtUtc = DateTimeOffset.UtcNow;
+        try {
+            var startedAtUtc = DateTimeOffset.UtcNow;
 
-        await _sessions.RevokeActiveSessionsByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
+            await _sessions.RevokeActiveSessionsByUserIdAsync(user.Id, cancellationToken).ConfigureAwait(false);
 
-        var record = new SessionRecord(
-            Guid.NewGuid().ToString("N"),
-            user.Id,
-            user.Username,
-            user.Role,
-            user.MachineId,
-            SessionState.Active,
-            startedAtUtc,
-            null);
+            var record = new SessionRecord(
+                Guid.NewGuid().ToString("N"),
+                user.Id,
+                user.Username,
+                user.Role,
+                user.MachineId,
+                SessionState.Active,
+                startedAtUtc,
+                null);
 
-        await _sessions.AddAsync(record, cancellationToken).ConfigureAwait(false);
-        return ToSessionInfo(record);
+            await _sessions.AddAsync(record, cancellationToken).ConfigureAwait(false);
+            return ToSessionInfo(record);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) {
+            throw new InvalidOperationException("Failed to open session.", ex);
+        }
     }
 
     // Dong session neu co sessionId hop le; neu sessionId rong thi bo qua an toan.
     public async Task CloseSessionAsync(string sessionId, CancellationToken cancellationToken = default) {
-        if (string.IsNullOrWhiteSpace(sessionId)) {
-            return;
-        }
+        try {
+            if (string.IsNullOrWhiteSpace(sessionId)) {
+                return;
+            }
 
-        await _sessions.UpdateStateAsync(sessionId.Trim(), SessionState.Closed, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
+            await _sessions.UpdateStateAsync(sessionId.Trim(), SessionState.Closed, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) {
+            throw new InvalidOperationException("Failed to close session.", ex);
+        }
     }
 
     // Lay session active hien tai cua user de server/UI co the kiem tra trang thai dang hoat dong.
     public async Task<SessionInfo?> GetActiveSessionAsync(string userId, CancellationToken cancellationToken = default) {
-        var record = await _sessions.GetActiveByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
-        return record is null ? null : ToSessionInfo(record);
+        try {
+            var record = await _sessions.GetActiveByUserIdAsync(userId, cancellationToken).ConfigureAwait(false);
+            return record is null ? null : ToSessionInfo(record);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) {
+            throw new InvalidOperationException("Failed to load active session.", ex);
+        }
     }
 
     // Chuyen SessionRecord trong DB thanh SessionInfo domain object.

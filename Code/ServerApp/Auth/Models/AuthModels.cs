@@ -81,28 +81,3 @@ public sealed record SessionInfo(
 
 // Hash va salt duoc luu trong DB de so sanh mat khau an toan.
 public sealed record PasswordHash(string SaltBase64, string HashBase64);
-
-// Ban ghi seed dung de tao tai khoan mac dinh khi khoi dong DB.
-public sealed record SeedAccount(string Username, string Password, string MachineId, UserRole Role, bool IsActive = true);
-
-// Ban ghi user day du trong DB.
-public sealed record UserRecord(
-    string Id,
-    string Username,
-    string PasswordSaltBase64,
-    string PasswordHashBase64,
-    UserRole Role,
-    string? MachineId,
-    bool IsActive,
-    DateTimeOffset? LastLoginAtUtc);
-
-// Ban ghi session day du trong DB.
-public sealed record SessionRecord(
-    string Id,
-    string UserId,
-    string Username,
-    UserRole Role,
-    string? MachineId,
-    SessionState State,
-    DateTimeOffset StartedAtUtc,
-    DateTimeOffset? EndedAtUtc);

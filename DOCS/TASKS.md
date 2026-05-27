@@ -70,7 +70,7 @@ Owner: `M2 + M1`
 Task: Freeze API `v0.2`; align string packet type, LOGIN response va error envelope
 Dependency: Contract review
 Required evidence: API approval + serialization tests
-Member done: [ ]
+Member done: [X]
 
 `R1-A01`
 Owner: `M5 + M1`

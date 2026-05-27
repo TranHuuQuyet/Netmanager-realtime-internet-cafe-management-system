@@ -8,7 +8,7 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 - Server startup smoke now opens a responsive login dialog after correcting the UI resource manifest lookup; login result behavior is not yet gate-verified.
 - The build evidence is submitted for M6 verification and does not by itself pass `G0`, because API/auth contract checks remain outstanding.
 - Client startup is an explicit shell artifact and does not prove network/login integration.
-- TCP round-trip, login integration, status and control flow are not verified.
+- TCP listener/dispatcher valid round-trip evidence has been submitted through `R1-N01`; invalid/unsupported packet handling, login integration, status and control flow are not verified.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 
 ## Required Environment

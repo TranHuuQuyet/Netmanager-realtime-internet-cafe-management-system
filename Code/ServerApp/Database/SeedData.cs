@@ -1,3 +1,4 @@
+using ServerApp.Auth.Models;
 using ServerApp.Database.Entities;
 
 namespace ServerApp.Database;

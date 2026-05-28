@@ -46,7 +46,7 @@ public sealed record AuthResult {
     public string? ErrorCode => IsSuccess ? null : Status.ToApiErrorCode();
 
     // Tao result thanh cong de caller khong can tu gom fields.
-    public static AuthResult Success(UserSummary user, SessionInfo session, string message = "Login succeeded.")
+    public static AuthResult Success(UserSummary user, SessionInfo session, string message = "Login accepted.")
         => new() {
             IsSuccess = true,
             Status = AuthStatus.Success,

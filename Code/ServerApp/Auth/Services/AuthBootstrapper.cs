@@ -12,8 +12,10 @@ public sealed record AuthRuntime(
     IAuthService Auth);
 
 public static class AuthBootstrapper {
+    private const string CanonicalDatabasePath = "internet_cafe.db";
+
     // Composition root cho auth runtime; persistence bootstrap nam trong DatabaseBootstrapper.
-    public static async Task<AuthRuntime> CreateAsync(string? databasePath = null, CancellationToken cancellationToken = default) {
+    public static async Task<AuthRuntime> CreateAsync(string? databasePath = CanonicalDatabasePath, CancellationToken cancellationToken = default) {
         DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(databasePath, cancellationToken).ConfigureAwait(false);
 
         ISessionService sessionService = new SessionService(database.Sessions);
@@ -23,7 +25,7 @@ public static class AuthBootstrapper {
     }
 
     // Helper cho UI form khi chi can IAuthService, khong can dereference AuthRuntime.
-    public static async Task<IAuthService> CreateAuthServiceAsync(string? databasePath = null, CancellationToken cancellationToken = default) {
+    public static async Task<IAuthService> CreateAuthServiceAsync(string? databasePath = CanonicalDatabasePath, CancellationToken cancellationToken = default) {
         var runtime = await CreateAsync(databasePath, cancellationToken).ConfigureAwait(false);
         return runtime.Auth;
     }

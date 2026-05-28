@@ -15,7 +15,8 @@ public enum AuthStatus {
     AccountMachineMismatch = 4,
     AccountDisabled = 5,
     RoleMismatch = 6,
-    ServerError = 7
+    ServerError = 7,
+    MachineAlreadyActive = 8
 }
 
 // Trang thai vong doi cua session trong DB.
@@ -40,8 +41,12 @@ public sealed record AuthResult {
 
     public SessionInfo? Session { get; init; }
 
+    public bool IsFailure => !IsSuccess;
+
+    public string? ErrorCode => IsSuccess ? null : Status.ToApiErrorCode();
+
     // Tao result thanh cong de caller khong can tu gom fields.
-    public static AuthResult Success(UserSummary user, SessionInfo session, string message = "Login succeeded.")
+    public static AuthResult Success(UserSummary user, SessionInfo session, string message = "Login accepted.")
         => new() {
             IsSuccess = true,
             Status = AuthStatus.Success,
@@ -81,3 +86,20 @@ public sealed record SessionInfo(
 
 // Hash va salt duoc luu trong DB de so sanh mat khau an toan.
 public sealed record PasswordHash(string SaltBase64, string HashBase64);
+
+// Chuyen AuthStatus sang ma loi API de network layer co the dung truc tiep.
+public static class AuthStatusExtensions {
+    public static string? ToApiErrorCode(this AuthStatus status)
+        => status switch {
+            AuthStatus.Success => null,
+            AuthStatus.InvalidInput => "INVALID_PACKET",
+            AuthStatus.InvalidCredentials => "INVALID_CREDENTIALS",
+            AuthStatus.InvalidMachineId => "INVALID_MACHINE_ID",
+            AuthStatus.AccountMachineMismatch => "ACCOUNT_MACHINE_MISMATCH",
+            AuthStatus.AccountDisabled => "ACCOUNT_DISABLED",
+            AuthStatus.RoleMismatch => "INVALID_CREDENTIALS",
+            AuthStatus.ServerError => "SERVER_ERROR",
+            AuthStatus.MachineAlreadyActive => "MACHINE_ALREADY_ACTIVE",
+            _ => "SERVER_ERROR"
+        };
+}

@@ -1,10 +1,8 @@
 # Member 2 - Network Engineer
 
-## Role
+## Recovery Role
 
-Ban own networking va shared transport contract implementation. Muc tieu la server/client noi chuyen dung schema, khong freeze UI, support multi-client, va de UI/auth layer tich hop qua interface ro.
-
-Tracker tien do nam trong `DOCS/TASKS.md`. File nay chi la playbook ca nhan, khong tick task tai day.
+Ban own networking va shared transport contract implementation. Muc tieu la server/client noi chuyen dung schema, support multi-client, va de UI/auth layer tich hop qua interface ro. Recovery phai bam gate/evidence, khong approve progress dua tren skeleton hay local stub.
 
 ## Write Scope
 
@@ -32,66 +30,40 @@ Ban khong own:
 - Can M3/M4 noi ro UI event/action can consume.
 - Can M6 feedback tu connection, invalid packet, multi-client tests.
 
-## Handoff Rules
+## Boundary Rules
 
 - Cung cap packet shape, service interface, event/callback, va sample input/output.
 - Packet/schema doi thi update `DOCS/API.md` cung ngay.
 - Auth duoc goi qua interface, khong embed SQL vao network layer.
 - GUI khong parse packet truc tiep trong form khi da co service boundary.
+- Nop thay doi networking/contract qua feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
-## My 8-Week Flow
+## Core Assignments
 
-### Week 1
+| Due | Task | Dependency | Required evidence |
+| --- | --- | --- | --- |
+| `2026-05-31` | Freeze/implement API `v0.2` transport behavior: string packet type, `LOGIN` response/error envelope, listener/dispatcher baseline and valid/invalid JSON-line round-trip | M1 contract approval; M5 auth handoff | `G0/G1` contract and network evidence |
+| `2026-06-07` | Route `LOGIN` through canonical auth service and emit `STATUS` after authenticated login/disconnect | `G0/G1` pass; M5 auth service | `G2` login/status trace |
+| `2026-06-14` | Route `LOCK`, `UNLOCK`, typed `ACK` and controlled command errors | `G2` pass; M3/M4 command consumers | `G3` command/ACK trace |
+| `2026-06-21` | Route two authenticated clients distinctly, verify disconnect stability, coordinate duplicate-login behavior; implement direct notification only if `E1` is opened | `G3` pass; M5 session rule; M1 extension decision | `G4` routing/disconnect evidence; `E1` test if opened |
+| `2026-06-28` | Support core regression and local rehearsal; implement/test only extensions opened by M1 | `G4` pass; opened extension gates | `G5` network support evidence and applicable extension test |
+| `2026-07-05` | Support frozen release/demo and submit final network report; introduce no new core feature after freeze | `G5` candidate; M1 release freeze | Release support and final network report |
 
-- `W1.P1`: confirm TCP/JSON-line feasibility, packet boundary, local multi-instance assumption.
-- `W1.P2`: define packet envelope, packet types, parser/serializer rules, invalid packet behavior.
-- `W1.P3`: create shared packet baseline, networking skeleton, connect/send/receive proof.
+## Retained Extension Ownership
 
-### Week 2
+- `E1`: route direct notification after `G3` passes and M1 opens the extension.
+- `E2`: route timer updates after `E1` passes and no High/Critical core blocker is open.
+- `E3`: route direct 1-1 chat only if `G4` passes by `2026-06-21` and M1 opens it.
+- `E4`: support Real LAN smoke only after local rehearsal passes.
+- `E5`: route notification broadcast after `E1` is stable.
+- `E6`: support timer transport after `E2` and core session stability; M5 owns timer persistence.
+- `E7`: support reconnect polish after disconnect stability passes.
 
-- `W2.P1`: finish TCP listener, client connector, send/receive loop, dispatcher skeleton.
-- `W2.P2`: call auth interface through agreed login contract.
-- `W2.P3`: provide UI-facing connection/state events or stubs.
+## Definition Of Done
 
-### Week 3
-
-- `W3.P1`: route `LOGIN` request/response and network errors.
-- `W3.P2`: route `STATUS` heartbeat/state changes.
-- `W3.P3`: connect login, status, lock/unlock route skeleton, and ACK visibility.
-
-### Week 4
-
-- `W4.P1`: finish `LOCK` and `UNLOCK` routing.
-- `W4.P2`: finish `ACK`, error packet handling, invalid packet guard.
-- `W4.P3`: fix network regressions in core control path.
-
-### Week 5
-
-- `W5.P1`: route direct/broadcast `NOTIFICATION`.
-- `W5.P2`: route `TIMER` updates.
-- `W5.P3`: route direct `CHAT` messages.
-
-### Week 6
-
-- `W6.P1`: manage multiple connections, session routing, duplicate login behavior.
-- `W6.P2`: harden disconnect, reconnect, timeout, malformed packet handling.
-- `W6.P3`: verify local and real LAN network assumptions.
-
-### Week 7
-
-- `W7.P1`: fix release-blocking network bugs only.
-- `W7.P2`: clean network/shared boundaries without behavior change.
-- `W7.P3`: support setup and network verification for release candidate.
-
-### Week 8
-
-- `W8.P1`: validate network setup and fallback local mode.
-- `W8.P2`: avoid network changes unless release-blocking.
-- `W8.P3`: support live network troubleshooting.
-
-## Definition of Done
-
-- 2 to 3 clients connect distinctly.
-- Packet schema matches `DOCS/API.md`.
-- UI thread does not block on socket work.
-- Disconnect, timeout, invalid packet, and reconnect cases fail gracefully.
+- Packet serialization and routing match `DOCS/API.md` recovery baseline `v0.2`.
+- Listener/connector valid and invalid JSON-line behavior is verified.
+- `LOGIN`, `STATUS`, `LOCK`, `UNLOCK` and `ACK` function through real runtime boundaries.
+- Two local clients connect and route distinctly.
+- Disconnect does not crash the server and socket work does not block the UI.
+- Notification, timer, chat, LAN and reconnect outcomes are reported only when their extension gate is opened; they do not block core completion.

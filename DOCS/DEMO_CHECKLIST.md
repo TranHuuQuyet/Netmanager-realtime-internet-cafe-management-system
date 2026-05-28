@@ -50,6 +50,7 @@ At final reporting, each extension is marked `Verified Pass Before Release`, `Op
 ## Fallback And Guardrails
 
 - Local multi-instance is the approved primary/fallback platform for core release.
+- The release candidate reaches `main` only after M6 verifies its integrated `develop` build as `Pass` and M1 approves promotion.
 - If two-client core cannot pass by `2026-06-21`, M1 may demonstrate one-client core and retain two-client work after release, with the limitation stated explicitly.
 - Real LAN never replaces a failing local core path.
 - No extension may enter the demo script if it introduces an open High/Critical blocker.

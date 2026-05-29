@@ -56,7 +56,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 `R1-L01`
 Owner: `M1`
 Task: Approve recovery scope, deadline, core/extension lanes va merge gates
-Dependency: Recovery report
+Dependency: Recoveary report
 Required evidence: Decision entry + team notice + `develop` -> tester `Pass` -> `main` promotion rule
 Member done: [x]
 

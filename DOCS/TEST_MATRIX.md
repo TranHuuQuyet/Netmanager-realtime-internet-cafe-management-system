@@ -31,20 +31,20 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 
 | ID      | Test                                                               | Owner        | Initial status | Evidence / blocker                                                  |
 | ------- | ------------------------------------------------------------------ | ------------ | -------------- | ------------------------------------------------------------------- |
-| `G0-01` | Full solution builds from approved setup command                   | M3 + M5 + M6 | `Fail`         | Audit build failed at `ServerApp/Forms/LoginForm.Designer.cs(7,29)` |
-| `G0-02` | Packet `type` serializes/deserializes as API string value          | M2 + M6      | `Blocked`      | Existing shared implementation not yet verified against API `v0.2`  |
-| `G0-03` | `LOGIN` request and response parse into distinct expected paths    | M2 + M6      | `Blocked`      | Requires contract implementation correction                         |
-| `G0-04` | Failure response emits top-level `success: false` and `error.code` | M2 + M5 + M6 | `Blocked`      | Requires contract/auth mapping                                      |
+| `G0-01` | Full solution builds from approved setup command                   | M3 + M5 + M6 | `Pass(M6 - 2026-05-29)`         | Audit build failed at `ServerApp/Forms/LoginForm.Designer.cs(7,29)` |
+| `G0-02` | Packet `type` serializes/deserializes as API string value          | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Existing shared implementation not yet verified against API `v0.2`  |
+| `G0-03` | `LOGIN` request and response parse into distinct expected paths    | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Requires contract implementation correction                         |
+| `G0-04` | Failure response emits top-level `success: false` and `error.code` | M2 + M5 + M6 | `Pass(M6 - 2026-05-29)`      | Requires contract/auth mapping                                      |
 | `G0-05` | Canonical auth seed/database/admin rule match docs                 | M5 + M6      | `Blocked`      | Documentation decision recorded; runtime proof required             |
 
 ## G1 - Network Foundation (`R1`)
 
 | ID      | Test                                                  | Mode  | Owner   | Initial status |
 | ------- | ----------------------------------------------------- | ----- | ------- | -------------- |
-| `G1-01` | Server starts and listens on recovery local endpoint  | Local | M2      | `Blocked`      |
-| `G1-02` | One client connects without UI freeze                 | Local | M2 + M4 | `Blocked`      |
-| `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2      | `Blocked`      |
-| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Blocked`      |
+| `G1-01` | Server starts and listens on recovery local endpoint  | Local | M2      | `Pass(M6 - 2026-05-29)`         |
+| `G1-02` | One client connects without UI freeze                 | Local | M2 + M4 | `Pass(M6 - 2026-05-29)`         |
+| `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2      | `Pass(M6 - 2026-05-29)`         |
+| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Blocked`         |
 | `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Blocked`      |
 
 ## G2 - Authentication And Status (`R2`)
@@ -102,7 +102,108 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 ## Evidence Rule
 
 - Every `Fail` must create or reference a bug in `DOCS/BUGS.md`.
-- Every `Pass` must record test date, tested `develop` commit/build identity, mode and tester.
+- Every `Pass` must record test date, tested `develop` commit/build identity, mode q tester.
 - M6 `Pass` evidence on the integrated `develop` candidate is required before M1 may approve a merge/promotion into `main`.
 - A `Fail` or `Blocked` candidate remains outside `main` and is corrected through the feature/fix to `develop` flow.
 - Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting.
+
+
+`G0-01` Full solution builds from approved setup command  
+
+Status: PASS
+
+Command: dotnet build Code/NetManager.sln
+
+Result: Build succeeded.
+        143 Warning(s)
+        0 Error(s)
+
+Conclusion: PASS
+
+`G0-02`  Packet `type` serializes/deserializes as API string value
+
+Status: Pass
+
+Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
+
+Result: PASS G0-02 packet type serializes as API string
+        PASS G0-02 numeric packet type is rejected
+
+Conclusion: Pass
+
+`G0-03`  `LOGIN` request and response parse into distinct expected paths
+
+Status: Pass
+
+Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
+
+Result: PASS G0-03 LOGIN request deserializes as request payload
+        PASS G0-03 LOGIN request keeps response envelope fields unset
+        PASS G0-03 LOGIN success deserializes as result payload
+
+Conclusion: Pass
+
+`G0-04`  Failure response emits top-level `success: false` and `error.code`
+
+Status: Pass 
+
+Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
+
+Result: PASS G0-04 LOGIN failure uses top-level error envelope
+
+Conclusion: Pass
+
+`G0-05`  Canonical auth seed/database/admin rule match docs
+
+`G1-01`  Server starts and listens on recovery local endpoint
+
+Status: Pass
+
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+
+Result: ServerApp listener active on 127.0.0.1:50833
+
+Conclusion: Pass
+
+`G1-02`  One client connects without UI freeze
+
+Status: Not Tested
+
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+
+Result: Smoke test không có UI, không thể verify qua lệnh này
+
+Conclusion: Not Tested — cần UI integration test, chưa có trong R1
+
+`G1-03`  Client and server exchange one valid JSON-line packet
+
+Status: Pass
+
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+
+Result: PASS: Client -> ServerApp listener ->typed
+            dispatcher -> ACK JSON-line -> Client
+            requestId khớp, status: "Success"
+
+Conclusion: Pass — LOGIN gửi đi, ACK trả về đúng, round-trip hoàn chỉnh
+
+
+`G1-04`  Invalid JSON fails gracefully without receiver crash
+
+Status: Blocked
+
+Command: —
+
+Result: —
+
+Conclusion: Blocked — chờ M2 hoàn thành R1-N02 (xử lý packet lỗi phía server)
+
+`G1-05`  Unsupported packet type yields controlled behavior
+
+Status: Blocked
+
+Command: —
+
+Result: —
+
+Conclusion: Blocked — chờ M2 hoàn thành R1-N02 (xử lý packet type không hỗ trợ)

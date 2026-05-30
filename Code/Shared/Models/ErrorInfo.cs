@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.Models;
+namespace Shared.Models;
 
 public class ErrorInfo
 {

@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.DTOs.Bidrectional;
+namespace Shared.DTOs.Bidrectional;
 
 public class ChatPayload
 {

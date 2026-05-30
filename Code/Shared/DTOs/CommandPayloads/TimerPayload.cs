@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.DTOs.CommandPayloads;
+namespace Shared.DTOs.CommandPayloads;
 
 public class TimerPayload
 {

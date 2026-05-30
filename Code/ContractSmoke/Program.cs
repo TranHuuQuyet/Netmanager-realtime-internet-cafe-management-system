@@ -1,8 +1,8 @@
 using System.Text.Json;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.Packets;
-using NETManager.Shared.Utilities.JsonHelper;
+using Shared.DTOs.RequestPayloads;
+using Shared.DTOs.ResponsePayloads;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
 
 Run("G0-02 packet type serializes as API string", PacketTypeSerializesAsString);
 Run("G0-02 numeric packet type is rejected", NumericPacketTypeIsRejected);

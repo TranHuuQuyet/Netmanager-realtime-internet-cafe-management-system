@@ -1,15 +1,13 @@
 namespace ServerApp.Auth.Models;
 
 // Role xac dinh quyen dang nhap va cach xu ly login o server.
-public enum UserRole
-{
+public enum UserRole {
     Admin = 0,
     Client = 1
 }
 
 // Ma ket qua chuan hoa cho toan bo luong auth.
-public enum AuthStatus
-{
+public enum AuthStatus {
     Success = 0,
     InvalidInput = 1,
     InvalidCredentials = 2,
@@ -22,8 +20,7 @@ public enum AuthStatus
 }
 
 // Trang thai vong doi cua session trong DB.
-public enum SessionState
-{
+public enum SessionState {
     Active = 0,
     Closed = 1,
     Revoked = 2
@@ -33,8 +30,7 @@ public enum SessionState
 public sealed record AuthRequest(string Username, string Password, string MachineId, UserRole? RequiredRole = null);
 
 // Ket qua tra ve sau xac thuc: co the mang ca user summary va session.
-public sealed record AuthResult
-{
+public sealed record AuthResult {
     public required bool IsSuccess { get; init; }
 
     public required AuthStatus Status { get; init; }
@@ -51,8 +47,7 @@ public sealed record AuthResult
 
     // Tao result thanh cong de caller khong can tu gom fields.
     public static AuthResult Success(UserSummary user, SessionInfo session, string message = "Login accepted.")
-        => new()
-        {
+        => new() {
             IsSuccess = true,
             Status = AuthStatus.Success,
             Message = message,
@@ -62,8 +57,7 @@ public sealed record AuthResult
 
     // Tao result that bai voi status va message ro rang.
     public static AuthResult Failure(AuthStatus status, string message)
-        => new()
-        {
+        => new() {
             IsSuccess = false,
             Status = status,
             Message = message
@@ -94,11 +88,9 @@ public sealed record SessionInfo(
 public sealed record PasswordHash(string SaltBase64, string HashBase64);
 
 // Chuyen AuthStatus sang ma loi API de network layer co the dung truc tiep.
-public static class AuthStatusExtensions
-{
+public static class AuthStatusExtensions {
     public static string? ToApiErrorCode(this AuthStatus status)
-        => status switch
-        {
+        => status switch {
             AuthStatus.Success => null,
             AuthStatus.InvalidInput => "INVALID_PACKET",
             AuthStatus.InvalidCredentials => "INVALID_CREDENTIALS",

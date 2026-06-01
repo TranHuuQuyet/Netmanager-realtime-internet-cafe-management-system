@@ -18,7 +18,8 @@ static class Program
 
         if (loginForm.ShowDialog() == DialogResult.OK)
         {
-            using TcpJsonLineServer? networkServer = TryStartNetworkServer();
+            IAuthService authService = authServiceTask.GetAwaiter().GetResult();
+            using TcpJsonLineServer? networkServer = TryStartNetworkServer(authService);
             Application.Run(new MainForm());
         }
     }
@@ -29,9 +30,12 @@ static class Program
         return authRuntime.Auth;
     }
 
-    private static TcpJsonLineServer? TryStartNetworkServer()
+    private static TcpJsonLineServer? TryStartNetworkServer(IAuthService authService)
     {
-        var server = new TcpJsonLineServer(IPAddress.Loopback, 5000);
+        var server = new TcpJsonLineServer(
+            IPAddress.Loopback,
+            5000,
+            new PacketDispatcher(authService));
 
         try
         {

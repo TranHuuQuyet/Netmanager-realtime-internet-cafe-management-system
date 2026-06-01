@@ -14,10 +14,10 @@ public sealed class TcpJsonLineServer : IDisposable
     private int _nextClientNumber;
     private bool _isStarted;
 
-    public TcpJsonLineServer(IPAddress address, int port, PacketDispatcher? dispatcher = null)
+    public TcpJsonLineServer(IPAddress address, int port, PacketDispatcher dispatcher)
     {
         _listener = new TcpListener(address, port);
-        _dispatcher = dispatcher ?? new PacketDispatcher();
+        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
     }
 
     public bool IsStarted => _isStarted;
@@ -86,7 +86,7 @@ public sealed class TcpJsonLineServer : IDisposable
 
         try
         {
-            string response = _dispatcher.Dispatch(message);
+            string response = await _dispatcher.DispatchAsync(message, cancellationToken).ConfigureAwait(false);
             TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, response));
             await connection.SendAsync(response, cancellationToken).ConfigureAwait(false);
         }

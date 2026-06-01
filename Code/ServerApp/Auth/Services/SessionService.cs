@@ -10,9 +10,11 @@ namespace ServerApp.Auth.Services;
 // Quan ly vong doi session: mo session moi, dong session va doc session active.
 public sealed class SessionService : ISessionService {
     private readonly ISessionRepository _sessions;
+    private readonly IMachineRepository _machines;
 
-    public SessionService(ISessionRepository sessions) {
+    public SessionService(ISessionRepository sessions, IMachineRepository machines) {
         _sessions = sessions;
+        _machines = machines;
     }
 
     // Khi user login thanh cong, revoke session cu roi tao session moi de tranh dang nhap tron.
@@ -39,6 +41,16 @@ public sealed class SessionService : ISessionService {
                 null);
 
             await _sessions.AddAsync(record, cancellationToken).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(record.MachineId)) {
+                await _machines.UpdateStatusAsync(
+                        record.MachineId,
+                        MachineStatusOnline,
+                        startedAtUtc.UtcDateTime,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             return ToSessionInfo(record);
         }
         catch (Exception ex) when (ex is not OperationCanceledException) {
@@ -53,7 +65,18 @@ public sealed class SessionService : ISessionService {
                 return;
             }
 
-            await _sessions.UpdateStateAsync(sessionId.Trim(), AuthSessionState.Closed, DateTimeOffset.UtcNow, cancellationToken).ConfigureAwait(false);
+            var endedAtUtc = DateTimeOffset.UtcNow;
+            var session = await _sessions.GetByIdAsync(sessionId.Trim(), cancellationToken).ConfigureAwait(false);
+            await _sessions.UpdateStateAsync(sessionId.Trim(), AuthSessionState.Closed, endedAtUtc, cancellationToken).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(session?.MachineId)) {
+                await _machines.UpdateStatusAsync(
+                        session.MachineId,
+                        MachineStatusOffline,
+                        endedAtUtc.UtcDateTime,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException) {
             throw new InvalidOperationException("Failed to close session.", ex);
@@ -86,4 +109,7 @@ public sealed class SessionService : ISessionService {
             (AuthSessionState)record.State,
             record.StartedAtUtc,
             record.EndedAtUtc);
+
+    private const string MachineStatusOnline = "Online";
+    private const string MachineStatusOffline = "Offline";
 }

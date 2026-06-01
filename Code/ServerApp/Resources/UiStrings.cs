@@ -26,8 +26,11 @@ internal static class UiStrings
 
     public static string MainTabMachines => Get(nameof(MainTabMachines), "Quản lý máy");
     public static string MainMachineTitle => Get(nameof(MainMachineTitle), "DANH SÁCH MÁY");
+    public static string MainMachineTitleSample => Get(nameof(MainMachineTitleSample), "DANH SÁCH MÁY - DỮ LIỆU MẪU");
     public static string MainLockMachine => Get(nameof(MainLockMachine), "Khóa máy");
     public static string MainUnlockMachine => Get(nameof(MainUnlockMachine), "Mở khóa");
+    public static string MainLockMachinePending => Get(nameof(MainLockMachinePending), "Khóa (chờ backend)");
+    public static string MainUnlockMachinePending => Get(nameof(MainUnlockMachinePending), "Mở khóa (chờ backend)");
     public static string MainShutdownMachine => Get(nameof(MainShutdownMachine), "Tắt máy");
     public static string MainChatGroup => Get(nameof(MainChatGroup), "Chat máy");
     public static string MainChatSelectedClientDefault => Get(nameof(MainChatSelectedClientDefault), "Chat với PC01");
@@ -58,7 +61,7 @@ internal static class UiStrings
     public static string MainEditCustomerButton => Get(nameof(MainEditCustomerButton), "Sửa");
     public static string MainDeleteCustomerButton => Get(nameof(MainDeleteCustomerButton), "Xóa");
     public static string MainCancelCustomerButton => Get(nameof(MainCancelCustomerButton), "Hủy");
-    public static string MainServerStatus => Get(nameof(MainServerStatus), "Máy chủ: đang thiết kế giao diện mẫu");
+    public static string MainServerStatus => Get(nameof(MainServerStatus), "R1 shell: dashboard đang dùng dữ liệu mẫu; STATUS runtime chờ R2.");
     public static string MainFormTitle => Get(nameof(MainFormTitle), "MÁY CHỦ");
     public static string MainChatPlaceholder => Get(nameof(MainChatPlaceholder), "Nhập tin nhắn...");
     public static string MainSendButton => Get(nameof(MainSendButton), "Gửi");
@@ -66,6 +69,7 @@ internal static class UiStrings
     public static string ChatHistoryTemplate => Get(nameof(ChatHistoryTemplate), "[{0}] Sẵn sàng nhận tin nhắn từ máy chủ.");
     public static string ServerPrefix => Get(nameof(ServerPrefix), "Máy chủ");
     public static string MainSelectedMachineStatusTemplate => Get(nameof(MainSelectedMachineStatusTemplate), "Đang chọn máy {0}.");
+    public static string MainRuntimeStatusUpdatedTemplate => Get(nameof(MainRuntimeStatusUpdatedTemplate), "Đã nhận cập nhật trạng thái runtime cho {0}: {1}.");
     public static string MainNoMachineSelectedStatus => Get(nameof(MainNoMachineSelectedStatus), "Vui lòng chọn một máy trước.");
     public static string MainActionPendingTemplate => Get(nameof(MainActionPendingTemplate), "{0} cho {1}: đang chờ backend.");
     public static string MainCustomerActionPendingTemplate => Get(nameof(MainCustomerActionPendingTemplate), "{0} khách hàng: đang chờ backend.");

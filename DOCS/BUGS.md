@@ -19,8 +19,8 @@ Primary mode: `Local Multi-Instance Core Demo`
 | `B-002` | Critical | No verified TCP listener/dispatcher round-trip | `R1-N01` candidate adds `TcpJsonLineServer` + `PacketDispatcher`; `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts a ServerApp listener, accepts one local client, traces `LOGIN`, and returns typed `ACK` with matching `requestId` and `status: "Success"`. Invalid/unsupported packet handling is still pending under `R1-N02`. | M2 | `R1/G1` | PARITIALLY VERIFIED (M6 - 2026-05-29) |
 | `B-003` | Critical | No integrated login/status/control demo | No runtime proof for UI -> TCP -> auth or command/ACK flow | M2 + M3 + M4 + M5 | `R2-R3` | Open |
 | `B-004` | High | Shared wire implementation does not yet prove API `v0.2` | Existing serializer/parser needs string enum and LOGIN response/error verification | M2 + M1 | `R1/G0` | Verified PASS (M6 - 2026-05-29) |
-| `B-005` | High | Competing auth/database directions | `AuthUsers/AuthSessions` runtime path coexists with broader `Users/Machines/Sessions` draft | M5 + M1 | `R1/G0` |  PARTIALLY VERIFIED (M6 - 2026-05-29) |
-| `B-006` | High | Seed/admin machine docs previously drifted from selected auth runtime | Runtime path uses `admin`/`PC00`/`123`; docs formerly listed another seed | M5 + M6 | `R1/G0` |  PARTIALLY VERIFIED (M6 - 2026-05-29) |
+| `B-005` | High | Competing auth/database directions | `AuthUsers/AuthSessions` runtime path is canonical; broader `Users/Machines/Sessions` remains retained backlog | M5 + M1 | `R1/G0` | Verified PASS (M6 - 2026-06-01) |
+| `B-006` | High | Seed/admin machine docs previously drifted from selected auth runtime | Runtime path uses `admin`/`PC00`/`123`; docs and root DB are now aligned to the same canonical seed | M5 + M6 | `R1/G0` | Verified PASS (M6 - 2026-06-01) |
 | `B-007` | High | Progress can be overstated by shells/skeletons | Legacy ticked tasks lack runtime evidence; client forms are local/uncommitted artifacts | M1 + M6 | Immediate | Tracking reset applied |
 
 ## Core Risk Register

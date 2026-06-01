@@ -2,22 +2,40 @@ namespace ServerApp;
 
 public partial class MainForm : Form
 {
+    private const string SampleMachinePrefix = "PC";
+
     private bool _isSelectingMachine;
     private string? _selectedMachineName;
 
     public MainForm()
     {
         InitializeComponent();
+        ConfigureR1ShellState();
     }
 
     private void MainForm_Load(object sender, EventArgs e)
     {
-        LoadMachineData();
-        LoadCustomerData();
+        LoadSampleMachineData();
+        LoadSampleCustomerData();
         SelectMachine("PC01");
+        lblServerStatus.Text = UiStrings.MainServerStatus;
     }
 
-    private void LoadMachineData()
+    private void ConfigureR1ShellState()
+    {
+        lblMachineTitle.Text = UiStrings.MainMachineTitleSample;
+        lblServerStatus.Text = UiStrings.MainServerStatus;
+
+        btnLockMachine.Text = UiStrings.MainLockMachinePending;
+        btnLockMachine.Width = 155;
+        btnLockMachine.Enabled = false;
+
+        btnUnlockMachine.Text = UiStrings.MainUnlockMachinePending;
+        btnUnlockMachine.Width = 170;
+        btnUnlockMachine.Enabled = false;
+    }
+
+    private void LoadSampleMachineData()
     {
         dgvMachines.Rows.Clear();
         pnlMachineCards.Controls.Clear();
@@ -39,11 +57,36 @@ public partial class MainForm : Form
         for (int index = 0; index < statuses.Length; index++)
         {
             int machineNumber = index + 1;
-            string machineName = $"PC{machineNumber:00}";
+            string machineName = $"{SampleMachinePrefix}{machineNumber:00}";
 
             dgvMachines.Rows.Add(machineNumber, machineNumber, statuses[index], machineName);
             pnlMachineCards.Controls.Add(CreateMachineCard(machineName, statuses[index]));
         }
+    }
+
+    public void ApplyMachineStatusUpdate(string machineId, string status)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyMachineStatusUpdate(machineId, status));
+            return;
+        }
+
+        string normalizedMachineId = NormalizeMachineId(machineId);
+        string normalizedStatus = NormalizeStatus(status);
+
+        UpsertMachineRow(normalizedMachineId, normalizedStatus);
+        UpsertMachineCard(normalizedMachineId, normalizedStatus);
+
+        if (string.Equals(_selectedMachineName, normalizedMachineId, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectMachine(normalizedMachineId);
+        }
+
+        lblServerStatus.Text = string.Format(
+            UiStrings.MainRuntimeStatusUpdatedTemplate,
+            normalizedMachineId,
+            normalizedStatus);
     }
 
     private Panel CreateMachineCard(string machineName, string status)
@@ -72,7 +115,7 @@ public partial class MainForm : Form
         var label = new Label
         {
             Dock = DockStyle.Fill,
-            Text = $"{machineName} - {status}",
+            Text = FormatMachineLabel(machineName, status),
             TextAlign = ContentAlignment.MiddleCenter,
             Font = new Font("Segoe UI", 8F, FontStyle.Bold),
             Cursor = Cursors.Hand,
@@ -99,6 +142,7 @@ public partial class MainForm : Form
         Color statusColor = status switch
         {
             "ONLINE" => Color.FromArgb(31, 122, 58),
+            "OFFLINE" => Color.FromArgb(170, 45, 45),
             "DISCONNECT" => Color.FromArgb(170, 45, 45),
             _ => Color.FromArgb(120, 120, 120)
         };
@@ -258,7 +302,74 @@ public partial class MainForm : Form
         }
     }
 
-    private void LoadCustomerData()
+    private void UpsertMachineRow(string machineName, string status)
+    {
+        foreach (DataGridViewRow row in dgvMachines.Rows)
+        {
+            if (!string.Equals(
+                    row.Cells["MachineNameColumn"].Value?.ToString(),
+                    machineName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            row.Cells["TinhTrangColumn"].Value = status;
+            return;
+        }
+
+        int machineNumber = TryGetMachineNumber(machineName);
+        dgvMachines.Rows.Add(machineNumber, machineNumber, status, machineName);
+    }
+
+    private void UpsertMachineCard(string machineName, string status)
+    {
+        foreach (Control control in pnlMachineCards.Controls)
+        {
+            if (control is Panel card
+                && card.Tag is string existingMachineName
+                && string.Equals(existingMachineName, machineName, StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateMachineCardStatus(card, machineName, status);
+                return;
+            }
+        }
+
+        pnlMachineCards.Controls.Add(CreateMachineCard(machineName, status));
+    }
+
+    private static void UpdateMachineCardStatus(Panel card, string machineName, string status)
+    {
+        foreach (Control child in card.Controls)
+        {
+            if (child is PictureBox icon)
+            {
+                icon.Tag = status;
+                icon.Invalidate();
+            }
+            else if (child is Label label)
+            {
+                label.Text = FormatMachineLabel(machineName, status);
+            }
+        }
+    }
+
+    private static string FormatMachineLabel(string machineName, string status)
+        => $"{machineName} - {status}";
+
+    private static string NormalizeMachineId(string machineId)
+        => string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId.Trim();
+
+    private static string NormalizeStatus(string status)
+        => string.IsNullOrWhiteSpace(status) ? "UNKNOWN" : status.Trim().ToUpperInvariant();
+
+    private static int TryGetMachineNumber(string machineName)
+    {
+        string digits = new(machineName.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out int machineNumber) ? machineNumber : 0;
+    }
+
+    private void LoadSampleCustomerData()
     {
         dgvCustomers.Rows.Clear();
 

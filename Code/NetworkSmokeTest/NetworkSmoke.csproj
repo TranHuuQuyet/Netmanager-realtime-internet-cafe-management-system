@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\ServerApp\ServerApp.csproj" />
+
   </ItemGroup>
 
   <PropertyGroup>

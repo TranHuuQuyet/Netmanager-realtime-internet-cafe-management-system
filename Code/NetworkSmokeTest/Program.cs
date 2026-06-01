@@ -1,9 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.Networking;
-using NETManager.Shared.Packets;
-using NETManager.Shared.Utilities.JsonHelper;
+using Shared.DTOs.RequestPayloads;
+using Shared.Networking;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
 using ServerApp.Networking;
 
 Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");

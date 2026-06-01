@@ -47,7 +47,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `R1-U01` client UI shell - `2026-05-26`, commit `6583b48` | On branch `quyet-clientapp-member4`, `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors; UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; boundary search finds no JSON/network service references in client forms | `Evidence Submitted`; UI shell buildable; network login, `LOCK`/`UNLOCK` and `ACK` runtime are not integrated; M6 verification pending |
 | `R1-U01` customer-flow shell correction - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; a temporary .NET 8 smoke verifies username/password-only login, read-only configured machine identity, hidden endpoint, no local lock action, `--machine-id PC-02` launch configuration, rejected invalid launch configuration, honest pending-login status and passive lock surface with `UnlockFromServer()` release hook | `Evidence Submitted`; corrects client shell ownership/UX only; TCP login and server-routed `LOCK`/`UNLOCK`/`ACK` remain unintegrated; M6 verification pending |
 | `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Evidence Submitted`; presentation refinement only; login/status/control routing and ACK remain pending their runtime gates; M6 verification pending |
-| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, `AuthStatusExtensions` maps auth statuses to API codes, and `PacketFactory`/`JsonHelper` now carry top-level login success/failure envelope so M2 can distinguish request vs response | `Evidence Submitted`; `R1-A01` is complete as a handoff artifact, but `G0/G1` still need runtime verification before the gate can pass |
+| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Evidence Submitted`; handoff is canonical in code, while `G0-05` runtime verification still remains before the gate can pass |
 
 `G0` is not passed by this submission: API `v0.2` contract checks, auth runtime verification and M6/M1 acceptance remain outstanding.
 
@@ -56,7 +56,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 `R1-L01`
 Owner: `M1`
 Task: Approve recovery scope, deadline, core/extension lanes va merge gates
-Dependency: Recovery report
+Dependency: Recoveary report
 Required evidence: Decision entry + team notice + `develop` -> tester `Pass` -> `main` promotion rule
 Member done: [x]
 
@@ -86,7 +86,7 @@ Owner: `M2`
 Task: Implement server listener, typed dispatcher baseline va local JSON-line round-trip
 Dependency: `R1-C01`, `R1-C02`
 Required evidence: Trace valid request/response
-Member done: [ ]
+Member done: [X]
 
 `R1-N02`
 Owner: `M2 + M6`

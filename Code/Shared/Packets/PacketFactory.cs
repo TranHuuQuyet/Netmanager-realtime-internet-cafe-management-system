@@ -1,11 +1,11 @@
-using NETManager.Shared.Enums;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.DTOs.CommandPayloads;
-using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.DTOs.Bidrectional;
-using NETManager.Shared.Models;
+using Shared.Enums;
+using Shared.DTOs.RequestPayloads;
+using Shared.DTOs.CommandPayloads;
+using Shared.DTOs.ResponsePayloads;
+using Shared.DTOs.Bidrectional;
+using Shared.Models;
 
-namespace NETManager.Shared.Packets;
+namespace Shared.Packets;
 
 public static class PacketFactory
 {

@@ -2,6 +2,7 @@ using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
 using ServerApp.Database.Contracts;
 using ServerApp.Database.Models;
+using AuthUserRole = ServerApp.Auth.Models.UserRole;
 
 namespace ServerApp.Auth.Services;
 
@@ -42,7 +43,7 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.AccountDisabled, "Account is inactive.");
             }
 
-            if (request.RequiredRole.HasValue && user.Role != request.RequiredRole.Value) {
+            if (request.RequiredRole.HasValue && (AuthUserRole)user.Role != request.RequiredRole.Value) {
                 return AuthResult.Failure(AuthStatus.RoleMismatch, "Account role is not allowed for this login.");
             }
 
@@ -52,7 +53,7 @@ public sealed class AuthService : IAuthService {
             }
 
             // Buoc 4: kiem tra machineId theo role.
-            if (user.Role == UserRole.Admin) {
+            if (user.Role == AuthUserRole.Admin) {
                 // Admin chi duoc login tren may dinh danh PC00.
                 if (string.IsNullOrWhiteSpace(machineId)) {
                     return AuthResult.Failure(AuthStatus.InvalidMachineId, "Admin machine ID is required.");
@@ -85,7 +86,7 @@ public sealed class AuthService : IAuthService {
             var summary = new UserSummary(
                 user.Id,
                 user.Username,
-                user.Role,
+                (AuthUserRole)user.Role,
                 user.MachineId ?? string.Empty,
                 user.IsActive,
                 session.StartedAtUtc);

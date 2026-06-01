@@ -1,4 +1,4 @@
-namespace NETManager.Shared.Enums;
+namespace Shared.Enums;
 
 public enum PacketType
 {

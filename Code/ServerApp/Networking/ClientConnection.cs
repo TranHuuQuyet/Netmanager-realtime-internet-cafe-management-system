@@ -8,7 +8,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using NETManager.Shared.Networking;
+using Shared.Networking;
 
 namespace ServerApp.Networking;
 
@@ -25,7 +25,7 @@ public class ClientConnection : IDisposable
     private readonly CancellationTokenSource _disconnectTokenSource = new();
     //quản lý viẹc các thread sử dụng biến isdisconnected 
     private readonly object _stateLock = new();
-// property 
+    // property 
     private bool _isDisconnected;
 
     public bool IsDisconnected
@@ -38,12 +38,12 @@ public class ClientConnection : IDisposable
             }
         }
     }
-/* event là một cơ chế chứa danh sách các delegate (hàm callback) 
-mà class khác có thể đăng ký vào để được thông báo khi một sự kiện xảy ra.*/
-// tạo event 
-// MessageReceived thông báo client vừa gửi message
+    /* event là một cơ chế chứa danh sách các delegate (hàm callback) 
+    mà class khác có thể đăng ký vào để được thông báo khi một sự kiện xảy ra.*/
+    // tạo event 
+    // MessageReceived thông báo client vừa gửi message
     public event Action<ClientConnection, string>? MessageReceived;
-// Disconnected thông báo client vừa ngắt kết nối 
+    // Disconnected thông báo client vừa ngắt kết nối 
     public event Action<ClientConnection>? Disconnected;
 
     public ClientConnection(string clientId, TcpClient tcpClient)// Construtors
@@ -68,7 +68,7 @@ mà class khác có thể đăng ký vào để được thông báo khi một s
         };
     }
 
-// Gửi dữ liệu cho server
+    // Gửi dữ liệu cho server
     public async Task SendAsync(string message, CancellationToken cancellationToken = default)
     {
         // kiểm tra input với điều kiện
@@ -76,14 +76,14 @@ mà class khác có thể đăng ký vào để được thông báo khi một s
 
         if (IsDisconnected)
             return;
-/*Chờ để vào SemaphoreSlim, đồng thời quan sát CancellationToken.*/
+        /*Chờ để vào SemaphoreSlim, đồng thời quan sát CancellationToken.*/
         await _sendLock.WaitAsync(cancellationToken);
 
         try
         {
             if (IsDisconnected)
                 return;
-// AsMemory() == biến string thành ReadOnlyMemory<char> là một struct nhỏ dùng để mô tả vùng ký tự của string.
+            // AsMemory() == biến string thành ReadOnlyMemory<char> là một struct nhỏ dùng để mô tả vùng ký tự của string.
             await _writer.WriteLineAsync(outgoingMessage.AsMemory(), cancellationToken);
         }
         catch (IOException)
@@ -101,7 +101,7 @@ mà class khác có thể đăng ký vào để được thông báo khi một s
         }
     }
 
-//vòng lặp liên tục nghe dữ liệu từ client gửi cho server 
+    //vòng lặp liên tục nghe dữ liệu từ client gửi cho server 
     public async Task ReceiveLoopAsync(CancellationToken cancellationToken = default)
     {
         /* CreateLinkedTokenSource hàm gội nhiều token lại nếu 1 cái bị huỷ thì cái còn lại cũng vậy
@@ -129,24 +129,24 @@ mà class khác có thể đăng ký vào để được thông báo khi một s
 
                 try
                 {// sau khi đã đọc thì thông báo cho các hàm đã đăng kí nghe 
-                //  client vừa gửi message
+                 //  client vừa gửi message
                     MessageReceived?.Invoke(this, message);
                 }
-                 // Bắt mọi lỗi xảy ra bên trong message handler.
+                // Bắt mọi lỗi xảy ra bên trong message handler.
                 catch (Exception ex)
                 {
                     Console.WriteLine($"[SERVER] Message handler failed for client {ClientId}: {ex.Message}");
                 }
-            }          
+            }
         } // Xảy ra khi CancellationToken bị huỷ.
         catch (OperationCanceledException)
         {
         }// Lỗi đọc/ghi stream.
-    //
-    // Thường xảy ra khi:
-    // - client mất mạng
-    // - client tắt app đột ngột
-    // - socket bị đóng giữa lúc đang read/write
+         //
+         // Thường xảy ra khi:
+         // - client mất mạng
+         // - client tắt app đột ngột
+         // - socket bị đóng giữa lúc đang read/write
         catch (IOException)
         {
             Console.WriteLine($"[SERVER] Client lost connection: {ClientId}");

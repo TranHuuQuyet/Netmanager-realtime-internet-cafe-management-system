@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.DTOs.RequestPayloads;
+namespace Shared.DTOs.RequestPayloads;
 
 public class LoginPayload
 {

@@ -36,7 +36,7 @@ This command must pass before a runtime demo or feature gate can be accepted.
 | Default port | `5000` | Target until `G1` pass |
 | Framing | one UTF-8 JSON object per line | Approved contract target |
 | Auth schema | `AuthUsers`, `AuthSessions` | Canonical recovery path |
-| Database under approved root-run workflow | `internet_cafe.db` in repository root | Matches current selected auth runtime artifact; verify in `G0` |
+| Database under approved root-run workflow | `internet_cafe.db` in repository root | Resolved by `AuthBootstrapper`; keep running from repository root so the canonical SQLite path stays unambiguous |
 | Machine status storage | in-memory connection registry | Core architecture target |
 
 Until a deterministic application data path is implemented and approved, run recovery commands from repository root so the relative SQLite database location is not ambiguous.

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using ServerApp.Database.Entities;
 
 namespace ServerApp.Database;
@@ -6,19 +8,19 @@ public static class SeedData
 {
     private static readonly DateTime CreatedAt = new(2026, 5, 13, 0, 0, 0, DateTimeKind.Utc);
 
-    public static IReadOnlyList<UserEntity> Users { get; } =
-    [
+    public static IReadOnlyList<UserEntity> Users { get; } = new List<UserEntity>
+    {
         CreateUser("admin", "Admin", "PC00"),
         CreateUser("client01", "Client", "PC-01"),
         CreateUser("client02", "Client", "PC-02")
-    ];
+    };
 
-    public static IReadOnlyList<MachineEntity> Machines { get; } =
-    [
+    public static IReadOnlyList<MachineEntity> Machines { get; } = new List<MachineEntity>
+    {
         CreateMachine("PC-01", "Computer 01"),
         CreateMachine("PC-02", "Computer 02"),
         CreateMachine("PC-03", "Computer 03")
-    ];
+    };
 
     private static UserEntity CreateUser(string username, string role, string? machineId)
     {

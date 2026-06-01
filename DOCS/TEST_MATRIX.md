@@ -36,7 +36,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G0-02` | Packet `type` serializes/deserializes as API string value          | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Existing shared implementation not yet verified against API `v0.2`  |
 | `G0-03` | `LOGIN` request and response parse into distinct expected paths    | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Requires contract implementation correction                         |
 | `G0-04` | Failure response emits top-level `success: false` and `error.code` | M2 + M5 + M6 | `Pass(M6 - 2026-05-29)`      | Requires contract/auth mapping                                      |
-| `G0-05` | Canonical auth seed/database/admin rule match docs                 | M5 + M6      | `Blocked`      | Documentation decision recorded; runtime proof required             |
+| `G0-05` | Canonical auth seed/database/admin rule match docs                 | M5 + M6      | `Pass`         | Runtime seed in `internet_cafe.db` matches `admin`/`client01`/`client02` and admin `PC00` rule |
 
 ## G1 - Network Foundation (`R1`)
 

@@ -32,7 +32,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | Item | Current status | Evidence / blocker |
 | --- | --- | --- |
 | Full solution build | `Fail` | Build audit fail tai `ServerApp/Forms/LoginForm.Designer.cs(7,29)` do thieu `LoginForm.cs` trong working tree |
-| Contract approval | `Blocked` | API/shared/auth/database dang drift; can M1/M2/M5 freeze baseline `v0.2` |
+| Contract approval | `Pass` | API `v0.2` contract va canonical auth/database baseline da duoc freeze va verified |
 | Runtime tests | `Blocked` | `0/33` legacy test cases da pass tai baseline audit |
 | Demo path | `Blocked` | `14/14` legacy demo steps van pending tai baseline audit |
 | M4 client forms | `Historical Artifact` | Forms local/uncommitted ton tai, chua consume runtime service |
@@ -48,9 +48,9 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `R1-U01` client UI shell - `2026-05-26`, commit `6583b48` | On branch `quyet-clientapp-member4`, `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors; UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; boundary search finds no JSON/network service references in client forms | `Evidence Submitted`; UI shell buildable; network login, `LOCK`/`UNLOCK` and `ACK` runtime are not integrated; M6 verification pending |
 | `R1-U01` customer-flow shell correction - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; a temporary .NET 8 smoke verifies username/password-only login, read-only configured machine identity, hidden endpoint, no local lock action, `--machine-id PC-02` launch configuration, rejected invalid launch configuration, honest pending-login status and passive lock surface with `UnlockFromServer()` release hook | `Evidence Submitted`; corrects client shell ownership/UX only; TCP login and server-routed `LOCK`/`UNLOCK`/`ACK` remain unintegrated; M6 verification pending |
 | `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Evidence Submitted`; presentation refinement only; login/status/control routing and ACK remain pending their runtime gates; M6 verification pending |
-| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Evidence Submitted`; handoff is canonical in code, while `G0-05` runtime verification still remains before the gate can pass |
+| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Verified Pass`; canonical seed/admin rule da khop runtime DB va `G0-05` da dong |
 
-`G0` is not passed by this submission: API `v0.2` contract checks, auth runtime verification and M6/M1 acceptance remain outstanding.
+`G0` contract and canonical auth baseline are now verified in the recovery log; M1/M6 gate approval still follows the standard promotion flow.
 
 ## R1 - Foundation Repair (`2026-05-25` to `2026-05-31`)
 

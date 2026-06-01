@@ -6,7 +6,8 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 
 - A current implementation candidate restores the typed-auth server login path and a buildable client shell; an isolated build submission passes with `0` warnings and `0` errors.
 - Server startup smoke now opens a responsive login dialog after correcting the UI resource manifest lookup; login result behavior is not yet gate-verified.
-- The build evidence is submitted for M6 verification and does not by itself pass `G0`, because API/auth contract checks remain outstanding.
+- The canonical recovery auth seed is now verified in `internet_cafe.db`: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
+- The build evidence is submitted for M6 verification and the canonical `G0` auth contract baseline is now verified; M1/M6 gate approval still applies separately.
 - Client startup is an explicit shell artifact and does not prove network/login integration.
 - TCP listener/dispatcher valid round-trip evidence has been submitted through `R1-N01`; invalid/unsupported packet handling, login integration, status and control flow are not verified.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
@@ -97,7 +98,7 @@ Real LAN is retained as a valuable project capability, but it is not allowed to 
 
 ## Reset And Evidence Rules
 
-- M5 must document a verified SQLite reset/seed path during `G0/G2`.
-- Do not delete or replace the tracked database without an approved reset procedure.
+- M5 must document a verified SQLite reset/seed path during `G0/G2`; the canonical reset is root `internet_cafe.db` with `AuthUsers/AuthSessions` and the three recovery accounts above.
+- Do not delete or replace the tracked database without an approved reset procedure, even when the seed has already been verified.
 - M6 records build identity, runtime mode, test date and evidence for each pass.
 - A screen opening without real network/auth interaction is not a completed demo step.

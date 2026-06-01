@@ -57,33 +57,7 @@ public static class DatabaseBootstrapper
     }
 
     private static IReadOnlyList<MachineEntity> BuildSeedMachines()
-        => new List<MachineEntity>
-        {
-            new()
-            {
-                Id = StableGuid("machine:PC-01"),
-                MachineId = "PC-01",
-                MachineName = "Computer 01",
-                Status = "Offline",
-                IsActive = true
-            },
-            new()
-            {
-                Id = StableGuid("machine:PC-02"),
-                MachineId = "PC-02",
-                MachineName = "Computer 02",
-                Status = "Offline",
-                IsActive = true
-            },
-            new()
-            {
-                Id = StableGuid("machine:PC-03"),
-                MachineId = "PC-03",
-                MachineName = "Computer 03",
-                Status = "Offline",
-                IsActive = true
-            }
-        };
+        => SeedData.Machines;
 
     private static UserRecord CreateUserRecord(SeedAccount seed)
     {

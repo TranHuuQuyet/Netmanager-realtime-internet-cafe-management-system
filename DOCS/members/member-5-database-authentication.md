@@ -2,7 +2,7 @@
 
 ## Recovery Role
 
-Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineId` validation. Audit thay co hai huong persistence, nen recovery quyet dinh dung auth path trong `AuthBootstrapper` lam canonical truoc deadline.
+Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineId` validation. Audit thay co hai huong persistence, nen recovery quyet dinh dung auth path trong `AuthBootstrapper` lam canonical truoc deadline. RR1 canonical seed/admin baseline da duoc dong bo va xac minh.
 
 ## Write Scope
 
@@ -55,3 +55,9 @@ Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineI
 - Canonical auth path is unambiguous and callable from network flow.
 - Machine-bound login and session guard pass runtime tests.
 - Deferred persistence work remains documented without destabilizing release scope.
+
+## RR1 Completion Note
+
+- `R1-A01` da hoan thanh theo canonical auth/database baseline.
+- `G0-05` da duoc xac minh theo runtime seed trong `internet_cafe.db`.
+- `AuthUsers/AuthSessions` van la runtime schema canonical; `Users/Machines/Sessions` tiep tuc la retained/post-core direction.

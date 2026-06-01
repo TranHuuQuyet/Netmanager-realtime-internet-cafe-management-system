@@ -17,9 +17,9 @@ public static class SeedData
 
     public static IReadOnlyList<MachineEntity> Machines { get; } = new List<MachineEntity>
     {
+        CreateMachine("PC00", "Computer 00"),
         CreateMachine("PC-01", "Computer 01"),
-        CreateMachine("PC-02", "Computer 02"),
-        CreateMachine("PC-03", "Computer 03")
+        CreateMachine("PC-02", "Computer 02")
     };
 
     private static UserEntity CreateUser(string username, string role, string? machineId)

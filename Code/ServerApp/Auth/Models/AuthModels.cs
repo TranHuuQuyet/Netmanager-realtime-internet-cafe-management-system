@@ -1,4 +1,4 @@
-using WireAuthResult = NETManager.Shared.Models.AuthResult;
+using WireAuthResult = Shared.Models.AuthResult;
 namespace ServerApp.Auth.Models;
 
 // Role xac dinh quyen dang nhap va cach xu ly login o server.

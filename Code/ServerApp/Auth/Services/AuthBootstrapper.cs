@@ -18,8 +18,8 @@ public static class AuthBootstrapper {
     public static async Task<AuthRuntime> CreateAsync(string? databasePath = CanonicalDatabasePath, CancellationToken cancellationToken = default) {
         DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(databasePath, cancellationToken).ConfigureAwait(false);
 
-        ISessionService sessionService = new SessionService(database.Sessions);
-        IAuthService auth = new AuthService(database.Users, sessionService);
+        ISessionService sessionService = new SessionService(database.Sessions, database.Machines);
+        IAuthService auth = new AuthService(database.Users, database.Machines, sessionService);
 
         return new AuthRuntime(database.Users, database.Sessions, sessionService, auth);
     }

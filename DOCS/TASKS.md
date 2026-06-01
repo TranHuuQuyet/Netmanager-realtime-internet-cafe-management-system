@@ -84,7 +84,7 @@ Owner: `M2`
 Task: Implement server listener, typed dispatcher baseline va local JSON-line round-trip
 Dependency: `R1-C01`, `R1-C02`
 Required evidence: Trace valid request/response
-Member done: [ ]
+Member done: [X]
 
 `R1-N02`
 Owner: `M2 + M6`

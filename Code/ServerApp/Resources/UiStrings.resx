@@ -85,11 +85,20 @@
   <data name="MainMachineTitle" xml:space="preserve">
     <value>DANH SÁCH MÁY</value>
   </data>
+  <data name="MainMachineTitleSample" xml:space="preserve">
+    <value>DANH SÁCH MÁY - DỮ LIỆU MẪU</value>
+  </data>
   <data name="MainLockMachine" xml:space="preserve">
     <value>Khóa máy</value>
   </data>
   <data name="MainUnlockMachine" xml:space="preserve">
     <value>Mở khóa</value>
+  </data>
+  <data name="MainLockMachinePending" xml:space="preserve">
+    <value>Khóa (chờ backend)</value>
+  </data>
+  <data name="MainUnlockMachinePending" xml:space="preserve">
+    <value>Mở khóa (chờ backend)</value>
   </data>
   <data name="MainShutdownMachine" xml:space="preserve">
     <value>Tắt máy</value>
@@ -182,7 +191,7 @@
     <value>Hủy</value>
   </data>
   <data name="MainServerStatus" xml:space="preserve">
-    <value>Máy chủ: đang thiết kế giao diện mẫu</value>
+    <value>R1 shell: dashboard đang dùng dữ liệu mẫu; STATUS runtime chờ R2.</value>
   </data>
   <data name="MainFormTitle" xml:space="preserve">
     <value>MÁY CHỦ</value>
@@ -213,6 +222,9 @@
   </data>
   <data name="MainSelectedMachineStatusTemplate" xml:space="preserve">
     <value>Đang chọn máy {0}.</value>
+  </data>
+  <data name="MainRuntimeStatusUpdatedTemplate" xml:space="preserve">
+    <value>Đã nhận cập nhật trạng thái runtime cho {0}: {1}.</value>
   </data>
   <data name="MainNoMachineSelectedStatus" xml:space="preserve">
     <value>Vui lòng chọn một máy trước.</value>

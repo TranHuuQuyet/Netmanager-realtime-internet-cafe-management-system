@@ -9,6 +9,8 @@ using ServerApp.Auth.Models;
 
 namespace ServerApp.Networking;
 
+public sealed record PacketDispatchResult(string Response, string? OpenedSessionId = null);
+
 public sealed class PacketDispatcher
 {
     private readonly IAuthService _authService;
@@ -18,7 +20,7 @@ public sealed class PacketDispatcher
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
     }
 
-    public async Task<string> DispatchAsync(string inboundLine, CancellationToken cancellationToken = default)
+    public async Task<PacketDispatchResult> DispatchAsync(string inboundLine, CancellationToken cancellationToken = default)
     {
         object packet = JsonHelper.DeserializePacket(inboundLine);
 
@@ -30,7 +32,7 @@ public sealed class PacketDispatcher
         };
     }
 
-    private async Task<string> DispatchLoginAsync(
+    private async Task<PacketDispatchResult> DispatchLoginAsync(
         Packet<LoginPayload> loginPacket,
         CancellationToken cancellationToken)
     {
@@ -83,10 +85,10 @@ public sealed class PacketDispatcher
             requestId: loginPacket.RequestId,
             message: result.Message);
 
-        return SerializeResponse(response);
+        return new PacketDispatchResult(SerializeResponse(response), result.Session.Id);
     }
 
-    private static string CreateLoginFailure(
+    private static PacketDispatchResult CreateLoginFailure(
         Packet<LoginPayload> loginPacket,
         string errorCode,
         string details)
@@ -98,7 +100,7 @@ public sealed class PacketDispatcher
             details: details,
             requestId: loginPacket.RequestId);
 
-        return SerializeResponse(response);
+        return new PacketDispatchResult(SerializeResponse(response));
     }
 
     private static string SerializeResponse(Packet response)

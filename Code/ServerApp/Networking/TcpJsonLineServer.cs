@@ -2,23 +2,33 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
-
+using ServerApp.Auth.Contracts;
+using ServerApp.Auth.Models;
+using ServerApp.Networking;
+using ServerApp.Auth.Services;
 namespace ServerApp.Networking;
 
 public sealed class TcpJsonLineServer : IDisposable
 {
     private readonly TcpListener _listener;
     private readonly PacketDispatcher _dispatcher;
+    private readonly ISessionService _sessions;
     private readonly ConcurrentDictionary<string, ClientConnection> _connections = new();
+    private readonly ConcurrentDictionary<string, string> _sessionBindings = new();
     private readonly CancellationTokenSource _stopTokenSource = new();
     private Task? _acceptLoopTask;
     private int _nextClientNumber;
     private bool _isStarted;
 
-    public TcpJsonLineServer(IPAddress address, int port, PacketDispatcher dispatcher)
+    public TcpJsonLineServer(
+        IPAddress address,
+        int port,
+        PacketDispatcher dispatcher,
+        ISessionService sessions)
     {
         _listener = new TcpListener(address, port);
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
+        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
     }
 
     public bool IsStarted => _isStarted;
@@ -87,9 +97,20 @@ public sealed class TcpJsonLineServer : IDisposable
 
         try
         {
-            string response = await _dispatcher.DispatchAsync(message, cancellationToken).ConfigureAwait(false);
-            TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, response));
-            await connection.SendAsync(response, cancellationToken).ConfigureAwait(false);
+            PacketDispatchResult result = await _dispatcher.DispatchAsync(message, cancellationToken).ConfigureAwait(false);
+
+            if (result.OpenedSessionId is not null)
+            {
+                if (!_sessionBindings.TryAdd(connection.ClientId, result.OpenedSessionId))
+                {
+                    await _sessions.CloseSessionAsync(result.OpenedSessionId, cancellationToken).ConfigureAwait(false);
+                    connection.Disconnect();
+                    return;
+                }
+            }
+
+            TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, result.Response));
+            await connection.SendAsync(result.Response, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException or JsonException)
         {
@@ -101,6 +122,19 @@ public sealed class TcpJsonLineServer : IDisposable
     private void ClientDisconnected(ClientConnection connection)
     {
         _connections.TryRemove(connection.ClientId, out _);
+
+        if (_sessionBindings.TryRemove(connection.ClientId, out var sessionId))
+        {
+            try
+            {
+                _sessions.CloseSessionAsync(sessionId).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                TraceEmitted?.Invoke(new NetworkTraceEntry("SESSION_ERROR", connection.ClientId, ex.Message));
+            }
+        }
+
         TraceEmitted?.Invoke(new NetworkTraceEntry("DISCONNECTED", connection.ClientId, string.Empty));
     }
 

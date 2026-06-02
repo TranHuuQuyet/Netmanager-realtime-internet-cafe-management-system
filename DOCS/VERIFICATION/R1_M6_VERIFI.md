@@ -76,7 +76,7 @@ Result: ServerApp listener active on 127.0.0.1:50833
 
 Conclusion: Pass
 
-`G1-02`  One client connects without UI freeze
+`G1-02`  ClientApp starts without UI freeze
 
 Status: Not Tested
 
@@ -85,6 +85,8 @@ Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
 Result: Smoke test không có UI, không thể verify qua lệnh này
 
 Conclusion: Not Tested — cần UI integration test, chưa có trong R1
+
+Supplemental note (2026-06-02): M4 submitted ClientApp startup UI smoke evidence for `G1-02`. This covers shell responsiveness only; runtime TCP connect/login/status remains unverified in R1 and is tracked in R2.
 
 `G1-03`  Client and server exchange one valid JSON-line packet
 

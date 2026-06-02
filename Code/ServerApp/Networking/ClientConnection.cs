@@ -27,6 +27,7 @@ public class ClientConnection : IDisposable
     private readonly object _stateLock = new();
     // property 
     private bool _isDisconnected;
+    private string? _sessionId;
 
     public bool IsDisconnected
     {
@@ -35,6 +36,17 @@ public class ClientConnection : IDisposable
             lock (_stateLock)
             {
                 return _isDisconnected;
+            }
+        }
+    }
+
+    public string? SessionId
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _sessionId;
             }
         }
     }
@@ -66,6 +78,21 @@ public class ClientConnection : IDisposable
             hoặc Dispose()*/
             AutoFlush = true
         };
+    }
+
+    public bool TryBindSession(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return false;
+
+        lock (_stateLock)
+        {
+            if (_isDisconnected || _sessionId is not null)
+                return false;
+
+            _sessionId = sessionId.Trim();
+            return true;
+        }
     }
 
     // Gửi dữ liệu cho server

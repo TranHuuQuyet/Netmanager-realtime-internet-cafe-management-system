@@ -13,29 +13,36 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
 
-        Task<IAuthService> authServiceTask = Task.Run(CreateAuthServiceAsync);
+        Task<AuthRuntime> authRuntimeTask = Task.Run(CreateAuthRuntimeAsync);
+        Task<IAuthService> authServiceTask = GetAuthServiceAsync(authRuntimeTask);
         using var loginForm = new LoginForm(authServiceTask);
 
         if (loginForm.ShowDialog() == DialogResult.OK)
         {
-            IAuthService authService = authServiceTask.GetAwaiter().GetResult();
-            using TcpJsonLineServer? networkServer = TryStartNetworkServer(authService);
+            AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
+            using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
             Application.Run(new MainForm());
         }
     }
 
-    private static async Task<IAuthService> CreateAuthServiceAsync()
+    private static Task<AuthRuntime> CreateAuthRuntimeAsync()
     {
-        AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync().ConfigureAwait(false);
+        return AuthBootstrapper.CreateAsync();
+    }
+
+    private static async Task<IAuthService> GetAuthServiceAsync(Task<AuthRuntime> authRuntimeTask)
+    {
+        AuthRuntime authRuntime = await authRuntimeTask.ConfigureAwait(false);
         return authRuntime.Auth;
     }
 
-    private static TcpJsonLineServer? TryStartNetworkServer(IAuthService authService)
+    private static TcpJsonLineServer? TryStartNetworkServer(AuthRuntime authRuntime)
     {
         var server = new TcpJsonLineServer(
             IPAddress.Loopback,
             5000,
-            new PacketDispatcher(authService));
+            new PacketDispatcher(authRuntime.Auth),
+            authRuntime.SessionService);
 
         try
         {

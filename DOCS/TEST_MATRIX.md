@@ -26,6 +26,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | Client UI startup smoke (`R1-U01`, `2026-05-26`, `6583b48`)                  | `Pass` on implementation working tree | On branch `quyet-clientapp-member4`, automated UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; source boundary check finds no JSON/network service references in client forms | Supporting evidence for M4 shell submission only; it does not prove connection, auth result, status, control routing or ACK                   |
 | Client customer-flow shell smoke (`R1-U01`, `2026-05-26`, working tree)      | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke inspects the updated login/lock surfaces, launch option validation and `PC-02` multi-instance configuration without connecting to a server                                                                         | Supporting evidence for corrected client UX only; it does not prove TCP login, status, command routing or ACK                                 |
 | Client plain WinForms smoke (`R1-U01`, `2026-05-26`, working tree)           | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke verifies the compact server-style login dialog, default-control main/lock forms, launch identities and removal of custom theme dependencies                                                                        | Supporting evidence for client presentation only; real login/status/command routing and ACK remain blocked                                    |
+| `G1-02` ClientApp startup UI smoke (`M4`, `2026-06-02`, working tree)        | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors; UIAutomation launched `.audit-artifacts\bin\ClientApp\debug\ClientApp.exe` as default `PC-01`, launched `--machine-id=PC-02`, read `txtMachineId`, confirmed the window was responsive, and closed via both main-window close and `btnExit` | `G1-02` is UI smoke pass only; full runtime connect/login/status/control is not verified in R1. Codegraph found no ClientApp caller of `TcpClientConnection`; runtime TCP work remains R2/R3 |
 | `G0-02/G0-03/G0-04` contract smoke (`R1-C02`, `2026-05-27`, working tree)    | `Pass` on implementation working tree | `dotnet run --project Code/ContractSmoke/ContractSmoke.csproj --no-restore` passes string packet-type serialization, numeric type rejection, `LOGIN` request/response split, request envelope nullables unset, and top-level login error envelope assertions                                   | Submitted for M6 verification; contract gate remains pending M1 approval and remaining `G0` dependencies                                      |
 | `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Submitted for M6 verification; covers local listener, valid round-trip and controlled invalid/unsupported disconnect behavior |
 
@@ -44,7 +45,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | ID      | Test                                                  | Mode  | Owner   | Initial status |
 | ------- | ----------------------------------------------------- | ----- | ------- | -------------- |
 | `G1-01` | Server starts and listens on recovery local endpoint  | Local | M2      | `Pass(M6 - 2026-05-29)`         |
-| `G1-02` | One client connects without UI freeze                 | Local | M2 + M4 | `Pass(M6 - 2026-05-29)`         |
+| `G1-02` | One client connects without UI freeze                 | Local | M2 + M4 | `Evidence Submitted(M4 - 2026-06-02; UI smoke only)` |
 | `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2      | `Pass(M6 - 2026-05-29)`         |
 | `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Evidence Submitted` |
 | `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Evidence Submitted` |
@@ -169,13 +170,26 @@ Conclusion: Pass
 
 `G1-02`  One client connects without UI freeze
 
-Status: Not Tested
+Status: Evidence Submitted - UI smoke pass only
 
-Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+Build command: dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal
 
-Result: Smoke test không có UI, không thể verify qua lệnh này
+Build result: Build succeeded with 0 Warning(s), 0 Error(s)
 
-Conclusion: Not Tested — cần UI integration test, chưa có trong R1
+Open ClientApp:
+        .audit-artifacts\bin\ClientApp\debug\ClientApp.exe
+        .audit-artifacts\bin\ClientApp\debug\ClientApp.exe --machine-id=PC-02
+
+UIAutomation result:
+        PASS default-launch opened responsive ConnectForm, machine=PC-01, closed cleanly
+        PASS pc02-equals-launch opened responsive ConnectForm, machine=PC-02, closed cleanly
+        PASS btnExit closes ConnectForm, machine=PC-02, process exited cleanly
+
+Scope note:
+        Codegraph found no ClientApp caller of TcpClientConnection.
+        ConnectForm login still reports server login is not integrated.
+
+Conclusion: UI smoke pass only; full runtime connect not verified in R1. Do not claim runtime network login pass. Runtime TCP login/status/control moves to R2/R3.
 
 `G1-03`  Client and server exchange one valid JSON-line packet
 

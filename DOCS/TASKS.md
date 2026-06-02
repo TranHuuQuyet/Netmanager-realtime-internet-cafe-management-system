@@ -32,7 +32,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | Item | Current status | Evidence / blocker |
 | --- | --- | --- |
 | Full solution build | `Fail` | Build audit fail tai `ServerApp/Forms/LoginForm.Designer.cs(7,29)` do thieu `LoginForm.cs` trong working tree |
-| Contract approval | `Blocked` | API/shared/auth/database dang drift; can M1/M2/M5 freeze baseline `v0.2` |
+| Contract approval | `Pass` | API `v0.2` contract va canonical auth/database baseline da duoc freeze va verified |
 | Runtime tests | `Blocked` | `0/33` legacy test cases da pass tai baseline audit |
 | Demo path | `Blocked` | `14/14` legacy demo steps van pending tai baseline audit |
 | M4 client forms | `Historical Artifact` | Forms local/uncommitted ton tai, chua consume runtime service |
@@ -41,15 +41,16 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 
 | Item | Submitted evidence | Current disposition |
 | --- | --- | --- |
-| Full solution build candidate | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors after restoring the server login path and adding an explicit client shell entry form | `Evidence Submitted`; pending M6 verification and M1 gate approval |
+| Full solution build candidate | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors after restoring the server login path, adding an explicit client shell entry form and annotating the WinForms server app as Windows-only | `Evidence Submitted`; pending M6 verification and M1 gate approval |
 | Server login path | `Program` initializes typed auth off the UI thread and passes `IAuthService` into `LoginForm`; the resource manifest lookup is corrected and a startup smoke opens the `Dang nhap` dialog responsively | `Evidence Submitted`; local admin authentication interaction still requires verification |
-| Client startup path | `ConnectForm` is present as a buildable shell and explicitly states that network login binding remains pending `G1/G2` | Build blocker removed only; no runtime integration claim |
+| M3 server dashboard R1 shell honesty - `2026-06-01`, working tree | `MainForm` labels the machine dashboard as sample data, uses explicit sample loaders, disables `LOCK`/`UNLOCK` actions as backend-pending, and exposes `ApplyMachineStatusUpdate(machineId, status)` as a UI-side bridge for R2 typed status events without parsing packets, querying SQLite or fabricating ACK/error results | `Evidence Submitted`; server UI shell/build path only; dashboard real status remains `R2-U02` and `G2-05/G2-06` stay blocked until M2/M4 status routing exists |
+| Client startup path | `ConnectForm` is present as a buildable shell and explicitly states that network login binding remains pending `R2/G2` | Build blocker removed only; no runtime integration claim |
 | `R1-U01` client UI shell - `2026-05-26`, commit `6583b48` | On branch `quyet-clientapp-member4`, `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` passes with `0` warnings and `0` errors; UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; boundary search finds no JSON/network service references in client forms | `Evidence Submitted`; UI shell buildable; network login, `LOCK`/`UNLOCK` and `ACK` runtime are not integrated; M6 verification pending |
 | `R1-U01` customer-flow shell correction - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; a temporary .NET 8 smoke verifies username/password-only login, read-only configured machine identity, hidden endpoint, no local lock action, `--machine-id PC-02` launch configuration, rejected invalid launch configuration, honest pending-login status and passive lock surface with `UnlockFromServer()` release hook | `Evidence Submitted`; corrects client shell ownership/UX only; TCP login and server-routed `LOCK`/`UNLOCK`/`ACK` remain unintegrated; M6 verification pending |
 | `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Evidence Submitted`; presentation refinement only; login/status/control routing and ACK remain pending their runtime gates; M6 verification pending |
-| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Evidence Submitted`; handoff is canonical in code, while `G0-05` runtime verification still remains before the gate can pass |
+| `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Verified Pass`; canonical seed/admin rule da khop runtime DB va `G0-05` da dong |
 
-`G0` is not passed by this submission: API `v0.2` contract checks, auth runtime verification and M6/M1 acceptance remain outstanding.
+`G0` contract and canonical auth baseline are now verified in the recovery log; M1/M6 gate approval still follows the standard promotion flow.
 
 ## R1 - Foundation Repair (`2026-05-25` to `2026-05-31`)
 
@@ -83,7 +84,7 @@ Member done: [x]
 
 `R1-N01`
 Owner: `M2`
-Task: Implement server listener, typed dispatcher baseline va local JSON-line round-trip
+Task: Implement server listener, typed dispatcher baseline va local JSON-line round-trip; no ClientApp UI login integration claim
 Dependency: `R1-C01`, `R1-C02`
 Required evidence: Trace valid request/response
 Member done: [X]
@@ -93,11 +94,11 @@ Owner: `M2 + M6`
 Task: Validate invalid/unsupported packet does not crash receiver
 Dependency: `R1-N01`
 Required evidence: `G1` test result
-Member done: [ ]
+Member done: [x]
 
 `R1-U01`
 Owner: `M4`
-Task: Integrate client form artifacts into buildable branch without claiming runtime integration
+Task: Integrate client form artifacts into buildable branch without claiming runtime integration; covers ClientApp shell/startup smoke only
 Dependency: `R1-C01`
 Required evidence: Build/UI smoke note
 Member done: [x]
@@ -113,7 +114,7 @@ Member done: [x]
 
 `R2-N01`
 Owner: `M2 + M5`
-Task: Route `LOGIN` from TCP dispatcher to canonical auth service
+Task: Route real `LOGIN` from TCP dispatcher to canonical auth service
 Dependency: `G0`, `G1` pass
 Required evidence: Request/response trace
 Member done: [ ]
@@ -127,14 +128,14 @@ Member done: [ ]
 
 `R2-U01`
 Owner: `M4`
-Task: Bind client login screen to real network/auth result
+Task: Bind client login screen to real M2/M5 network/auth result
 Dependency: `R2-N01`
 Required evidence: Visible success/error result
 Member done: [ ]
 
 `R2-N02`
 Owner: `M2 + M4`
-Task: Emit `STATUS` after authenticated client login va disconnect
+Task: Emit `STATUS` after authenticated client login va disconnect through the runtime service boundary
 Dependency: `R2-A01`
 Required evidence: Status packet trace
 Member done: [ ]

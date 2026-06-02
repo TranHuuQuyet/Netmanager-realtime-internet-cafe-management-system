@@ -151,7 +151,7 @@ Receiving owners:
 
 ### R1 Foundation Repair - `2026-05-25` to `2026-05-31`
 
-Goal: remove build and contract blockers and produce the first verified packet round-trip.
+Goal: remove build and contract blockers and produce the first verified packet round-trip without claiming integrated ClientApp login.
 
 - M1: approve recovery decisions and gate rules.
 - M2: align shared packet behavior with API, implement listener/dispatcher baseline and prove local valid/invalid handling.
@@ -160,7 +160,7 @@ Goal: remove build and contract blockers and produce the first verified packet r
 - M5: declare canonical auth database, seed, admin rule and auth handoff.
 - M6: mark baseline fail/blocked states and verify `G0/G1`.
 
-Gate: solution build passes, contract is approved, packet tests pass and local round-trip is verified.
+Gate: solution build passes, contract is approved, packet tests pass and local round-trip is verified; ClientApp runtime login/status remains R2.
 
 ### R2 Authenticated Status - `2026-06-01` to `2026-06-07`
 
@@ -222,7 +222,7 @@ Goal: freeze and deliver core safely while reporting retained extension state ho
 | Gate | Must pass before | Required outcome |
 | --- | --- | --- |
 | `G0 Build & Contract` | Further integration | Build pass and shared wire/auth contract verified |
-| `G1 Network` | Login UI integration claim | Local listener/connector round-trip and invalid handling |
+| `G1 Network` | Login UI integration claim | Local listener/dispatcher round-trip and invalid handling; ClientApp startup smoke is supporting evidence only |
 | `G2 Auth & Status` | Control work | Real login/machine validation/status path |
 | `G3 Core Control` | Extension routing | Lock/unlock/ACK/error repeated demo |
 | `G4 Multi-Client` | Optional chat/LAN opening | Two local clients and disconnect stability |

@@ -8,13 +8,15 @@ namespace ServerApp.Auth.Services;
 
 // Xu ly logic dang nhap cap nghiep vu: check input, user, password, machine va mo session.
 public sealed class AuthService : IAuthService {
-    private const string AdminMachineId = "PC00";
+    private const string MachineStatusOnline = "Online";
 
     private readonly IUserRepository _users;
+    private readonly IMachineRepository _machines;
     private readonly ISessionService _sessions;
 
-    public AuthService(IUserRepository users, ISessionService sessions) {
+    public AuthService(IUserRepository users, IMachineRepository machines, ISessionService sessions) {
         _users = users;
+        _machines = machines;
         _sessions = sessions;
     }
 
@@ -52,30 +54,30 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.InvalidCredentials, "Password is incorrect.");
             }
 
-            // Buoc 4: kiem tra machineId theo role.
-            if (user.Role == AuthUserRole.Admin) {
-                // Admin chi duoc login tren may dinh danh PC00.
-                if (string.IsNullOrWhiteSpace(machineId)) {
-                    return AuthResult.Failure(AuthStatus.InvalidMachineId, "Admin machine ID is required.");
-                }
-
-                if (!string.Equals(machineId, AdminMachineId, StringComparison.OrdinalIgnoreCase)) {
-                    return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "Admin account is only allowed on PC00.");
-                }
+            // Buoc 4: kiem tra machineId theo mapping trong DB va theo trang thai machine.
+            if (string.IsNullOrWhiteSpace(machineId)) {
+                return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine ID is required.");
             }
-            else {
-                // Client bat buoc phai co machineId khop voi mapping trong DB.
-                if (string.IsNullOrWhiteSpace(machineId)) {
-                    return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine ID is required for client accounts.");
-                }
 
-                if (string.IsNullOrWhiteSpace(user.MachineId)) {
-                    return AuthResult.Failure(AuthStatus.InvalidMachineId, "This account has no machine assignment.");
-                }
+            if (string.IsNullOrWhiteSpace(user.MachineId)) {
+                return AuthResult.Failure(AuthStatus.InvalidMachineId, "This account has no machine assignment.");
+            }
 
-                if (!string.Equals(user.MachineId, machineId, StringComparison.OrdinalIgnoreCase)) {
-                    return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "This account is not assigned to the selected machine.");
-                }
+            if (!string.Equals(user.MachineId, machineId, StringComparison.OrdinalIgnoreCase)) {
+                return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "This account is not assigned to the selected machine.");
+            }
+
+            var machine = await _machines.GetByMachineIdAsync(machineId, cancellationToken).ConfigureAwait(false);
+            if (machine is null) {
+                return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine was not found.");
+            }
+
+            if (!machine.IsActive) {
+                return AuthResult.Failure(AuthStatus.AccountDisabled, "Machine is disabled.");
+            }
+
+            if (IsMachineOnline(machine.Status)) {
+                return AuthResult.Failure(AuthStatus.MachineAlreadyActive, "Machine is already active.");
             }
 
             // Buoc 5: mo session moi va cap nhat lan dang nhap cuoi.
@@ -101,4 +103,7 @@ public sealed class AuthService : IAuthService {
 
     // Trim/null-safe helper de login khong bi loi vi khoang trang.
     private static string Normalize(string? value) => value?.Trim() ?? string.Empty;
+
+    private static bool IsMachineOnline(string? status)
+        => string.Equals(status?.Trim(), MachineStatusOnline, StringComparison.OrdinalIgnoreCase);
 }

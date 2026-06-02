@@ -1,3 +1,4 @@
+using WireAuthResult = Shared.Models.AuthResult;
 namespace ServerApp.Auth.Models;
 
 // Role xac dinh quyen dang nhap va cach xu ly login o server.
@@ -97,9 +98,20 @@ public static class AuthStatusExtensions {
             AuthStatus.InvalidMachineId => "INVALID_MACHINE_ID",
             AuthStatus.AccountMachineMismatch => "ACCOUNT_MACHINE_MISMATCH",
             AuthStatus.AccountDisabled => "ACCOUNT_DISABLED",
+            // RoleMismatch hien khong co ma rieng trong wire contract, nen normalize ve invalid credentials.
             AuthStatus.RoleMismatch => "INVALID_CREDENTIALS",
             AuthStatus.ServerError => "SERVER_ERROR",
             AuthStatus.MachineAlreadyActive => "MACHINE_ALREADY_ACTIVE",
             _ => "SERVER_ERROR"
         };
+}
+
+// Adapter o tang server de M2 co the nhan AuthResult wire-friendly on dinh.
+public static class AuthResultWireMapper {
+    public static WireAuthResult ToWireAuthResult(this AuthResult result)
+        => new(
+            Success: result.IsSuccess,
+            Token: result.IsSuccess ? result.Session?.Id : null,
+            ErrorCode: result.ErrorCode,
+            ErrorMessage: result.IsSuccess ? null : result.Message);
 }

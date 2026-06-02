@@ -36,8 +36,17 @@ try
     await AssertLoginSuccessAsync(port);
     await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
     await AssertLoginFailureAsync(port, password: "123", machineId: "PC-02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
+    await AssertRejectedLineDoesNotStopServerAsync(port, "{ invalid json", "invalid JSON");
+    await AssertRejectedLineDoesNotStopServerAsync(
+        port,
+        """{"type":"UNKNOWN","source":"PC-01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
+        "unknown packet type");
+    await AssertRejectedLineDoesNotStopServerAsync(
+        port,
+        """{"type":"STATUS","source":"PC-01","target":"server","requestId":"unsupported-status","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
+        "packet type without an open route");
 
-    Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> LOGIN success/failure JSON-line -> Client");
+    Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
 }
 finally
 {
@@ -140,6 +149,36 @@ static async Task<object> SendLoginAsync(int port, Packet<LoginPayload> loginPac
 
     Console.WriteLine($"CLIENT IN : {inboundLine}");
     return JsonHelper.DeserializePacket(inboundLine);
+}
+
+static async Task AssertRejectedLineDoesNotStopServerAsync(int port, string outboundLine, string scenario)
+{
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+
+        await using NetworkStream stream = tcpClient.GetStream();
+        using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+        await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+        {
+            AutoFlush = true
+        };
+
+        Console.WriteLine($"CLIENT OUT: {outboundLine}");
+        await writer.WriteLineAsync(outboundLine);
+
+        using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        string? inboundLine = await reader.ReadLineAsync(timeoutTokenSource.Token);
+
+        if (inboundLine is not null)
+        {
+            throw new InvalidOperationException(
+                $"Client expected a controlled disconnect for {scenario}, but received: {inboundLine}");
+        }
+    }
+
+    await AssertLoginSuccessAsync(port);
+    Console.WriteLine($"PASS: {scenario} disconnects only the offending client and server remains available");
 }
 
 static void AssertMatchingRequestId(Packet<LoginPayload> request, Packet response)

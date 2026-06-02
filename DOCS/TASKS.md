@@ -93,7 +93,7 @@ Owner: `M2 + M6`
 Task: Validate invalid/unsupported packet does not crash receiver
 Dependency: `R1-N01`
 Required evidence: `G1` test result
-Member done: [ ]
+Member done: [x]
 
 `R1-U01`
 Owner: `M4`

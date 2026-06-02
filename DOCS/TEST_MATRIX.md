@@ -10,6 +10,7 @@ Core delivery deadline: `2026-07-05`
 | `Pass`        | Executed and verified against the current build                                   |
 | `Fail`        | Executed and failed; requires bug entry                                           |
 | `Blocked`     | Cannot execute because a required implementation/dependency is missing or failing |
+| `Evidence Submitted` | Implementation evidence passes locally and awaits M6 verification          |
 | `Conditional` | Retained extension test, not opened until its gate allows work                    |
 | `Not Run`     | Runnable gate has not yet been executed                                           |
 
@@ -25,7 +26,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | Client customer-flow shell smoke (`R1-U01`, `2026-05-26`, working tree)      | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke inspects the updated login/lock surfaces, launch option validation and `PC-02` multi-instance configuration without connecting to a server                                                                         | Supporting evidence for corrected client UX only; it does not prove TCP login, status, command routing or ACK                                 |
 | Client plain WinForms smoke (`R1-U01`, `2026-05-26`, working tree)           | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke verifies the compact server-style login dialog, default-control main/lock forms, launch identities and removal of custom theme dependencies                                                                        | Supporting evidence for client presentation only; real login/status/command routing and ACK remain blocked                                    |
 | `G0-02/G0-03/G0-04` contract smoke (`R1-C02`, `2026-05-27`, working tree)    | `Pass` on implementation working tree | `dotnet run --project Code/ContractSmoke/ContractSmoke.csproj --no-restore` passes string packet-type serialization, numeric type rejection, `LOGIN` request/response split, request envelope nullables unset, and top-level login error envelope assertions                                   | Submitted for M6 verification; contract gate remains pending M1 approval and remaining `G0` dependencies                                      |
-| `G1-01/G1-03` ServerApp network smoke (`R1-N01`, `2026-05-27`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, accepts one local client, traces inbound `LOGIN`, returns typed `ACK` from `PacketDispatcher`, and verifies matching `requestId` + `status: "Success"`                               | Submitted for M6 verification; covers valid local listener/round-trip only; `G1-04/G1-05` invalid/unsupported packet behavior remains pending |
+| `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Submitted for M6 verification; covers local listener, valid round-trip and controlled invalid/unsupported disconnect behavior |
 
 ## G0 - Build And Contract (`R1`)
 
@@ -44,8 +45,8 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G1-01` | Server starts and listens on recovery local endpoint  | Local | M2      | `Pass(M6 - 2026-05-29)`         |
 | `G1-02` | One client connects without UI freeze                 | Local | M2 + M4 | `Pass(M6 - 2026-05-29)`         |
 | `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2      | `Pass(M6 - 2026-05-29)`         |
-| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Blocked`         |
-| `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Blocked`      |
+| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Evidence Submitted` |
+| `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Evidence Submitted` |
 
 ## G2 - Authentication And Status (`R2`)
 
@@ -181,29 +182,27 @@ Status: Pass
 
 Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
 
-Result: PASS: Client -> ServerApp listener ->typed
-            dispatcher -> ACK JSON-line -> Client
-            requestId khớp, status: "Success"
+Result: PASS: valid LOGIN returns authenticated session payload
 
-Conclusion: Pass — LOGIN gửi đi, ACK trả về đúng, round-trip hoàn chỉnh
+Conclusion: Pass — LOGIN request nhận typed LOGIN response đúng `requestId`
 
 
 `G1-04`  Invalid JSON fails gracefully without receiver crash
 
-Status: Blocked
+Status: Evidence Submitted
 
-Command: —
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
 
-Result: —
+Result: TRACE DISPATCH_ERROR cho malformed JSON; socket lỗi bị đóng; fresh LOGIN tiếp theo thành công
 
-Conclusion: Blocked — chờ M2 hoàn thành R1-N02 (xử lý packet lỗi phía server)
+Conclusion: Candidate pass — chờ M6 verify evidence `2026-06-02`
 
 `G1-05`  Unsupported packet type yields controlled behavior
 
-Status: Blocked
+Status: Evidence Submitted
 
-Command: —
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
 
-Result: —
+Result: TRACE DISPATCH_ERROR cho unknown type và unopened `STATUS`; từng socket lỗi bị đóng; fresh LOGIN tiếp theo thành công
 
-Conclusion: Blocked — chờ M2 hoàn thành R1-N02 (xử lý packet type không hỗ trợ)
+Conclusion: Candidate pass — chờ M6 verify evidence `2026-06-02`

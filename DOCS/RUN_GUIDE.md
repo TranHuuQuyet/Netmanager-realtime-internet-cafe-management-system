@@ -9,7 +9,7 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 - The canonical recovery auth seed is now verified in `internet_cafe.db`: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
 - The build evidence is submitted for M6 verification and the canonical `G0` auth contract baseline is now verified; M1/M6 gate approval still applies separately.
 - Client startup is an explicit shell artifact and does not prove network/login integration.
-- TCP listener/dispatcher valid round-trip evidence has been submitted through `R1-N01`; invalid/unsupported packet handling, login integration, status and control flow are not verified.
+- TCP listener/dispatcher valid round-trip evidence has been submitted through `R1-N01/R1-N02`; malformed JSON and unsupported packet types now disconnect only the offending socket in the implementation candidate. M6 gate verification, client UI login integration, status and control flow remain pending.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 
 ## Required Environment

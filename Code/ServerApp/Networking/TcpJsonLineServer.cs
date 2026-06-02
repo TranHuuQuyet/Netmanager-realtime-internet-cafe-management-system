@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 
 namespace ServerApp.Networking;
 
@@ -90,9 +91,10 @@ public sealed class TcpJsonLineServer : IDisposable
             TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, response));
             await connection.SendAsync(response, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException or JsonException)
         {
             TraceEmitted?.Invoke(new NetworkTraceEntry("DISPATCH_ERROR", connection.ClientId, ex.Message));
+            connection.Disconnect();
         }
     }
 

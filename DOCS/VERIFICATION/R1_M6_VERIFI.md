@@ -1,7 +1,9 @@
-# R1 Verification Log — M6
+# R1 Verification Report
+Prepared by: M6 (Tester)
+This report summarizes the verification activities performed during Sprint R1, including test execution results, evidence review, bug verification, and the current status of project features.
 Sprint: R1 (2026-05-25 to 2026-05-31)
-Tester: M6
-Date: 2026-05-29
+
+## Date: 2026-05-29
 
 ## G0 Results
 
@@ -52,17 +54,13 @@ Conclusion: Pass
 
 `G0-05`  Canonical auth seed/database/admin rule match docs
 
-Status: Pass
+Status: Blocked
 
-Command: sqlite3.exe internet_cafe.db "SELECT Username, MachineId, IsActive, LastLoginAtUtc FROM AuthUsers ORDER BY Username; SELECT COUNT(*) FROM AuthSessions;"
+Command: No information
 
-Result: admin|PC00|1|
-        client01|PC-01|1|
-        client02|PC-02|1|
-        0
+Result: No information 
 
-Conclusion: Pass
-Evidence: Runtime DB root `internet_cafe.db` matches canonical recovery seed and admin machine rule.
+Conclusion: Blocked
 
 ## G1 Results
 
@@ -76,7 +74,7 @@ Result: ServerApp listener active on 127.0.0.1:50833
 
 Conclusion: Pass
 
-`G1-02`  ClientApp starts without UI freeze
+`G1-02`  One client connects without UI freeze
 
 Status: Not Tested
 
@@ -85,8 +83,6 @@ Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
 Result: Smoke test không có UI, không thể verify qua lệnh này
 
 Conclusion: Not Tested — cần UI integration test, chưa có trong R1
-
-Supplemental note (2026-06-02): M4 submitted ClientApp startup UI smoke evidence for `G1-02`. This covers shell responsiveness only; runtime TCP connect/login/status remains unverified in R1 and is tracked in R2.
 
 `G1-03`  Client and server exchange one valid JSON-line packet
 
@@ -178,9 +174,10 @@ Verified items:
 Evidence Review:Decision: the SQLite auth implementation centered on `AuthBootstrapper` and `AuthUsers/AuthSessions` is the canonical
                 runtime path for the recovery delivery; machine status remains in-memory for core scope
 
-Verification Result:Architecture direction has been formally selected, documented, and runtime seed is now aligned
+Verification Result:Architecture direction has been formally selected and documented
+                But code has not yet been fully verified
 
-Conclusion: VERIFIED PASS
+Conclusion: PARTIALLY VERIFIED
 
 ## B-006
 
@@ -190,8 +187,68 @@ Infomation: Documentation reviewed and aligned with the selected authentication 
                         MachineId: PC00
                         Password: 123
 
-Verification: Documentation alignment confirmed and runtime seed now matches the same canonical baseline
+Verification: Documentation alignmet confirmed but runtime login has not yet been verified
 
-Conclusion: VERIFIED PASS
+Conclusion: PARTIALLY VERIFIED
         Documentation issue resolved.
-        Runtime confirmation recorded.
+        Runtime confirmation pending.
+
+## Day:2026-06-02
+
+`G0-05`  Canonical auth seed/database/admin rule match docs
+
+Status: Pass
+
+Command: dotnet run --project Code/Auth_Test/Auth_Test.csproj
+
+Result: PASS G0-05: canonical auth seed/database/admin rule match docs
+
+Conclusion: Pass - canonical auth seed/database/admin rule baseline matches docs.
+
+`G1-02`  ClientApp starts without UI freeze
+
+Status: Pass
+
+Command: dotnet run --project Code/ClientApp/ClientApp.csproj
+
+Result: ClientApp window opened successfully; startup UI remained responsive with no visible freeze or startup exception.
+
+Conclusion: Pass - ClientApp starts and remains responsive during startup.
+
+
+`G1-04`  Invalid JSON fails gracefully without receiver crash
+
+Status: Pass
+
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+
+Result:
+CLIENT OUT: "{" invalid json
+TRACE IN tcp-0004: "{" invalid json
+TRACE DISPATCH_ERROR tcp-0004: 'i' is an invalid start of a property name. Expected a '"'. LineNumber: 0 | BytePositionInLine: 2.
+
+After the malformed JSON, the server still accepted and processed the next LOGIN request:
+
+TRACE IN tcp-0005: {"payload":{"username":"client01","password":"123","role":"Client","machineId":"PC-01"},"type":"LOGIN","source":"PC-01","target":"server","requestId":"roundtrip-b0ef3f77f2bf4c50acfe6a739f79d768","timestamp":"2026-06-02T11:05:25.7758098Z"}
+TRACE OUT tcp-0005: {"payload":{},"type":"LOGIN","source":"server","target":"PC-01","requestId":"roundtrip-b0ef3f77f2bf4c50acfe6a739f79d768","timestamp":"2026-06-02T11:05:25.7978102Z","success":false,"message":"Login rejected","error":{"code":"MACHINE_ALREADY_ACTIVE","details":"Machine is already active."}}
+
+Conclusion: Pass - malformed JSON produced a controlled dispatch error and did not crash the receiver/listener; the server remained available for the next request.
+
+`G1-05`  Unsupported packet type yields controlled behavior
+
+Status: Pass
+
+Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
+
+Result:
+TRACE DISPATCH_ERROR tcp-0009: The JSON value could not be converted to Shared.Enums.PacketType.
+PASS: unknown packet type disconnects only the offending client and server remains available
+
+TRACE DISPATCH_ERROR tcp-0011: Unsupported packet type: STATUS
+PASS: packet type without an open route disconnects only the offending client and server remains available
+
+Conclusion: Pass - unsupported packet types are handled in a controlled way without stopping the server listener.
+
+
+
+

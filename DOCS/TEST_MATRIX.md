@@ -38,17 +38,17 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G0-02` | Packet `type` serializes/deserializes as API string value          | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Existing shared implementation not yet verified against API `v0.2`  |
 | `G0-03` | `LOGIN` request and response parse into distinct expected paths    | M2 + M6      | `Pass(M6 - 2026-05-29)`      | Requires contract implementation correction                         |
 | `G0-04` | Failure response emits top-level `success: false` and `error.code` | M2 + M5 + M6 | `Pass(M6 - 2026-05-29)`      | Requires contract/auth mapping                                      |
-| `G0-05` | Canonical auth seed/database/admin rule match docs                 | M5 + M6      | `Pass`         | Runtime seed in `internet_cafe.db` matches `admin`/`client01`/`client02` and admin `PC00` rule |
+| `G0-05` | Canonical auth seed/database/admin rule match docs                 | M5 + M6      | `Pass(M6 - 2026-06-02)`         | Runtime seed in `internet_cafe.db` matches `admin`/`client01`/`client02` and admin `PC00` rule |
 
 ## G1 - Network Foundation (`R1`)
 
 | ID      | Test                                                  | Mode  | Owner   | Initial status |
 | ------- | ----------------------------------------------------- | ----- | ------- | -------------- |
 | `G1-01` | Server starts and listens on recovery local endpoint  | Local | M2      | `Pass(M6 - 2026-05-29)`         |
-| `G1-02` | ClientApp starts without UI freeze                    | Local | M4 + M6 | `Evidence Submitted(M4 - 2026-06-02; UI smoke only; M6 verification pending)` |
+| `G1-02` | ClientApp starts without UI freeze                    | Local | M4 + M6 | `Pass(M6 - 2026-06-02)` |
 | `G1-03` | Client and server exchange one valid JSON-line packet | Local | M2      | `Pass(M6 - 2026-05-29)`         |
-| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Evidence Submitted` |
-| `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Evidence Submitted` |
+| `G1-04` | Invalid JSON fails gracefully without receiver crash  | Local | M2      | `Pass(M6 - 2026-06-02)` |
+| `G1-05` | Unsupported packet type yields controlled behavior    | Local | M2      | `Pass(M6 - 2026-06-02)` |
 
 ## G2 - Authentication And Status (`R2`)
 

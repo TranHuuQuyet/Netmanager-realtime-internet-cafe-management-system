@@ -2,22 +2,34 @@ namespace ServerApp;
 
 public partial class MainForm : Form
 {
-    private const string SampleMachinePrefix = "PC";
+    private const string MachineStatusOnline = "Online";
+    private const string MachineStatusOffline = "Offline";
+    private const string MachineStatusStale = "Stale";
+    private const string MachineStatusDisconnected = "Disconnected";
+    private const string MachineStatusUnknown = "Unknown";
 
     private bool _isSelectingMachine;
+    private readonly bool _runStatusBridgeSmoke;
     private string? _selectedMachineName;
 
-    public MainForm()
+    public MainForm(bool runStatusBridgeSmoke = false)
     {
+        _runStatusBridgeSmoke = runStatusBridgeSmoke;
+
         InitializeComponent();
         ConfigureR1ShellState();
+
+        if (_runStatusBridgeSmoke)
+        {
+            Shown += MainForm_ShownStatusBridgeSmoke;
+        }
     }
 
     private void MainForm_Load(object sender, EventArgs e)
     {
         LoadSampleMachineData();
         LoadSampleCustomerData();
-        SelectMachine("PC01");
+        SelectMachine("PC-01");
         lblServerStatus.Text = UiStrings.MainServerStatus;
     }
 
@@ -40,28 +52,23 @@ public partial class MainForm : Form
         dgvMachines.Rows.Clear();
         pnlMachineCards.Controls.Clear();
 
-        string[] statuses =
+        (int Number, string MachineId, string Status)[] machines =
         [
-            "AVAILABLE",
-            "DISCONNECT",
-            "ONLINE",
-            "ONLINE",
-            "ONLINE",
-            "AVAILABLE",
-            "DISCONNECT",
-            "DISCONNECT",
-            "AVAILABLE",
-            "AVAILABLE"
+            (1, "PC-01", MachineStatusOffline),
+            (2, "PC-02", MachineStatusOffline)
         ];
 
-        for (int index = 0; index < statuses.Length; index++)
+        foreach ((int number, string machineId, string status) in machines)
         {
-            int machineNumber = index + 1;
-            string machineName = $"{SampleMachinePrefix}{machineNumber:00}";
-
-            dgvMachines.Rows.Add(machineNumber, machineNumber, statuses[index], machineName);
-            pnlMachineCards.Controls.Add(CreateMachineCard(machineName, statuses[index]));
+            dgvMachines.Rows.Add(number, number, status, machineId);
+            pnlMachineCards.Controls.Add(CreateMachineCard(machineId, status));
         }
+    }
+
+    public void ApplyMachineStatusUpdate(MachineStatusUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        ApplyMachineStatusUpdate(update.MachineId, update.Status);
     }
 
     public void ApplyMachineStatusUpdate(string machineId, string status)
@@ -87,6 +94,28 @@ public partial class MainForm : Form
             UiStrings.MainRuntimeStatusUpdatedTemplate,
             normalizedMachineId,
             normalizedStatus);
+    }
+
+    private async void MainForm_ShownStatusBridgeSmoke(object? sender, EventArgs e)
+    {
+        Shown -= MainForm_ShownStatusBridgeSmoke;
+
+        await Task.Delay(500).ConfigureAwait(true);
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        ApplyMachineStatusUpdate(new MachineStatusUpdate("PC-01", MachineStatusOnline));
+
+        await Task.Delay(1500).ConfigureAwait(true);
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        ApplyMachineStatusUpdate(new MachineStatusUpdate("PC-01", MachineStatusOffline));
+        lblServerStatus.Text = "M3 status bridge smoke: PC-01 Online -> Offline completed.";
     }
 
     private Panel CreateMachineCard(string machineName, string status)
@@ -138,12 +167,13 @@ public partial class MainForm : Form
             return;
         }
 
-        string status = icon.Tag?.ToString() ?? "AVAILABLE";
-        Color statusColor = status switch
+        string status = NormalizeStatus(icon.Tag?.ToString() ?? MachineStatusUnknown);
+        Color statusColor = status.ToUpperInvariant() switch
         {
             "ONLINE" => Color.FromArgb(31, 122, 58),
             "OFFLINE" => Color.FromArgb(170, 45, 45),
-            "DISCONNECT" => Color.FromArgb(170, 45, 45),
+            "STALE" => Color.FromArgb(190, 120, 25),
+            "DISCONNECTED" => Color.FromArgb(170, 45, 45),
             _ => Color.FromArgb(120, 120, 120)
         };
 
@@ -358,10 +388,41 @@ public partial class MainForm : Form
         => $"{machineName} - {status}";
 
     private static string NormalizeMachineId(string machineId)
-        => string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId.Trim();
+    {
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return MachineStatusUnknown.ToUpperInvariant();
+        }
+
+        string trimmed = machineId.Trim();
+
+        if (trimmed.Length > 2
+            && trimmed.StartsWith("PC", StringComparison.OrdinalIgnoreCase)
+            && !trimmed.StartsWith("PC-", StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(trimmed[2..], out int machineNumber))
+        {
+            return $"PC-{machineNumber:00}";
+        }
+
+        return trimmed.ToUpperInvariant();
+    }
 
     private static string NormalizeStatus(string status)
-        => string.IsNullOrWhiteSpace(status) ? "UNKNOWN" : status.Trim().ToUpperInvariant();
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return MachineStatusUnknown;
+        }
+
+        return status.Trim().ToUpperInvariant() switch
+        {
+            "ONLINE" => MachineStatusOnline,
+            "OFFLINE" or "AVAILABLE" => MachineStatusOffline,
+            "STALE" => MachineStatusStale,
+            "DISCONNECT" or "DISCONNECTED" => MachineStatusDisconnected,
+            _ => status.Trim()
+        };
+    }
 
     private static int TryGetMachineNumber(string machineName)
     {

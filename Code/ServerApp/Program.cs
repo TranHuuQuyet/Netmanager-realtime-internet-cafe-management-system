@@ -8,8 +8,10 @@ namespace ServerApp;
 
 static class Program
 {
+    private const string StatusBridgeSmokeArgument = "--m3-status-bridge-smoke";
+
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
 
@@ -21,7 +23,7 @@ static class Program
         {
             AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
             using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
-            Application.Run(new MainForm());
+            Application.Run(new MainForm(ShouldRunStatusBridgeSmoke(args)));
         }
     }
 
@@ -59,5 +61,11 @@ static class Program
                 MessageBoxIcon.Warning);
             return null;
         }
+    }
+
+    private static bool ShouldRunStatusBridgeSmoke(string[] args)
+    {
+        return args.Any(argument =>
+            string.Equals(argument, StatusBridgeSmokeArgument, StringComparison.OrdinalIgnoreCase));
     }
 }

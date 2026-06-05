@@ -9,7 +9,7 @@ public sealed class DbInitializer
         _options = options ?? new DatabaseOptions();
     }
 
-    public string DatabasePath => _options.DatabasePath;
+    public string DatabasePath => DatabasePathResolver.Resolve(_options.DatabasePath);
 
     public void EnsureAppDataDirectory()
     {
@@ -59,6 +59,11 @@ public sealed class DbInitializer
                 EndedAtUtc TEXT NULL,
                 FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
             );
+
+            CREATE INDEX IF NOT EXISTS IX_AuthUsers_Username ON AuthUsers (Username);
+            CREATE INDEX IF NOT EXISTS IX_AuthUsers_MachineId ON AuthUsers (MachineId);
+            CREATE INDEX IF NOT EXISTS IX_AuthSessions_UserId_State ON AuthSessions (UserId, State);
+            CREATE INDEX IF NOT EXISTS IX_AuthSessions_MachineId_State ON AuthSessions (MachineId, State);
             """;
     }
 }

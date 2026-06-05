@@ -39,12 +39,16 @@ public static class DatabaseBootstrapper
     {
         foreach (var seed in BuildSeedUsers())
         {
-            if (await users.GetByUsernameAsync(seed.Username, cancellationToken).ConfigureAwait(false) is not null)
+            var existing = await users.GetByUsernameAsync(seed.Username, cancellationToken).ConfigureAwait(false);
+            var record = CreateUserRecord(seed);
+
+            if (existing is null)
             {
+                await users.AddAsync(record, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
-            await users.AddAsync(CreateUserRecord(seed), cancellationToken).ConfigureAwait(false);
+            await users.UpdateSeedAsync(record, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -286,6 +290,34 @@ internal sealed class SqliteUserRepository : IUserRepository
         command.Parameters.AddWithValue("@MachineId", (object?)user.MachineId ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsActive", user.IsActive ? 1 : 0);
         command.Parameters.AddWithValue("@LastLoginAtUtc", (object?)user.LastLoginAtUtc?.UtcDateTime.ToString("O") ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task UpdateSeedAsync(UserRecord user, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE AuthUsers
+            SET
+                PasswordSaltBase64 = @PasswordSaltBase64,
+                PasswordHashBase64 = @PasswordHashBase64,
+                Role = @Role,
+                MachineId = @MachineId,
+                IsActive = @IsActive
+            WHERE Username = @Username;
+            """;
+        command.Parameters.AddWithValue("@PasswordSaltBase64", user.PasswordSaltBase64);
+        command.Parameters.AddWithValue("@PasswordHashBase64", user.PasswordHashBase64);
+        command.Parameters.AddWithValue("@Role", (int)user.Role);
+        command.Parameters.AddWithValue("@MachineId", (object?)user.MachineId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IsActive", user.IsActive ? 1 : 0);
+        command.Parameters.AddWithValue("@Username", user.Username);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }

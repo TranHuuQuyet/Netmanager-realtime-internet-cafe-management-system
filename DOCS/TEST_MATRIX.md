@@ -20,15 +20,15 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 
 | Test                                                                         | Candidate result                      | Evidence                                                                                                                                                                                                                                                                                       | Acceptance state                                                                                                                              |
 | ---------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `G0-01` Full solution builds                                                 | `Pass` on implementation working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors after server login/client shell restoration and Windows-only WinForms annotation                                                                         | Submitted for M6 verification; gate remains blocked until required `G0` cases pass                                                            |
+| `G0-01` Full solution builds                                                 | `Pass` on implementation working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors after server login/client shell restoration and Windows-only WinForms annotation                                                                         | Pass(M6 - 2026-05-29)                                                            |
 | Server UI startup smoke                                                      | `Pass` on implementation working tree | Launching `ServerApp.exe` after correcting the `UiStrings` resource base name produced a responsive `Dang nhap` window                                                                                                                                                                         | Supporting evidence only; it does not prove listener, authentication result or `G1/G2`                                                        |
 | M3 server dashboard R1 shell honesty                                         | `Pass` on implementation working tree | `MainForm` now labels the dashboard as sample data, keeps lock/unlock visibly backend-pending, and provides a UI-only status update bridge for future typed events                                                                                                                              | Supporting evidence only; it does not prove authenticated status, dashboard online/offline runtime, command routing or ACK                    |
 | Client UI startup smoke (`R1-U01`, `2026-05-26`, `6583b48`)                  | `Pass` on implementation working tree | On branch `quyet-clientapp-member4`, automated UI smoke opens responsive `ConnectForm`, `ClientMainForm` preview and `LockScreenForm` preview; lock preview displays that real `LOCK/UNLOCK` waits for routing; source boundary check finds no JSON/network service references in client forms | Supporting evidence for M4 shell submission only; it does not prove connection, auth result, status, control routing or ACK                   |
 | Client customer-flow shell smoke (`R1-U01`, `2026-05-26`, working tree)      | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke inspects the updated login/lock surfaces, launch option validation and `PC-02` multi-instance configuration without connecting to a server                                                                         | Supporting evidence for corrected client UX only; it does not prove TCP login, status, command routing or ACK                                 |
 | Client plain WinForms smoke (`R1-U01`, `2026-05-26`, working tree)           | `Pass` on implementation working tree | Full solution build passes with `0` warnings/errors; temporary .NET 8 smoke verifies the compact server-style login dialog, default-control main/lock forms, launch identities and removal of custom theme dependencies                                                                        | Supporting evidence for client presentation only; real login/status/command routing and ACK remain blocked                                    |
-| `G1-02` ClientApp startup UI smoke (`M4`, `2026-06-02`, working tree)        | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors; UIAutomation launched `.audit-artifacts\bin\ClientApp\debug\ClientApp.exe` as default `PC-01`, launched `--machine-id=PC-02`, read `txtMachineId`, confirmed the window was responsive, and closed via both main-window close and `btnExit` | `G1-02` is UI smoke pass only; runtime TCP connect/login/status is not part of R1 and remains tracked in `R2-N01`, `R2-U01`, `R2-N02`, `G2-02`, `G2-05`, `G2-06`; M6 verification pending |
-| `G0-02/G0-03/G0-04` contract smoke (`R1-C02`, `2026-05-27`, working tree)    | `Pass` on implementation working tree | `dotnet run --project Code/ContractSmoke/ContractSmoke.csproj --no-restore` passes string packet-type serialization, numeric type rejection, `LOGIN` request/response split, request envelope nullables unset, and top-level login error envelope assertions                                   | Submitted for M6 verification; contract gate remains pending M1 approval and remaining `G0` dependencies                                      |
-| `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Submitted for M6 verification; covers local listener, valid round-trip and controlled invalid/unsupported disconnect behavior |
+| `G1-02` ClientApp startup UI smoke (`M4`, `2026-06-02`, working tree)        | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors; UIAutomation launched `.audit-artifacts\bin\ClientApp\debug\ClientApp.exe` as default `PC-01`, launched `--machine-id=PC-02`, read `txtMachineId`, confirmed the window was responsive, and closed via both main-window close and `btnExit` | Pass(M6 - 2026-06-02) for UI startup only; runtime TCP connect/login/status remains tracked in `R2-N01`, `R2-U01`, `R2-N02`, `G2-02`, `G2-05`, `G2-06` |
+| `G0-02/G0-03/G0-04` contract smoke (`R1-C02`, `2026-05-27`, working tree)    | `Pass` on implementation working tree | `dotnet run --project Code/ContractSmoke/ContractSmoke.csproj --no-restore` passes string packet-type serialization, numeric type rejection, `LOGIN` request/response split, request envelope nullables unset, and top-level login error envelope assertions                                   | Pass(M6 2026-06-02) |
+| `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Pass(M6 2026-06-02) |
 
 ## G0 - Build And Contract (`R1`)
 
@@ -109,117 +109,3 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 - M6 `Pass` evidence on the integrated `develop` candidate is required before M1 may approve a merge/promotion into `main`.
 - A `Fail` or `Blocked` candidate remains outside `main` and is corrected through the feature/fix to `develop` flow.
 - Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting.
-
-
-`G0-01` Full solution builds from approved setup command  
-
-Status: PASS
-
-Command: dotnet build Code/NetManager.sln
-
-Result: Build succeeded.
-        143 Warning(s)
-        0 Error(s)
-
-Conclusion: PASS
-
-`G0-02`  Packet `type` serializes/deserializes as API string value
-
-Status: Pass
-
-Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
-
-Result: PASS G0-02 packet type serializes as API string
-        PASS G0-02 numeric packet type is rejected
-
-Conclusion: Pass
-
-`G0-03`  `LOGIN` request and response parse into distinct expected paths
-
-Status: Pass
-
-Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
-
-Result: PASS G0-03 LOGIN request deserializes as request payload
-        PASS G0-03 LOGIN request keeps response envelope fields unset
-        PASS G0-03 LOGIN success deserializes as result payload
-
-Conclusion: Pass
-
-`G0-04`  Failure response emits top-level `success: false` and `error.code`
-
-Status: Pass 
-
-Command: dotnet run --project Code/ContractSmoke/ContractSmoke.csproj
-
-Result: PASS G0-04 LOGIN failure uses top-level error envelope
-
-Conclusion: Pass
-
-`G0-05`  Canonical auth seed/database/admin rule match docs
-
-`G1-01`  Server starts and listens on recovery local endpoint
-
-Status: Pass
-
-Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
-
-Result: ServerApp listener active on 127.0.0.1:50833
-
-Conclusion: Pass
-
-`G1-02`  ClientApp starts without UI freeze
-
-Status: Evidence Submitted - UI smoke pass only; M6 verification pending
-
-Build command: dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal
-
-Build result: Build succeeded with 0 Warning(s), 0 Error(s)
-
-Open ClientApp:
-        .audit-artifacts\bin\ClientApp\debug\ClientApp.exe
-        .audit-artifacts\bin\ClientApp\debug\ClientApp.exe --machine-id=PC-02
-
-UIAutomation result:
-        PASS default-launch opened responsive ConnectForm, machine=PC-01, closed cleanly
-        PASS pc02-equals-launch opened responsive ConnectForm, machine=PC-02, closed cleanly
-        PASS btnExit closes ConnectForm, machine=PC-02, process exited cleanly
-
-Scope note:
-        Codegraph found no ClientApp caller of TcpClientConnection.
-        ConnectForm login still reports server login is not integrated.
-        Runtime TCP connect/login/status is not part of R1.
-        Track runtime work in R2-N01, R2-U01, R2-N02, G2-02, G2-05 and G2-06.
-
-Conclusion: UI smoke pass only; do not claim runtime connect/login/status pass from G1-02.
-
-`G1-03`  Client and server exchange one valid JSON-line packet
-
-Status: Pass
-
-Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj
-
-Result: PASS: valid LOGIN returns authenticated session payload
-
-Conclusion: Pass — LOGIN request nhận typed LOGIN response đúng `requestId`
-
-
-`G1-04`  Invalid JSON fails gracefully without receiver crash
-
-Status: Evidence Submitted
-
-Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
-
-Result: TRACE DISPATCH_ERROR cho malformed JSON; socket lỗi bị đóng; fresh LOGIN tiếp theo thành công
-
-Conclusion: Candidate pass — chờ M6 verify evidence `2026-06-02`
-
-`G1-05`  Unsupported packet type yields controlled behavior
-
-Status: Evidence Submitted
-
-Command: dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
-
-Result: TRACE DISPATCH_ERROR cho unknown type và unopened `STATUS`; từng socket lỗi bị đóng; fresh LOGIN tiếp theo thành công
-
-Conclusion: Candidate pass - pending M6 verify evidence `2026-06-02`

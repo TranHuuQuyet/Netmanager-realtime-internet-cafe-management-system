@@ -7,9 +7,10 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 - A current implementation candidate restores the typed-auth server login path and a buildable client shell; an isolated build submission passes with `0` warnings and `0` errors.
 - Server startup smoke now opens a responsive login dialog after correcting the UI resource manifest lookup; login result behavior is not yet gate-verified.
 - The canonical recovery auth seed is now verified in `internet_cafe.db`: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
-- The build evidence is submitted for M6 verification and the canonical `G0` auth contract baseline is now verified; M1/M6 gate approval still applies separately.
+- `G0` build/contract/auth baseline is verified pass.
 - Client startup is an explicit shell artifact and does not prove network/login integration.
-- TCP listener/dispatcher valid round-trip evidence has been submitted through `R1-N01/R1-N02`; malformed JSON and unsupported packet types now disconnect only the offending socket in the implementation candidate. M6 gate verification, client UI login integration, status and control flow remain pending.
+- `G1` network foundation is verified pass: the TCP listener/dispatcher handles valid login round-trips, malformed JSON and unsupported packet types without crashing the receiver.
+- ClientApp UI login binding, status flow and control flow remain pending under `R2/G2` and later gates.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 
 ## Required Environment
@@ -33,8 +34,8 @@ This command must pass before a runtime demo or feature gate can be accepted.
 
 | Setting | Recovery value | Status |
 | --- | --- | --- |
-| Local server host | `127.0.0.1` | Target until `G1` pass |
-| Default port | `5000` | Target until `G1` pass |
+| Local server host | `127.0.0.1` | Verified local recovery endpoint |
+| Default port | `5000` | Verified local recovery endpoint |
 | Framing | one UTF-8 JSON object per line | Approved contract target |
 | Auth schema | `AuthUsers`, `AuthSessions` | Canonical recovery path |
 | Database under approved root-run workflow | `internet_cafe.db` in repository root | Resolved by `AuthBootstrapper`; keep running from repository root so the canonical SQLite path stays unambiguous |

@@ -102,86 +102,13 @@ internal sealed class DatabaseStore
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
-        command.CommandText = GetSchemaScript();
+        command.CommandText = new DbInitializer().GetSchemaScript();
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static string ResolveDatabasePath(string? databasePath)
-    {
-        var options = new DatabaseOptions();
-        var path = string.IsNullOrWhiteSpace(databasePath) ? options.DatabasePath : databasePath.Trim();
-        if (Path.IsPathRooted(path))
-        {
-            return path;
-        }
+        => DatabasePathResolver.Resolve(databasePath);
 
-        return Path.GetFullPath(Path.Combine(ResolveRepositoryRoot(), path));
-    }
-
-    private static string ResolveRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (directory is not null)
-        {
-            var candidate = directory.FullName;
-            if (Directory.Exists(Path.Combine(candidate, ".git")) ||
-                (Directory.Exists(Path.Combine(candidate, "Code")) && Directory.Exists(Path.Combine(candidate, "DOCS"))))
-            {
-                return candidate;
-            }
-
-            directory = directory.Parent;
-        }
-
-        return AppContext.BaseDirectory;
-    }
-
-    private static string GetSchemaScript()
-    {
-        var schemaPath = Path.Combine(AppContext.BaseDirectory, "Database", "DatabaseSchema.sql");
-        if (File.Exists(schemaPath))
-        {
-            return File.ReadAllText(schemaPath);
-        }
-
-        return """
-               PRAGMA foreign_keys = ON;
-
-               CREATE TABLE IF NOT EXISTS AuthUsers (
-                   Id TEXT PRIMARY KEY,
-                   Username TEXT NOT NULL UNIQUE,
-                   PasswordSaltBase64 TEXT NOT NULL,
-                   PasswordHashBase64 TEXT NOT NULL,
-                   Role INTEGER NOT NULL,
-                   MachineId TEXT NULL,
-                   IsActive INTEGER NOT NULL DEFAULT 1,
-                   LastLoginAtUtc TEXT NULL
-               );
-
-               CREATE TABLE IF NOT EXISTS Machines (
-                   Id TEXT PRIMARY KEY,
-                   MachineId TEXT NOT NULL UNIQUE,
-                   MachineName TEXT NOT NULL,
-                   IpAddress TEXT NULL,
-                   Status TEXT NOT NULL,
-                   LastSeen TEXT NULL,
-                   IsActive INTEGER NOT NULL DEFAULT 1
-               );
-
-               CREATE TABLE IF NOT EXISTS AuthSessions (
-                   Id TEXT PRIMARY KEY,
-                   UserId TEXT NOT NULL,
-                   Username TEXT NOT NULL,
-                   Role INTEGER NOT NULL,
-                   MachineId TEXT NULL,
-                   State INTEGER NOT NULL,
-                   StartedAtUtc TEXT NOT NULL,
-                   EndedAtUtc TEXT NULL,
-                   FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
-               );
-               """;
-    }
 }
 
 internal sealed class SqliteUserRepository : IUserRepository

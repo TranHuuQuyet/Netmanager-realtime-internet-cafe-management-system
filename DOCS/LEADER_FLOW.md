@@ -24,6 +24,9 @@ Rules:
 - Previous 8-week checkboxes are historical evidence only; they no longer express active delivery completion.
 - A checked item in `DOCS/TASKS.md` records submitted member work; it is not a runtime or gate pass.
 - Delivery pass is counted only from verified results in `DOCS/TEST_MATRIX.md` and `DOCS/DEMO_CHECKLIST.md`, with M1 approval where a gate requires it.
+- `develop` is the integration/testing branch; `main` is the accepted release branch.
+- Members submit feature or fix branches to `develop`; no member feature branch merges directly into `main`.
+- A change may enter `main` only after M6 records a `Pass` for the integrated `develop` candidate and M1 approves the promotion.
 - If code and docs differ, runtime is not approved until the owning contract/docs and tests are aligned.
 - If a core gate is red, extension work cannot begin unless M1 records an exception that does not delay core recovery.
 
@@ -115,7 +118,11 @@ These features do not enter development before `G5 Release` unless M1 formally c
 
 - Packet/schema changes require M2 proposal, M1 approval and M5 review when auth/session is affected.
 - Auth/schema/seed changes require M5 proposal and M1 approval before M2 or UI owners consume them.
-- Merge candidates for core runtime must build and carry the relevant gate evidence.
+- Each member branches from the latest `develop`, implements one scoped feature/fix, and opens the PR back into `develop`.
+- Merge candidates into `develop` must build and carry the relevant owner evidence; integration into `develop` means ready for M6 testing, not accepted release.
+- M6 tests the integrated candidate on `develop` and records the tested commit/build identity and result in `DOCS/TEST_MATRIX.md` or `DOCS/DEMO_CHECKLIST.md`.
+- Only a `develop` candidate with the required M6 `Pass` result may be promoted to `main`; M1 approves and performs or authorizes that merge.
+- A failed or blocked candidate stays out of `main` and returns to the owning feature/fix flow through `develop`.
 - Uncommitted local forms, docs or database files are artifacts, not delivered integration.
 
 ### Handoff Evidence
@@ -144,7 +151,7 @@ Receiving owners:
 
 ### R1 Foundation Repair - `2026-05-25` to `2026-05-31`
 
-Goal: remove build and contract blockers and produce the first verified packet round-trip.
+Goal: remove build and contract blockers and produce the first verified packet round-trip without claiming integrated ClientApp login.
 
 - M1: approve recovery decisions and gate rules.
 - M2: align shared packet behavior with API, implement listener/dispatcher baseline and prove local valid/invalid handling.
@@ -153,7 +160,7 @@ Goal: remove build and contract blockers and produce the first verified packet r
 - M5: declare canonical auth database, seed, admin rule and auth handoff.
 - M6: mark baseline fail/blocked states and verify `G0/G1`.
 
-Gate: solution build passes, contract is approved, packet tests pass and local round-trip is verified.
+Gate: solution build passes, contract is approved, packet tests pass and local round-trip is verified; ClientApp runtime login/status remains R2.
 
 ### R2 Authenticated Status - `2026-06-01` to `2026-06-07`
 
@@ -215,7 +222,7 @@ Goal: freeze and deliver core safely while reporting retained extension state ho
 | Gate | Must pass before | Required outcome |
 | --- | --- | --- |
 | `G0 Build & Contract` | Further integration | Build pass and shared wire/auth contract verified |
-| `G1 Network` | Login UI integration claim | Local listener/connector round-trip and invalid handling |
+| `G1 Network` | Login UI integration claim | Local listener/dispatcher round-trip and invalid handling; ClientApp startup smoke is supporting evidence only |
 | `G2 Auth & Status` | Control work | Real login/machine validation/status path |
 | `G3 Core Control` | Extension routing | Lock/unlock/ACK/error repeated demo |
 | `G4 Multi-Client` | Optional chat/LAN opening | Two local clients and disconnect stability |

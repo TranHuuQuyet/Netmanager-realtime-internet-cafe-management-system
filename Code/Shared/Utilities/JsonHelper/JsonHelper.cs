@@ -1,13 +1,13 @@
 using System.Text.Json;
-using NETManager.Shared.Enums;
-using NETManager.Shared.DTOs.Bidrectional;
-using NETManager.Shared.DTOs.CommandPayloads;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.Packets;
+using Shared.Enums;
+using Shared.DTOs.Bidrectional;
+using Shared.DTOs.CommandPayloads;
+using Shared.DTOs.RequestPayloads;
+using Shared.DTOs.ResponsePayloads;
+using Shared.Packets;
 using System.IO;
 
-namespace NETManager.Shared.Utilities.JsonHelper;
+namespace Shared.Utilities.JsonHelper;
 
 public static class JsonHelper
 {

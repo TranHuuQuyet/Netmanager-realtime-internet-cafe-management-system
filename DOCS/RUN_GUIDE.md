@@ -6,9 +6,11 @@ This guide documents the approved setup target for the recovery roadmap. Runtime
 
 - A current implementation candidate restores the typed-auth server login path and a buildable client shell; an isolated build submission passes with `0` warnings and `0` errors.
 - Server startup smoke now opens a responsive login dialog after correcting the UI resource manifest lookup; login result behavior is not yet gate-verified.
-- The build evidence is submitted for M6 verification and does not by itself pass `G0`, because API/auth contract checks remain outstanding.
+- The canonical recovery auth seed is now verified in `internet_cafe.db`: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
+- `G0` build/contract/auth baseline is verified pass.
 - Client startup is an explicit shell artifact and does not prove network/login integration.
-- TCP round-trip, login integration, status and control flow are not verified.
+- `G1` network foundation is verified pass: the TCP listener/dispatcher handles valid login round-trips, malformed JSON and unsupported packet types without crashing the receiver.
+- ClientApp UI login binding, status flow and control flow remain pending under `R2/G2` and later gates.
 - Use `DOCS/TEST_MATRIX.md` for real pass/fail status.
 
 ## Required Environment
@@ -32,11 +34,11 @@ This command must pass before a runtime demo or feature gate can be accepted.
 
 | Setting | Recovery value | Status |
 | --- | --- | --- |
-| Local server host | `127.0.0.1` | Target until `G1` pass |
-| Default port | `5000` | Target until `G1` pass |
+| Local server host | `127.0.0.1` | Verified local recovery endpoint |
+| Default port | `5000` | Verified local recovery endpoint |
 | Framing | one UTF-8 JSON object per line | Approved contract target |
 | Auth schema | `AuthUsers`, `AuthSessions` | Canonical recovery path |
-| Database under approved root-run workflow | `internet_cafe.db` in repository root | Matches current selected auth runtime artifact; verify in `G0` |
+| Database under approved root-run workflow | `internet_cafe.db` in repository root | Resolved by `AuthBootstrapper`; keep running from repository root so the canonical SQLite path stays unambiguous |
 | Machine status storage | in-memory connection registry | Core architecture target |
 
 Until a deterministic application data path is implemented and approved, run recovery commands from repository root so the relative SQLite database location is not ambiguous.
@@ -97,7 +99,7 @@ Real LAN is retained as a valuable project capability, but it is not allowed to 
 
 ## Reset And Evidence Rules
 
-- M5 must document a verified SQLite reset/seed path during `G0/G2`.
-- Do not delete or replace the tracked database without an approved reset procedure.
+- M5 must document a verified SQLite reset/seed path during `G0/G2`; the canonical reset is root `internet_cafe.db` with `AuthUsers/AuthSessions` and the three recovery accounts above.
+- Do not delete or replace the tracked database without an approved reset procedure, even when the seed has already been verified.
 - M6 records build identity, runtime mode, test date and evidence for each pass.
 - A screen opening without real network/auth interaction is not a completed demo step.

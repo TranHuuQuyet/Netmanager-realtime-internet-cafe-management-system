@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 
-namespace NETManager.Shared.Networking;
+namespace Shared.Networking;
 
 public static class NetworkProtocol
 {

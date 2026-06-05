@@ -1,12 +1,13 @@
 using System.Text.Json;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.DTOs.ResponsePayloads;
-using NETManager.Shared.Packets;
-using NETManager.Shared.Utilities.JsonHelper;
+using Shared.DTOs.RequestPayloads;
+using Shared.DTOs.ResponsePayloads;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
 
 Run("G0-02 packet type serializes as API string", PacketTypeSerializesAsString);
 Run("G0-02 numeric packet type is rejected", NumericPacketTypeIsRejected);
 Run("G0-03 LOGIN request deserializes as request payload", LoginRequestDeserializesAsRequest);
+Run("G0-03 LOGIN request keeps response envelope fields unset", LoginRequestKeepsResponseFieldsUnset);
 Run("G0-03 LOGIN success deserializes as result payload", LoginSuccessDeserializesAsResult);
 Run("G0-04 LOGIN failure uses top-level error envelope", LoginFailureUsesErrorEnvelope);
 
@@ -73,6 +74,27 @@ static void LoginRequestDeserializesAsRequest()
     object packet = JsonHelper.DeserializePacket(json);
 
     Assert(packet is Packet<LoginPayload>, "LOGIN request must deserialize as Packet<LoginPayload>.");
+}
+
+static void LoginRequestKeepsResponseFieldsUnset()
+{
+    string json = JsonHelper.SerializeToJson(PacketFactory.CreateLogin(
+        "client01",
+        "server",
+        new LoginPayload
+        {
+            Username = "client01",
+            Password = "123",
+            Role = "Client",
+            MachineId = "PC-01"
+        },
+        "req-0001"));
+
+    var packet = (Packet<LoginPayload>)JsonHelper.DeserializePacket(json);
+
+    Assert(packet.Success is null, "LOGIN request must not set success.");
+    Assert(packet.Message is null, "LOGIN request must not set message.");
+    Assert(packet.Error is null, "LOGIN request must not set error.");
 }
 
 static void LoginSuccessDeserializesAsResult()

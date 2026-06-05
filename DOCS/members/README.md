@@ -11,6 +11,23 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 - Do not claim shell, draft or local uncommitted artifact as runtime delivery.
 - Packet/schema changes follow `../API.md` and require owner approval.
 - Feature work must follow the dependency and gate order in `../LEADER_FLOW.md`.
+- Moi member tao feature/fix branch tu `develop` va nop PR/merge vao `develop`; khong merge feature truc tiep vao `main`.
+- `develop` la nhanh integration de M6 test; chi candidate duoc M6 ghi `Pass` va M1 approve moi duoc merge/promote vao `main`.
+
+## Standard Playbook Form
+
+Every member playbook uses the same planning form in this order:
+
+1. `Recovery Role` - delivery responsibility for the recovery window.
+2. `Write Scope` - files or areas the member may change.
+3. `Non-Owned Scope` - boundaries that require handoff rather than silent edits.
+4. `Dependencies` - upstream inputs or approvals needed before delivery.
+5. `Boundary Rules` - contract, evidence and integration limits.
+6. `Core Assignments` - a table with `Due`, `Task`, `Dependency` and `Required evidence`.
+7. `Retained Extension Ownership` - gated secondary scope only.
+8. `Definition Of Done` - evidence-based completion criteria for the member.
+
+The playbooks describe ownership and handoff. Current submission status remains in `../TASKS.md`; runtime pass/fail status remains in `../TEST_MATRIX.md` and `../DEMO_CHECKLIST.md`.
 
 ## Files
 
@@ -23,4 +40,4 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 
 ## Handoff Checklist
 
-Each handoff includes interface/result shape, evidence or blocker, consumer, due date and affected gate. M6 verifies pass status; M1 approves gate transitions and extension opening.
+Each handoff includes interface/result shape, evidence or blocker, consumer, due date and affected gate. M6 verifies pass status on `develop`; M1 approves gate transitions, extension opening and promotion from `develop` to `main`.

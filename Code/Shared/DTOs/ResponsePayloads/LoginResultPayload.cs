@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace NETManager.Shared.DTOs.ResponsePayloads;
+namespace Shared.DTOs.ResponsePayloads;
 
 /// <summary>
 /// Successful LOGIN response payload.

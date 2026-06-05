@@ -91,11 +91,24 @@ Each decision should include:
 - Decision: recovery seed baseline is `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, and `client02` / `123` / `PC-02`; admin login requires `PC00` in the recovery baseline
 - Reason: align demo instructions with the selected canonical runtime path before network/UI integration
 
+### 2026-05-27 - Use Develop As The Integration And Test Gate Before Main
+
+- Owner: Member 1 + Member 6
+- Affected docs/code: branch workflow, all feature work, `DOCS/LEADER_FLOW.md`, `DOCS/TASKS.md`, `DOCS/TEST_MATRIX.md`, member playbooks
+- Decision: every member feature/fix branch is merged into `develop` for integration and M6 verification; only a tested `develop` candidate recorded as `Pass` and approved by M1 may be merged into `main`
+- Reason: keep unverified feature work out of the accepted release branch and make tester evidence mandatory before release promotion
+
+### 2026-06-01 - Close Canonical Auth Seed Verification
+
+- Owner: Member 5 + Member 6
+- Affected docs/code: `DOCS/TASKS.md`, `DOCS/TEST_MATRIX.md`, `DOCS/BUGS.md`, `DOCS/RUN_GUIDE.md`, `internet_cafe.db`
+- Decision: canonical recovery auth seed is closed as verified for `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, and `client02` / `123` / `PC-02`; `AuthUsers/AuthSessions` remains the canonical runtime schema
+- Reason: runtime DB now matches the documented recovery seed and removes the remaining RR1 seed/admin drift
+
 ## Pending Decisions
 
 These are retained decisions that must be closed only at their owning recovery gate:
 
-- `R1/G0`: exact runtime database file location for canonical `AuthUsers/AuthSessions`, while retaining the selected SQLite path.
 - `R2/G2`: heartbeat or status emission interval.
 - `R4/G4`: duplicate active login behavior.
 - `E7`: exact reconnect retry/backoff behavior after disconnect stability passes.

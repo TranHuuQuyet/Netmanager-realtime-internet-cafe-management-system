@@ -1,4 +1,4 @@
-namespace NETManager.Shared.DTOs.ResponsePayloads;
+namespace Shared.DTOs.ResponsePayloads;
 
 /// <summary>
 /// Represents an intentionally empty JSON object payload.

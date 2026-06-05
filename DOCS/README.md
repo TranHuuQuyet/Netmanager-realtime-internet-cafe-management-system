@@ -17,6 +17,8 @@ Core delivery deadline: `2026-07-05`
 
 - Core local demo is mandatory before `2026-07-05`.
 - Important secondary features are kept in `Retained Extension Track` and opened only after required core gates pass.
+- `develop` is the integration/testing branch; members merge feature/fix branches into `develop`, not directly into `main`.
+- `main` receives a candidate only after M6 verifies the integrated `develop` build as `Pass` and M1 approves the promotion.
 - Previous 8-week tasks are retained as audit history, not active completion evidence.
 - A docs draft, UI shell or code skeleton does not count as delivered runtime behavior.
 

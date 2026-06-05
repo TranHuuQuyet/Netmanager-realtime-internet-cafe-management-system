@@ -1,14 +1,14 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS Users (
+CREATE TABLE IF NOT EXISTS AuthUsers (
     Id TEXT PRIMARY KEY,
     Username TEXT NOT NULL UNIQUE,
-    Password TEXT NOT NULL,
-    Role TEXT NOT NULL,
+    PasswordSaltBase64 TEXT NOT NULL,
+    PasswordHashBase64 TEXT NOT NULL,
+    Role INTEGER NOT NULL,
     MachineId TEXT NULL,
     IsActive INTEGER NOT NULL DEFAULT 1,
-    LastLogin TEXT NULL,
-    CreatedAt TEXT NOT NULL
+    LastLoginAtUtc TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Machines (
@@ -21,17 +21,19 @@ CREATE TABLE IF NOT EXISTS Machines (
     IsActive INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE TABLE IF NOT EXISTS Sessions (
+CREATE TABLE IF NOT EXISTS AuthSessions (
     Id TEXT PRIMARY KEY,
     UserId TEXT NOT NULL,
+    Username TEXT NOT NULL,
+    Role INTEGER NOT NULL,
     MachineId TEXT NULL,
-    Status TEXT NOT NULL,
-    StartTime TEXT NOT NULL,
-    EndTime TEXT NULL,
-    LastSeen TEXT NULL,
-    FOREIGN KEY (UserId) REFERENCES Users(Id)
+    State INTEGER NOT NULL,
+    StartedAtUtc TEXT NOT NULL,
+    EndedAtUtc TEXT NULL,
+    FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
 );
 
-CREATE INDEX IF NOT EXISTS IX_Users_Username ON Users (Username);
-CREATE INDEX IF NOT EXISTS IX_Users_MachineId ON Users (MachineId);
-CREATE INDEX IF NOT EXISTS IX_Sessions_MachineId_Status ON Sessions (MachineId, Status);
+CREATE INDEX IF NOT EXISTS IX_AuthUsers_Username ON AuthUsers (Username);
+CREATE INDEX IF NOT EXISTS IX_AuthUsers_MachineId ON AuthUsers (MachineId);
+CREATE INDEX IF NOT EXISTS IX_AuthSessions_UserId_State ON AuthSessions (UserId, State);
+CREATE INDEX IF NOT EXISTS IX_AuthSessions_MachineId_State ON AuthSessions (MachineId, State);

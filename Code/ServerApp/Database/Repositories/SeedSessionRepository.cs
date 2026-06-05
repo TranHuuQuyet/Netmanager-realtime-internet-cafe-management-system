@@ -2,7 +2,7 @@ using ServerApp.Database.Entities;
 
 namespace ServerApp.Database.Repositories;
 
-public sealed class SeedSessionRepository : ISessionRepository
+public sealed class SeedSessionRepository
 {
     private readonly List<SessionEntity> _sessions = [];
 
@@ -23,7 +23,7 @@ public sealed class SeedSessionRepository : ISessionRepository
             UserId = userId,
             MachineId = machineId,
             Status = "Active",
-            StartTime = startTime,
+            StartedAt = startTime,
             LastSeen = startTime
         };
 
@@ -36,7 +36,7 @@ public sealed class SeedSessionRepository : ISessionRepository
         var index = _sessions.FindIndex(session => session.Id == sessionId);
         if (index >= 0)
         {
-            _sessions[index] = _sessions[index] with { Status = "Ended", EndTime = endTime };
+            _sessions[index] = _sessions[index] with { Status = "Ended", EndedAt = endTime };
         }
 
         return Task.CompletedTask;

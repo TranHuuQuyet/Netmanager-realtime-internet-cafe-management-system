@@ -1,96 +1,183 @@
 using System.Net;
 using System.Net.Sockets;
-using NETManager.Shared.DTOs.RequestPayloads;
-using NETManager.Shared.Packets;
-using NETManager.Shared.Networking;
-using NETManager.Shared.Utilities.JsonHelper;
+using Microsoft.Data.Sqlite;
+using Shared.DTOs.RequestPayloads;
+using Shared.DTOs.ResponsePayloads;
+using Shared.Networking;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
+using ServerApp.Auth.Services;
+using ServerApp.Database.Contracts;
+using ServerApp.Networking;
 
-Console.WriteLine("NETManager JSON-line TCP round-trip smoke test");
+Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");
 
-await RunValidLoginRoundTripAsync();
-await RunInvalidPacketRoundTripAsync();
+string databasePath = Path.Combine(Path.GetTempPath(), $"netmanager-network-smoke-{Guid.NewGuid():N}.db");
 
-Console.WriteLine("PASS: valid LOGIN round-trip and invalid packet error envelope");
-
-static async Task RunValidLoginRoundTripAsync()
+try
 {
-    using var listener = new TcpListener(IPAddress.Loopback, port: 0);
-    listener.Start();
+    AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(databasePath);
 
-    int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-    Console.WriteLine($"Server listening on 127.0.0.1:{port}");
-
-    Task serverTask = RunServerOnceAsync(listener);
-    await RunValidLoginClientOnceAsync(port);
-    await serverTask;
-
-    Console.WriteLine("PASS: Client -> TCP JSON-line -> Server -> ACK JSON-line -> Client");
-}
-
-static async Task RunInvalidPacketRoundTripAsync()
-{
-    using var listener = new TcpListener(IPAddress.Loopback, port: 0);
-    listener.Start();
-
-    int port = ((IPEndPoint)listener.LocalEndpoint).Port;
-    Console.WriteLine($"Server listening on 127.0.0.1:{port}");
-
-    Task serverTask = RunServerOnceAsync(listener);
-    await RunInvalidPacketClientOnceAsync(port);
-    await serverTask;
-
-    Console.WriteLine("PASS: Invalid packet -> Server -> top-level error envelope -> Client");
-}
-
-static async Task RunServerOnceAsync(TcpListener listener)
-{
-    using TcpClient serverClient = await listener.AcceptTcpClientAsync();
-    await using NetworkStream stream = serverClient.GetStream();
-    using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
-    await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    using var server = new TcpJsonLineServer(
+        IPAddress.Loopback,
+        port: 0,
+        new PacketDispatcher(authRuntime.Auth),
+        authRuntime.SessionService);
+    server.TraceEmitted += trace =>
     {
-        AutoFlush = true
+        if (!string.IsNullOrWhiteSpace(trace.Message))
+        {
+            Console.WriteLine($"TRACE {trace.Direction} {trace.ClientId}: {trace.Message}");
+        }
     };
 
-    string? inboundLine = await reader.ReadLineAsync();
-    if (string.IsNullOrWhiteSpace(inboundLine))
+    server.Start();
+    int port = server.LocalEndpoint.Port;
+    Console.WriteLine($"ServerApp listener active on 127.0.0.1:{port}");
+
+    await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
+    await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
+    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
+    await AssertLoginFailureAsync(port, password: "123", machineId: "PC-02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
+    await AssertRejectedLineDoesNotStopServerAsync(port, authRuntime.SessionRepository, "{ invalid json", "invalid JSON");
+    await AssertRejectedLineDoesNotStopServerAsync(
+        port,
+        authRuntime.SessionRepository,
+        """{"type":"UNKNOWN","source":"PC-01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
+        "unknown packet type");
+    await AssertRejectedLineDoesNotStopServerAsync(
+        port,
+        authRuntime.SessionRepository,
+        """{"type":"STATUS","source":"PC-01","target":"server","requestId":"unsupported-status","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
+        "packet type without an open route");
+
+    Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
+}
+finally
+{
+    SqliteConnection.ClearAllPools();
+
+    if (File.Exists(databasePath))
     {
-        throw new InvalidOperationException("Server did not receive a JSON-line packet.");
+        File.Delete(databasePath);
+    }
+}
+
+static async Task AssertLoginSuccessAsync(int port, ISessionRepository sessions)
+{
+    Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+    object response = await SendLoginAsync(port, loginPacket);
+    Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+
+    Console.WriteLine("PASS: valid LOGIN returns authenticated session payload");
+    await WaitForClosedSessionAsync(sessions, resultPacket.TypedPayload.SessionId);
+}
+
+static Packet<LoginResultPayload> AssertLoginSuccessResponse(Packet<LoginPayload> loginPacket, object response)
+{
+    var resultPacket = response as Packet<LoginResultPayload>
+        ?? throw new InvalidOperationException("Client expected LOGIN success packet.");
+
+    if (resultPacket.Success != true)
+    {
+        throw new InvalidOperationException("LOGIN success response must set success to true.");
     }
 
-    Console.WriteLine($"SERVER IN : {inboundLine}");
+    if (resultPacket.TypedPayload.Username != "client01"
+        || resultPacket.TypedPayload.MachineId != "PC-01"
+        || string.IsNullOrWhiteSpace(resultPacket.TypedPayload.SessionId))
+    {
+        throw new InvalidOperationException("LOGIN success payload did not match the authenticated account.");
+    }
 
-    string outboundLine = DispatchPacket(inboundLine);
-
-    Console.WriteLine($"SERVER OUT: {outboundLine}");
-
-    await writer.WriteLineAsync(outboundLine);
-    listener.Stop();
+    AssertMatchingRequestId(loginPacket, resultPacket);
+    return resultPacket;
 }
 
-static async Task RunValidLoginClientOnceAsync(int port)
+static async Task AssertRepeatedLoginRejectedWhileActiveAsync(int port, ISessionRepository sessions)
 {
-    using var tcpClient = new TcpClient();
-    await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+    string sessionId;
 
-    await using NetworkStream stream = tcpClient.GetStream();
-    using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
-    await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    using (var tcpClient = new TcpClient())
     {
-        AutoFlush = true
-    };
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
 
-    var loginPacket = PacketFactory.CreateLogin(
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        object response = await SendLoginOnStreamAsync(stream, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        await AssertLoginFailureAsync(
+            port,
+            password: "123",
+            machineId: "PC-01",
+            expectedErrorCode: "MACHINE_ALREADY_ACTIVE");
+    }
+
+    await WaitForClosedSessionAsync(sessions, sessionId);
+    await AssertLoginSuccessAsync(port, sessions);
+    Console.WriteLine("PASS: repeated LOGIN is rejected while active and succeeds after disconnect");
+}
+
+static async Task AssertLoginFailureAsync(
+    int port,
+    string password,
+    string machineId,
+    string expectedErrorCode)
+{
+    Packet<LoginPayload> loginPacket = CreateLoginPacket(password, machineId);
+    object response = await SendLoginAsync(port, loginPacket);
+
+    var resultPacket = response as Packet<EmptyPayload>
+        ?? throw new InvalidOperationException("Client expected LOGIN failure packet.");
+
+    if (resultPacket.Success != false)
+    {
+        throw new InvalidOperationException("LOGIN failure response must set success to false.");
+    }
+
+    if (resultPacket.Error?.Code != expectedErrorCode)
+    {
+        throw new InvalidOperationException(
+            $"LOGIN error code was {resultPacket.Error?.Code}, expected {expectedErrorCode}.");
+    }
+
+    AssertMatchingRequestId(loginPacket, resultPacket);
+    Console.WriteLine($"PASS: rejected LOGIN returns {expectedErrorCode}");
+}
+
+static Packet<LoginPayload> CreateLoginPacket(string password, string machineId)
+{
+    return PacketFactory.CreateLogin(
         source: "PC-01",
         target: NetworkProtocol.ServerSource,
         payload: new LoginPayload
         {
             Username = "client01",
-            Password = "123456",
-            Role = "client",
-            MachineId = "PC-01"
+            Password = password,
+            Role = "Client",
+            MachineId = machineId
         },
         requestId: $"roundtrip-{Guid.NewGuid():N}");
+}
+
+static async Task<object> SendLoginAsync(int port, Packet<LoginPayload> loginPacket)
+{
+    using var tcpClient = new TcpClient();
+    await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+
+    await using NetworkStream stream = tcpClient.GetStream();
+    return await SendLoginOnStreamAsync(stream, loginPacket);
+}
+
+static async Task<object> SendLoginOnStreamAsync(NetworkStream stream, Packet<LoginPayload> loginPacket)
+{
+    using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
 
     string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(loginPacket));
     Console.WriteLine($"CLIENT OUT: {outboundLine}");
@@ -100,123 +187,71 @@ static async Task RunValidLoginClientOnceAsync(int port)
     string? inboundLine = await reader.ReadLineAsync();
     if (string.IsNullOrWhiteSpace(inboundLine))
     {
-        throw new InvalidOperationException("Client did not receive an ACK JSON-line packet.");
+        throw new InvalidOperationException("Client did not receive a LOGIN JSON-line packet.");
     }
 
     Console.WriteLine($"CLIENT IN : {inboundLine}");
-
-    var ackPacket = JsonHelper.DeserializePacket(inboundLine) as Packet<AckPayload>
-        ?? throw new InvalidOperationException("Client expected ACK packet.");
-
-    if (ackPacket.TypedPayload.Status != "OK")
-    {
-        throw new InvalidOperationException($"ACK status was {ackPacket.TypedPayload.Status}, expected OK.");
-    }
+    return JsonHelper.DeserializePacket(inboundLine);
 }
 
-static async Task RunInvalidPacketClientOnceAsync(int port)
+static async Task AssertRejectedLineDoesNotStopServerAsync(
+    int port,
+    ISessionRepository sessions,
+    string outboundLine,
+    string scenario)
 {
-    using var tcpClient = new TcpClient();
-    await tcpClient.ConnectAsync(IPAddress.Loopback, port);
-
-    await using NetworkStream stream = tcpClient.GetStream();
-    using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
-    await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    using (var tcpClient = new TcpClient())
     {
-        AutoFlush = true
-    };
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
 
-    string invalidPacket = NetworkProtocol.ValidateOutgoingMessage(
-        "{\"type\":\"UNKNOWN\",\"source\":\"PC-01\",\"target\":\"server\",\"requestId\":\"invalid-1\",\"payload\":{}}");
-
-    Console.WriteLine($"CLIENT OUT: {invalidPacket}");
-    await writer.WriteLineAsync(invalidPacket);
-
-    string? inboundLine = await reader.ReadLineAsync();
-    if (string.IsNullOrWhiteSpace(inboundLine))
-    {
-        throw new InvalidOperationException("Client did not receive an error JSON-line packet.");
-    }
-
-    Console.WriteLine($"CLIENT IN : {inboundLine}");
-
-    using var doc = System.Text.Json.JsonDocument.Parse(inboundLine);
-    System.Text.Json.JsonElement root = doc.RootElement;
-
-    if (root.GetProperty("type").GetString() != "ERROR")
-    {
-        throw new InvalidOperationException("Client expected ERROR packet type.");
-    }
-
-    if (root.GetProperty("success").GetBoolean())
-    {
-        throw new InvalidOperationException("Error packet must set success=false.");
-    }
-
-    string? code = root.GetProperty("error").GetProperty("code").GetString();
-    if (code != "INVALID_PACKET")
-    {
-        throw new InvalidOperationException($"Error code was {code}, expected INVALID_PACKET.");
-    }
-}
-
-static string DispatchPacket(string inboundLine)
-{
-    try
-    {
-        Packet packet = (Packet)JsonHelper.DeserializePacket(inboundLine);
-
-        switch (packet.Type.ToString())
+        await using NetworkStream stream = tcpClient.GetStream();
+        using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+        await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
         {
-            case "LOGIN":
-                return HandleLoginPacket((Packet<LoginPayload>)packet);
+            AutoFlush = true
+        };
 
-            default:
-                return CreateErrorPacket("Unsupported packet type.", "UNSUPPORTED_PACKET", $"Unsupported packet type: {packet.Type}");
+        Console.WriteLine($"CLIENT OUT: {outboundLine}");
+        await writer.WriteLineAsync(outboundLine);
+
+        using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        string? inboundLine = await reader.ReadLineAsync(timeoutTokenSource.Token);
+
+        if (inboundLine is not null)
+        {
+            throw new InvalidOperationException(
+                $"Client expected a controlled disconnect for {scenario}, but received: {inboundLine}");
         }
     }
-    catch (Exception ex)
-    {
-        return CreateErrorPacket("Invalid packet.", "INVALID_PACKET", ex.Message);
-    }
+
+    await AssertLoginSuccessAsync(port, sessions);
+    Console.WriteLine($"PASS: {scenario} disconnects only the offending client and server remains available");
 }
 
-static string HandleLoginPacket(Packet<LoginPayload> loginPacket)
+static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string sessionId)
 {
-    var ackPacket = PacketFactory.CreateAck(
-        source: NetworkProtocol.ServerSource,
-        target: loginPacket.Source,
-        payload: new AckPayload
-        {
-            MachineId = loginPacket.TypedPayload.MachineId,
-            AckFor = loginPacket.Type.ToString(),
-            Status = "OK",
-            Message = $"Round-trip received for {loginPacket.TypedPayload.Username}"
-        },
-        requestId: loginPacket.RequestId);
+    using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-    return NetworkProtocol.ValidateOutgoingMessage(
-        JsonHelper.SerializeToJson(ackPacket));
-}
-
-static string CreateErrorPacket(string message, string code, string details)
-{
-    var errorPacket = new
+    while (!timeoutTokenSource.IsCancellationRequested)
     {
-        type = "ERROR",
-        source = NetworkProtocol.ServerSource,
-        target = "PC-01",
-        requestId = "invalid-1",
-        timestamp = DateTime.UtcNow,
-        success = false,
-        message,
-        error = new
+        var session = await sessions.GetByIdAsync(sessionId, timeoutTokenSource.Token);
+
+        if (session?.State == ServerApp.Auth.Models.SessionState.Closed)
         {
-            code,
-            details = details.Replace('\r', ' ').Replace('\n', ' ')
+            Console.WriteLine($"PASS: disconnected socket closes session {sessionId}");
+            return;
         }
-    };
 
-    return NetworkProtocol.ValidateOutgoingMessage(
-        System.Text.Json.JsonSerializer.Serialize(errorPacket));
+        await Task.Delay(TimeSpan.FromMilliseconds(25), timeoutTokenSource.Token);
+    }
+
+    throw new InvalidOperationException($"Session {sessionId} remained active after socket disconnect.");
+}
+
+static void AssertMatchingRequestId(Packet<LoginPayload> request, Packet response)
+{
+    if (response.RequestId != request.RequestId)
+    {
+        throw new InvalidOperationException("LOGIN response requestId did not match LOGIN requestId.");
+    }
 }

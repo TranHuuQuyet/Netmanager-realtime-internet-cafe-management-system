@@ -117,7 +117,7 @@ Owner: `M2 + M5`
 Task: Route `LOGIN` from TCP dispatcher to canonical auth service
 Dependency: `G0`, `G1` pass
 Required evidence: Request/response trace
-Member done: [ ]
+Member done: [X]
 
 `R2-A01`
 Owner: `M5 + M6`

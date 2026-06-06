@@ -1,8 +1,8 @@
-# M5 DB Split Stage 2 - Nhom 2 Rehearsal Note
+# M5 DB Split Stage 2 
 
 ## Muc tieu
 
-Nhom 2 dam bao database sau khi reset van chay on, dung schema, dung path va san sang demo.
+Dam bao database sau khi reset van chay on, dung schema, dung path va san sang demo.
 
 ## Baseline can dat
 
@@ -27,8 +27,8 @@ Nhom 2 dam bao database sau khi reset van chay on, dung schema, dung path va san
 ### 1. Kiem tra DB path
 
 - [x] Chay app tu root repo.
-- [x] Xac nhan file `internet_cafe.db` dang co o root repo.
-- [x] Xac nhan hien khong co DB tai `AppData/netmanager.db` trong workspace.
+- [x] Xac nhan file `internet_cafe.db` duoc tao o root repo.
+- [x] Xac nhan khong tao DB moi tai `AppData/netmanager.db`.
 - [x] Kiem tra cac module sau dung chung mot DB path:
   - `DatabaseBootstrapper`
   - `DbInitializer`
@@ -37,12 +37,10 @@ Nhom 2 dam bao database sau khi reset van chay on, dung schema, dung path va san
 Ghi chu hien tai:
 
 - `internet_cafe.db` dang ton tai o root repo.
-- Khong tim thay `AppData/netmanager.db` sau reset.
-- `DatabasePathResolver` da la resolver dung chung.
-- `DatabaseBootstrapper` dung `DatabasePathResolver.Resolve(...)`.
-- `DatabaseOptions` default ve `DatabasePathResolver.DefaultDatabaseFileName` la `internet_cafe.db`.
-- `DbInitializer` dung `DatabaseOptions.DatabasePath`, nen cung di qua resolver chung.
-- Ket luan code check: **Pass** muc dung chung 1 path.
+- `DatabaseOptions` hien resolve default path den `internet_cafe.db` o root repo.
+- `DatabaseBootstrapper` dang co logic resolve path trong `DatabaseStore.ResolveDatabasePath`.
+- Da co class rieng `DatabasePathResolver`, nhung cac module chua dung chung mot co che resolve duoc toan bo.
+- Can hop nhat path resolver de tranh lech path giua cac module.
 
 ### 2. Test clean database
 
@@ -63,10 +61,9 @@ sqlite3 internet_cafe.db "SELECT type, name, tbl_name FROM sqlite_master WHERE t
 
 - [x] `DatabaseSchema.sql` co du bang `AuthUsers`, `Machines`, `AuthSessions`.
 - [x] `DatabaseSchema.sql` co du index baseline.
-- [x] `Database01.csproj` copy `DatabaseSchema.sql` ra output theo `TargetPath` la `Database\DatabaseSchema.sql`.
+- [x] `ServerApp.csproj` copy `DatabaseSchema.sql` ra output theo `TargetPath` la `Database\DatabaseSchema.sql`.
 - [x] `DatabaseBootstrapper` co goi seed user va seed machine.
 - [x] `internet_cafe.db` hien tai khop baseline schema.
-
 Sau reset, ket qua mong doi phai co:
 
 ```text
@@ -82,7 +79,6 @@ index|IX_AuthUsers_Username|AuthUsers
 Co the co them `sqlite_autoindex_*` do SQLite tu tao cho primary key/unique constraint.
 
 ## Evidence hien tai
-
 Thoi diem kiem tra: 2026-06-06.
 
 ### Setup/reset result
@@ -93,7 +89,6 @@ Thoi diem kiem tra: 2026-06-06.
 - Khong tim thay `AppData/netmanager.db` trong workspace sau reset.
 - `PRAGMA integrity_check` tra ve `ok`.
 - DB hien tai dat baseline schema.
-
 ### Code check result
 
 | Hang muc | Trang thai | Evidence |
@@ -102,11 +97,11 @@ Thoi diem kiem tra: 2026-06-06.
 | `DatabaseSchema.sql` co bang `Machines` | Pass | `CREATE TABLE IF NOT EXISTS Machines` |
 | `DatabaseSchema.sql` co bang `AuthSessions` | Pass | `CREATE TABLE IF NOT EXISTS AuthSessions` |
 | `DatabaseSchema.sql` co index baseline | Pass | Co `IX_AuthUsers_Username`, `IX_AuthUsers_MachineId`, `IX_AuthSessions_UserId_State`, `IX_AuthSessions_MachineId_State` |
-| Schema file duoc copy ra runtime output | Pass | `Database01.csproj` va `ServerApp.csproj` dat `CopyToOutputDirectory=PreserveNewest`, `TargetPath=Database\DatabaseSchema.sql` |
+|Schema file duoc copy ra runtime output | Pass | `ServerApp.csproj` dat `CopyToOutputDirectory=PreserveNewest`, `TargetPath=Database\DatabaseSchema.sql` |
 | `DatabaseBootstrapper` bootstrap DB | Pass | `CreateAsync` goi `store.InitializeAsync`, `SeedUsersAsync`, `SeedMachinesAsync` |
 | `DbInitializer` doc schema file | Pass | Doc `Database\DatabaseSchema.sql`, co fallback schema day du bang va index |
 | `DatabaseOptions` dung root `internet_cafe.db` | Pass | Default dung `DatabasePathResolver.DefaultDatabaseFileName` |
-| Tat ca module dung chung path resolver | Pass | Co `DatabasePathResolver`; `DatabaseBootstrapper`, `DbInitializer`, `DatabaseOptions` cung di qua resolver chung |
+| DatabaseOptions va DatabaseBootstrapper dung chung path resolver | Pass | Co `DatabasePathResolver`; `DatabaseBootstrapper` va `DatabaseOptions` can chinh path resolver, `DbInitializer` chi doc schema file |
 | DB hien tai khop schema baseline | Pass | DB sau reset co du 3 bang va 4 index baseline |
 
 ### Schema thuc te trong `internet_cafe.db`
@@ -142,7 +137,6 @@ MACHINE_COUNT|3
 ```
 
 ### Ket luan hien tai
-
 Trang thai: **Ready for demo**.
 
 Ly do:
@@ -153,24 +147,21 @@ Ly do:
 - Co du bang `AuthUsers`, `Machines`, `AuthSessions`.
 - Co du index baseline.
 - Seed user/machine da co du.
-- `DatabaseBootstrapper`, `DbInitializer`, `DatabaseOptions` dung chung `DatabasePathResolver`.
+- `DatabaseBootstrapper` va `DatabaseOptions` dung chung `DatabasePathResolver`; `DbInitializer` chi doc schema tu runtime output.
 
 ## Viec can lam tiep
-
 - [x] Reset DB va chay lai app de bootstrap schema moi.
 - [x] Kiem tra viec copy/use `DatabaseSchema.sql` khi runtime trong csproj.
 - [x] Neu DB sau reset van thieu `Machines` hoac index, can kiem tra app co dang chay dung build output moi khong.
 - [x] Tao/hoan thien `DatabasePathResolver` dung chung cho:
-  - `DatabaseBootstrapper`
-  - `DbInitializer`
-  - `DatabaseOptions`
+- `DatabaseBootstrapper`
+- `DbInitializer`
+- `DatabaseOptions`
 - [x] Cap nhat `DatabaseOptions` de default path tro ve `internet_cafe.db` o root repo, khong phai `AppData/netmanager.db`.
 - [x] Chay lai checklist va cap nhat ket qua cuoi cung.
 
-## Mau ket luan da nop
-
-```text
-Nhom 2 da reset database va chay lai app bootstrap thanh cong.
+## Mau ket luan khi pass
+Da reset database va chay lai app bootstrap thanh cong.
 DB moi duoc tao dung tai root repo: internet_cafe.db.
 Khong phat sinh DB o path cu: AppData/netmanager.db.
 SQLite integrity_check: ok.
@@ -178,6 +169,6 @@ Schema sau reset khop DatabaseSchema.sql.
 DB co du bang baseline: AuthUsers, Machines, AuthSessions.
 DB co du index baseline: IX_AuthUsers_Username, IX_AuthUsers_MachineId, IX_AuthSessions_UserId_State, IX_AuthSessions_MachineId_State.
 Seed data sau reset hop le: USER_COUNT=3, MACHINE_COUNT=3.
-DatabaseBootstrapper, DbInitializer, DatabaseOptions dung chung DatabasePathResolver.
+DatabaseBootstrapper va DatabaseOptions dung chung DatabasePathResolver; DbInitializer chi doc schema tu runtime output.
 Ket luan: Ready for demo.
 ```

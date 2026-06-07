@@ -126,7 +126,7 @@ Owner: `M5 + M6`
 Task: Verify admin/client valid login, bad password va wrong `machineId`
 Dependency: `R2-N01`
 Required evidence: `G2` auth cases pass
-Member done: [ ]
+Member done: [X]
 
 `R2-U01`
 Owner: `M4`

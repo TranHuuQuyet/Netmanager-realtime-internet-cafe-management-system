@@ -116,8 +116,10 @@ Member done: [x]
 Owner: `M2 + M5`
 Task: Route real `LOGIN` from TCP dispatcher to canonical auth service
 Dependency: `G0`, `G1` pass
-Required evidence: Request/response trace. Backend TCP dispatcher -> canonical auth service behavior is already proven by `NetworkSmokeTest`; this checkbox remains open only if the tracker requires a distinct R2 member submission.
-Member done: [ ]
+Required evidence: Request/response trace
+Member done: [X]
+
+
 
 `R2-A01`
 Owner: `M5 + M6`

@@ -2,14 +2,20 @@ namespace ClientApp.Forms;
 
 public sealed class ClientMainForm : Form
 {
-    private const string TotalTime = "01:59:01";
-    private const string UsedTime = "00:00:45";
-    private const string RemainingTime = "01:58:16";
-    private const string PlayCost = "63(VND)";
-    private const string LoginTime = "11/17/2017 11:41:39 PM";
+    private readonly DateTime _loginTimeUtc;
+    private readonly System.Windows.Forms.Timer _sessionTimer = new();
+    private TextBox _usedTimeTextBox = null!;
 
-    public ClientMainForm(string username, string machineId, string host, int port)
+    public ClientMainForm(
+        string username,
+        string machineId,
+        string host,
+        int port,
+        string sessionId,
+        DateTime loginTimeUtc)
     {
+        _loginTimeUtc = DateTime.SpecifyKind(loginTimeUtc, DateTimeKind.Utc);
+
         Text = "Máy trạm";
         ClientSize = new Size(420, 380);
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -34,12 +40,17 @@ public sealed class ClientMainForm : Form
             Font = new Font("Segoe UI", 18F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleCenter
         }, 0, 0);
-        root.Controls.Add(BuildInfoLayout(), 0, 1);
+        root.Controls.Add(BuildInfoLayout(username, sessionId, host, port), 0, 1);
         root.Controls.Add(BuildActionStrip(), 0, 2);
         Controls.Add(root);
 
         ToolTip tooltip = new();
-        tooltip.SetToolTip(this, $"Preview only: {username}/{machineId} at {host}:{port}. Runtime binding waits for M2 route.");
+        tooltip.SetToolTip(this, $"Đã đăng nhập {username}/{machineId} tại {host}:{port}.");
+
+        _sessionTimer.Interval = 1000;
+        _sessionTimer.Tick += (_, _) => UpdateUsedTime();
+        _sessionTimer.Start();
+        UpdateUsedTime();
     }
 
     private static string MachineCaption(string machineId)
@@ -52,7 +63,7 @@ public sealed class ClientMainForm : Form
         return string.IsNullOrWhiteSpace(machineId) ? "Máy 1" : machineId.Trim();
     }
 
-    private static Control BuildInfoLayout()
+    private Control BuildInfoLayout(string username, string sessionId, string host, int port)
     {
         var infoLayout = new TableLayoutPanel
         {
@@ -69,15 +80,15 @@ public sealed class ClientMainForm : Form
             infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
         }
 
-        AddInfoRow(infoLayout, 0, "Tổng thời gian", TotalTime);
-        AddInfoRow(infoLayout, 1, "Thời gian sử dụng", UsedTime);
-        AddInfoRow(infoLayout, 2, "Thời gian còn lại", RemainingTime);
-        AddInfoRow(infoLayout, 3, "Chi phí giờ chơi", PlayCost);
-        AddInfoRow(infoLayout, 4, "Giờ đăng nhập", LoginTime);
+        AddInfoRow(infoLayout, 0, "Tài khoản", username);
+        AddInfoRow(infoLayout, 1, "Mã phiên", ShortSessionId(sessionId));
+        _usedTimeTextBox = AddInfoRow(infoLayout, 2, "Thời gian sử dụng", "00:00:00");
+        AddInfoRow(infoLayout, 3, "Máy chủ", $"{host}:{port}");
+        AddInfoRow(infoLayout, 4, "Giờ đăng nhập", FormatLoginTime(_loginTimeUtc));
         return infoLayout;
     }
 
-    private static void AddInfoRow(TableLayoutPanel layout, int row, string label, string value)
+    private static TextBox AddInfoRow(TableLayoutPanel layout, int row, string label, string value)
     {
         layout.Controls.Add(new Label
         {
@@ -86,14 +97,17 @@ public sealed class ClientMainForm : Form
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, row);
-        layout.Controls.Add(new TextBox
+        var textBox = new TextBox
         {
             Dock = DockStyle.Fill,
             Text = value,
             ReadOnly = true,
             TabStop = false,
             Margin = new Padding(3, 9, 3, 3)
-        }, 1, row);
+        };
+
+        layout.Controls.Add(textBox, 1, row);
+        return textBox;
     }
 
     private Control BuildActionStrip()
@@ -137,5 +151,39 @@ public sealed class ClientMainForm : Form
     private void Communication_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(this, "Giao tiếp với máy chủ sẽ được bật sau khi route CHAT sẵn sàng.", "Giao tiếp", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void UpdateUsedTime()
+    {
+        TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc;
+
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        _usedTimeTextBox.Text = $"{(int)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
+    }
+
+    private static string ShortSessionId(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return "N/A";
+        }
+
+        return sessionId.Length <= 12 ? sessionId : sessionId[..12];
+    }
+
+    private static string FormatLoginTime(DateTime loginTimeUtc)
+    {
+        return loginTimeUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _sessionTimer.Stop();
+        _sessionTimer.Dispose();
+        base.OnFormClosed(e);
     }
 }

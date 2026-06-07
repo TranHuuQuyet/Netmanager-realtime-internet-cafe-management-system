@@ -4,9 +4,9 @@
 
 Version: `v0.2`
 Decision date: `2026-05-25`
-Verification status: `Blocked until G0 tests pass`
+Verification status: `Pass(G0/M6 - 2026-06-02)`
 
-This contract is the required runtime target for the recovery roadmap. Existing code artifacts must be corrected and tested against it before integration is considered complete.
+This contract is the verified runtime target for the recovery roadmap. UI integration and later feature gates must continue to implement this contract without drifting from the tested packet/error behavior.
 
 ### Current freeze evidence (`R1-C02`, submitted `2026-05-27`)
 
@@ -15,7 +15,7 @@ This contract is the required runtime target for the recovery roadmap. Existing 
   - `G0-03` `LOGIN` request/response paths deserialize into distinct payload models.
   - `G0-03` `LOGIN` request keeps response-only envelope fields (`success`, `message`, `error`) unset.
   - `G0-04` `LOGIN` failure uses top-level `success: false` and `error.code`.
-- `R1-C02` remains pending M6 verification and M1 approval before gate acceptance.
+- `R1-C02` is verified pass in `DOCS/TEST_MATRIX.md`; later gates must preserve API `v0.2` compatibility.
 
 ## Scope And Scheduling
 
@@ -259,5 +259,5 @@ Chat remains direct 1-1 text only: no history, group, file/image, delivery queue
 ## Change And Verification Rule
 
 - Any field/packet/error change updates this file and its tests in the same review batch.
-- `G0` cannot pass until serialization produces string packet types, LOGIN request/response are distinguishable, and top-level error handling matches this contract.
+- `G0` has passed with serialization producing string packet types, LOGIN request/response distinguishable, and top-level error handling matching this contract.
 - Retained extension models remain documented even while their routing is gated closed.

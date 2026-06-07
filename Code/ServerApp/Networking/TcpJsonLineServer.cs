@@ -2,6 +2,10 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using Shared.DTOs.RequestPayloads;
+using Shared.Networking;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
 using ServerApp.Networking;
@@ -15,6 +19,7 @@ public sealed class TcpJsonLineServer : IDisposable
     private readonly ISessionService _sessions;
     private readonly ConcurrentDictionary<string, ClientConnection> _connections = new();
     private readonly ConcurrentDictionary<string, string> _sessionBindings = new();
+    private readonly ConcurrentDictionary<string, string> _machineBindings = new();
     private readonly CancellationTokenSource _stopTokenSource = new();
     private Task? _acceptLoopTask;
     private int _nextClientNumber;
@@ -107,6 +112,13 @@ public sealed class TcpJsonLineServer : IDisposable
                     connection.Disconnect();
                     return;
                 }
+
+                if (!string.IsNullOrWhiteSpace(result.MachineId))
+                {
+                    string machineId = result.MachineId.Trim();
+                    _machineBindings[connection.ClientId] = machineId;
+                    EmitStatus(connection.ClientId, machineId, "Online");
+                }
             }
 
             TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, result.Response));
@@ -135,7 +147,34 @@ public sealed class TcpJsonLineServer : IDisposable
             }
         }
 
+        if (_machineBindings.TryRemove(connection.ClientId, out var machineId))
+        {
+            EmitStatus(connection.ClientId, machineId, "Offline");
+        }
+
         TraceEmitted?.Invoke(new NetworkTraceEntry("DISCONNECTED", connection.ClientId, string.Empty));
+    }
+
+    private void EmitStatus(string clientId, string machineId, string status)
+    {
+        var packet = PacketFactory.CreateStatus(
+            source: NetworkProtocol.ServerSource,
+            target: machineId,
+            payload: new StatusPayload
+            {
+                MachineId = machineId,
+                MachineName = machineId,
+                Status = status,
+                IpAddress = _listener.LocalEndpoint is IPEndPoint endpoint
+                    ? endpoint.Address.ToString()
+                    : string.Empty,
+                LastSeen = DateTime.UtcNow
+            });
+
+        TraceEmitted?.Invoke(new NetworkTraceEntry(
+            "STATUS",
+            clientId,
+            NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet))));
     }
 
     public void Dispose()

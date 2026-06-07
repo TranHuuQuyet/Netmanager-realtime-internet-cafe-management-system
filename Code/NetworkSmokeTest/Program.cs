@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Data.Sqlite;
+using Shared.Enums;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
 using Shared.Networking;
@@ -17,6 +18,7 @@ string databasePath = Path.Combine(Path.GetTempPath(), $"netmanager-network-smok
 try
 {
     AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(databasePath);
+    List<NetworkTraceEntry> traces = [];
 
     using var server = new TcpJsonLineServer(
         IPAddress.Loopback,
@@ -25,6 +27,11 @@ try
         authRuntime.SessionService);
     server.TraceEmitted += trace =>
     {
+        lock (traces)
+        {
+            traces.Add(trace);
+        }
+
         if (!string.IsNullOrWhiteSpace(trace.Message))
         {
             Console.WriteLine($"TRACE {trace.Direction} {trace.ClientId}: {trace.Message}");
@@ -35,6 +42,7 @@ try
     int port = server.LocalEndpoint.Port;
     Console.WriteLine($"ServerApp listener active on 127.0.0.1:{port}");
 
+    await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
     await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
@@ -118,6 +126,32 @@ static async Task AssertRepeatedLoginRejectedWhileActiveAsync(int port, ISession
     await WaitForClosedSessionAsync(sessions, sessionId);
     await AssertLoginSuccessAsync(port, sessions);
     Console.WriteLine("PASS: repeated LOGIN is rejected while active and succeeds after disconnect");
+}
+
+static async Task AssertLoginAndDisconnectEmitStatusAsync(
+    int port,
+    ISessionRepository sessions,
+    List<NetworkTraceEntry> traces)
+{
+    string sessionId;
+
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
+
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        object response = await SendLoginOnStreamAsync(stream, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        await WaitForStatusTraceAsync(traces, "PC-01", "Online");
+        Console.WriteLine("PASS: authenticated LOGIN emits STATUS Online");
+    }
+
+    await WaitForClosedSessionAsync(sessions, sessionId);
+    await WaitForStatusTraceAsync(traces, "PC-01", "Offline");
+    Console.WriteLine("PASS: authenticated disconnect emits STATUS Offline");
 }
 
 static async Task AssertLoginFailureAsync(
@@ -246,6 +280,41 @@ static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string 
     }
 
     throw new InvalidOperationException($"Session {sessionId} remained active after socket disconnect.");
+}
+
+static async Task WaitForStatusTraceAsync(List<NetworkTraceEntry> traces, string machineId, string status)
+{
+    using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+    while (!timeoutTokenSource.IsCancellationRequested)
+    {
+        NetworkTraceEntry[] snapshot;
+        lock (traces)
+        {
+            snapshot = [.. traces];
+        }
+
+        foreach (NetworkTraceEntry trace in snapshot)
+        {
+            if (!string.Equals(trace.Direction, "STATUS", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(trace.Message))
+            {
+                continue;
+            }
+
+            if (JsonHelper.DeserializePacket(trace.Message) is Packet<StatusPayload> statusPacket
+                && statusPacket.Type == PacketType.STATUS
+                && string.Equals(statusPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(statusPacket.TypedPayload.Status, status, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25), timeoutTokenSource.Token);
+    }
+
+    throw new InvalidOperationException($"STATUS {status} for {machineId} was not emitted.");
 }
 
 static void AssertMatchingRequestId(Packet<LoginPayload> request, Packet response)

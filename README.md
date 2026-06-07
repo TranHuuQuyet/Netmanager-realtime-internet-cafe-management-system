@@ -100,7 +100,7 @@ Approved build target command, from repository root:
 dotnet build Code/NetManager.sln
 ```
 
-This command is currently known to fail in the working tree and is the first core blocker. Runtime commands and seed/reset details are maintained in [DOCS/RUN_GUIDE.md](DOCS/RUN_GUIDE.md); do not claim a demo step passes until the corresponding gate is verified.
+This command is expected to pass on the current baseline. Any failure should be recorded in DOCS/BUGS.md and investigated before proceeding to later gates.
 
 ## Active Documents
 

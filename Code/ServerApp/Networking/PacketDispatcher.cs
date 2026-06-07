@@ -9,7 +9,7 @@ using ServerApp.Auth.Models;
 
 namespace ServerApp.Networking;
 
-public sealed record PacketDispatchResult(string Response, string? OpenedSessionId = null);
+public sealed record PacketDispatchResult(string Response, string? OpenedSessionId = null, string? MachineId = null);
 
 public sealed class PacketDispatcher
 {
@@ -85,7 +85,7 @@ public sealed class PacketDispatcher
             requestId: loginPacket.RequestId,
             message: result.Message);
 
-        return new PacketDispatchResult(SerializeResponse(response), result.Session.Id);
+        return new PacketDispatchResult(SerializeResponse(response), result.Session.Id, result.User.MachineId);
     }
 
     private static PacketDispatchResult CreateLoginFailure(

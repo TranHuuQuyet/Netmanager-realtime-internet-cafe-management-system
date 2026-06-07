@@ -1,6 +1,9 @@
 # R1 Verification Report
+
 Prepared by: M6 (Tester)
+
 This report summarizes the verification activities performed during Sprint R1, including test execution results, evidence review, bug verification, and the current status of project features.
+
 Sprint: R1 (2026-05-25 to 2026-05-31)
 
 ## Date: 2026-05-29

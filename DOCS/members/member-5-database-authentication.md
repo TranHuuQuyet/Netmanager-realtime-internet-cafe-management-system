@@ -61,3 +61,9 @@ Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineI
 - `R1-A01` da hoan thanh theo canonical auth/database baseline.
 - `G0-05` da duoc xac minh theo runtime seed trong `internet_cafe.db`.
 - `AuthUsers/AuthSessions` van la runtime schema canonical; `Users/Machines/Sessions` tiep tuc la retained/post-core direction.
+
+## R2-A01 Evidence Note
+
+- `Code/ServerApp/Auth/Services/AuthService.cs` da xu ly valid login, wrong password, wrong `machineId`, account-disabled, and machine-active cases theo canonical auth path.
+- `Code/Auth_Test/Program.cs` da co verify cho `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, wrong password, va wrong `machineId`.
+- Pham vi M5 cho `R2-A01` da san sang, con M6 runtime verification va final `G2` gate review la phan cua tester/gate owner.

@@ -29,6 +29,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G1-02` ClientApp startup UI smoke (`M4`, `2026-06-02`, working tree)        | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts --no-restore -v:minimal` completed with `0` warnings and `0` errors; UIAutomation launched `.audit-artifacts\bin\ClientApp\debug\ClientApp.exe` as default `PC-01`, launched `--machine-id=PC-02`, read `txtMachineId`, confirmed the window was responsive, and closed via both main-window close and `btnExit` | Pass(M6 - 2026-06-02) for UI startup only; runtime TCP connect/login/status remains tracked in `R2-N01`, `R2-U01`, `R2-N02`, `G2-02`, `G2-05`, `G2-06` |
 | `G0-02/G0-03/G0-04` contract smoke (`R1-C02`, `2026-05-27`, working tree)    | `Pass` on implementation working tree | `dotnet run --project Code/ContractSmoke/ContractSmoke.csproj --no-restore` passes string packet-type serialization, numeric type rejection, `LOGIN` request/response split, request envelope nullables unset, and top-level login error envelope assertions                                   | Pass(M6 2026-06-02) |
 | `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Pass(M6 2026-06-02) |
+| `G2` R2 audit (`2026-06-08`, dirty working tree) | `Partial` | Build passes with `0` warnings/errors; `Auth_Test`, `NetworkSmokeTest`, `CurrentAdminLoginSmoke`, `CurrentClientLoginSmoke` and `CurrentDashboardSmoke` verify real auth/login and server-generated Online/Offline UI bridge. Strict client-sent `STATUS` is missing and inbound `STATUS` remains unsupported. | `G2-01`-`G2-04` Pass; `G2-06` Pass with risk; `G2-05` Fail (`B-008`). Not ready for R3 without fix or M1 exception. |
 
 ## G0 - Build And Contract (`R1`)
 
@@ -54,12 +55,12 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 
 | ID      | Test                                                           | Mode  | Owner        | Initial status |
 | ------- | -------------------------------------------------------------- | ----- | ------------ | -------------- |
-| `G2-01` | Admin login succeeds with `admin` / `123` / `PC00`             | Local | M5 + M3      | `Blocked`      |
-| `G2-02` | Client login succeeds with `client01` / `123` / `PC-01`        | Local | M5 + M4      | `Blocked`      |
-| `G2-03` | Wrong password is rejected visibly                             | Local | M5 + M4      | `Blocked`      |
-| `G2-04` | Correct client credentials with wrong `machineId` are rejected | Local | M5 + M4      | `Blocked`      |
-| `G2-05` | Authenticated client sends status and dashboard shows online   | Local | M2 + M3 + M4 | `Blocked`      |
-| `G2-06` | Disconnect/status update shows client offline or clearly stale | Local | M2 + M3      | `Blocked`      |
+| `G2-01` | Admin login succeeds with `admin` / `123` / `PC00`             | Local | M5 + M3      | `Pass(M6 - 2026-06-08; working tree)`      |
+| `G2-02` | Client login succeeds with `client01` / `123` / `PC-01`        | Local | M5 + M4      | `Pass(M6 - 2026-06-08; working tree)`      |
+| `G2-03` | Wrong password is rejected visibly                             | Local | M5 + M4      | `Pass(M6 - 2026-06-08; working tree)`      |
+| `G2-04` | Correct client credentials with wrong `machineId` are rejected | Local | M5 + M4      | `Pass(M6 - 2026-06-08; working tree)`      |
+| `G2-05` | Authenticated client sends status and dashboard shows online   | Local | M2 + M3 + M4 | `Fail(M6 - 2026-06-08; B-008)`      |
+| `G2-06` | Disconnect/status update shows client offline or clearly stale | Local | M2 + M3      | `Pass(M6 - 2026-06-08; risk B-008)`      |
 
 ## G3 - Core Control (`R3`)
 

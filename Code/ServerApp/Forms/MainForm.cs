@@ -5,6 +5,7 @@ public partial class MainForm : Form
     private const string SampleMachinePrefix = "PC";
 
     private bool _isSelectingMachine;
+    private bool _isRuntimeMachineDataActive;
     private string? _selectedMachineName;
 
     public MainForm()
@@ -37,6 +38,7 @@ public partial class MainForm : Form
 
     private void LoadSampleMachineData()
     {
+        _isRuntimeMachineDataActive = false;
         dgvMachines.Rows.Clear();
         pnlMachineCards.Controls.Clear();
 
@@ -75,13 +77,10 @@ public partial class MainForm : Form
         string normalizedMachineId = NormalizeMachineId(machineId);
         string normalizedStatus = NormalizeStatus(status);
 
+        EnsureRuntimeMachineDataActive();
         UpsertMachineRow(normalizedMachineId, normalizedStatus);
         UpsertMachineCard(normalizedMachineId, normalizedStatus);
-
-        if (string.Equals(_selectedMachineName, normalizedMachineId, StringComparison.OrdinalIgnoreCase))
-        {
-            SelectMachine(normalizedMachineId);
-        }
+        SelectMachine(normalizedMachineId);
 
         lblServerStatus.Text = string.Format(
             UiStrings.MainRuntimeStatusUpdatedTemplate,
@@ -299,6 +298,31 @@ public partial class MainForm : Form
                     child.BackColor = card.BackColor;
                 }
             }
+        }
+    }
+
+    private void EnsureRuntimeMachineDataActive()
+    {
+        if (_isRuntimeMachineDataActive)
+        {
+            return;
+        }
+
+        _isRuntimeMachineDataActive = true;
+        lblMachineTitle.Text = UiStrings.MainMachineTitle;
+        _selectedMachineName = null;
+
+        bool previousSelectingState = _isSelectingMachine;
+        _isSelectingMachine = true;
+
+        try
+        {
+            dgvMachines.Rows.Clear();
+            pnlMachineCards.Controls.Clear();
+        }
+        finally
+        {
+            _isSelectingMachine = previousSelectingState;
         }
     }
 

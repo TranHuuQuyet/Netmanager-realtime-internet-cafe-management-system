@@ -126,21 +126,21 @@ Owner: `M5 + M6`
 Task: Verify admin/client valid login, bad password va wrong `machineId`
 Dependency: `R2-N01`
 Required evidence: `G2` auth cases pass
-Member done: [ ]
+Member done: [X]
 
 `R2-U01`
 Owner: `M4`
 Task: Bind client login screen to real M2/M5 network/auth result
 Dependency: `R2-N01`
 Required evidence: Visible success/error result
-Member done: [ ]
+Member done: [X]
 
 `R2-N02`
 Owner: `M2 + M4`
 Task: Emit `STATUS` after authenticated client login va disconnect through the runtime service boundary
 Dependency: `R2-A01`
 Required evidence: Status packet trace
-Member done: [ ]
+Member done: [X]
 
 `R2-U02`
 Owner: `M3`

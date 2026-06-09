@@ -39,12 +39,16 @@ public static class DatabaseBootstrapper
     {
         foreach (var seed in BuildSeedUsers())
         {
-            if (await users.GetByUsernameAsync(seed.Username, cancellationToken).ConfigureAwait(false) is not null)
+            var existing = await users.GetByUsernameAsync(seed.Username, cancellationToken).ConfigureAwait(false);
+            var record = CreateUserRecord(seed);
+
+            if (existing is null)
             {
+                await users.AddAsync(record, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
-            await users.AddAsync(CreateUserRecord(seed), cancellationToken).ConfigureAwait(false);
+            await users.UpdateSeedAsync(record, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -57,33 +61,7 @@ public static class DatabaseBootstrapper
     }
 
     private static IReadOnlyList<MachineEntity> BuildSeedMachines()
-        => new List<MachineEntity>
-        {
-            new()
-            {
-                Id = StableGuid("machine:PC-01"),
-                MachineId = "PC-01",
-                MachineName = "Computer 01",
-                Status = "Offline",
-                IsActive = true
-            },
-            new()
-            {
-                Id = StableGuid("machine:PC-02"),
-                MachineId = "PC-02",
-                MachineName = "Computer 02",
-                Status = "Offline",
-                IsActive = true
-            },
-            new()
-            {
-                Id = StableGuid("machine:PC-03"),
-                MachineId = "PC-03",
-                MachineName = "Computer 03",
-                Status = "Offline",
-                IsActive = true
-            }
-        };
+        => SeedData.Machines;
 
     private static UserRecord CreateUserRecord(SeedAccount seed)
     {
@@ -316,6 +294,34 @@ internal sealed class SqliteUserRepository : IUserRepository
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task UpdateSeedAsync(UserRecord user, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE AuthUsers
+            SET
+                PasswordSaltBase64 = @PasswordSaltBase64,
+                PasswordHashBase64 = @PasswordHashBase64,
+                Role = @Role,
+                MachineId = @MachineId,
+                IsActive = @IsActive
+            WHERE Username = @Username;
+            """;
+        command.Parameters.AddWithValue("@PasswordSaltBase64", user.PasswordSaltBase64);
+        command.Parameters.AddWithValue("@PasswordHashBase64", user.PasswordHashBase64);
+        command.Parameters.AddWithValue("@Role", (int)user.Role);
+        command.Parameters.AddWithValue("@MachineId", (object?)user.MachineId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IsActive", user.IsActive ? 1 : 0);
+        command.Parameters.AddWithValue("@Username", user.Username);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task UpdateLastLoginAtAsync(string userId, DateTimeOffset lastLoginAtUtc, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -429,6 +435,31 @@ internal sealed class SqliteSessionRepository : ISessionRepository
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("@UserId", userId.Trim());
+        command.Parameters.AddWithValue("@State", (int)SessionState.Active);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<SessionRecord?> GetActiveByMachineIdAsync(string machineId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, UserId, Username, Role, MachineId, State, StartedAtUtc, EndedAtUtc
+            FROM AuthSessions
+            WHERE MachineId = @MachineId AND State = @State
+            ORDER BY StartedAtUtc DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@MachineId", machineId.Trim());
         command.Parameters.AddWithValue("@State", (int)SessionState.Active);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);

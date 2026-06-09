@@ -9,6 +9,9 @@ public class StatusPayload
     [Required]
     public string MachineId { get; set; } = string.Empty;
 
+    [JsonPropertyName("sessionId")]
+    public string? SessionId { get; set; }
+
     [JsonPropertyName("machineName")]
     [Required]
     public string MachineName { get; set; } = string.Empty;

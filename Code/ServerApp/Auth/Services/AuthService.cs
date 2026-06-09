@@ -45,7 +45,9 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.AccountDisabled, "Account is inactive.");
             }
 
-            if (request.RequiredRole.HasValue && (AuthUserRole)user.Role != request.RequiredRole.Value) {
+            var userRole = (AuthUserRole)user.Role;
+
+            if (request.RequiredRole.HasValue && userRole != request.RequiredRole.Value) {
                 return AuthResult.Failure(AuthStatus.RoleMismatch, "Account role is not allowed for this login.");
             }
 
@@ -76,7 +78,7 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.AccountDisabled, "Machine is disabled.");
             }
 
-            if (IsMachineOnline(machine.Status)) {
+            if (userRole == AuthUserRole.Client && IsMachineOnline(machine.Status)) {
                 return AuthResult.Failure(AuthStatus.MachineAlreadyActive, "Machine is already active.");
             }
 
@@ -88,7 +90,7 @@ public sealed class AuthService : IAuthService {
             var summary = new UserSummary(
                 user.Id,
                 user.Username,
-                (AuthUserRole)user.Role,
+                userRole,
                 user.MachineId ?? string.Empty,
                 user.IsActive,
                 session.StartedAtUtc);

@@ -76,6 +76,7 @@ public partial class ConnectForm : Form
 
             _connection?.Dispose();
             _connection = pendingConnection;
+            _connection.EnableAutoReconnect();
             pendingConnection = null;
             loginSucceeded = true;
 
@@ -226,7 +227,8 @@ public partial class ConnectForm : Form
             _launchOptions.ServerHost,
             _launchOptions.ServerPort,
             authResult.SessionId ?? string.Empty,
-            authResult.LoginTimeUtc);
+            authResult.LoginTimeUtc,
+            _connection ?? throw new InvalidOperationException("Client connection is not available."));
 
         mainForm.ShowDialog(this);
         Close();
@@ -311,6 +313,7 @@ public partial class ConnectForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _connection?.DisableAutoReconnect();
         _connection?.Dispose();
         base.OnFormClosed(e);
     }

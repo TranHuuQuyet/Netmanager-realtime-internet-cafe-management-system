@@ -541,6 +541,28 @@ internal sealed class SqliteMachineRepository : IMachineRepository
         _store = store;
     }
 
+    public async Task<IReadOnlyList<MachineEntity>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, MachineId, MachineName, IpAddress, Status, LastSeen, IsActive
+            FROM Machines
+            ORDER BY MachineId;
+            """;
+
+        var machines = new List<MachineEntity>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            machines.Add(ReadMachine(reader));
+        }
+
+        return machines;
+    }
+
     public async Task<MachineEntity?> GetByMachineIdAsync(string machineId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(machineId))
@@ -566,16 +588,7 @@ internal sealed class SqliteMachineRepository : IMachineRepository
             return null;
         }
 
-        return new MachineEntity
-        {
-            Id = Guid.Parse(reader.GetString(0)),
-            MachineId = reader.GetString(1),
-            MachineName = reader.GetString(2),
-            IpAddress = reader.IsDBNull(3) ? null : reader.GetString(3),
-            Status = reader.GetString(4),
-            LastSeen = reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            IsActive = reader.GetInt32(6) == 1
-        };
+        return ReadMachine(reader);
     }
 
     public async Task UpdateStatusAsync(string machineId, string status, DateTime lastSeenUtc, CancellationToken cancellationToken = default)
@@ -611,7 +624,7 @@ internal sealed class SqliteMachineRepository : IMachineRepository
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            INSERT OR REPLACE INTO Machines
+            INSERT INTO Machines
             (
                 Id,
                 MachineId,
@@ -630,7 +643,11 @@ internal sealed class SqliteMachineRepository : IMachineRepository
                 @Status,
                 @LastSeen,
                 @IsActive
-            );
+            )
+            ON CONFLICT(MachineId) DO UPDATE SET
+                MachineName = excluded.MachineName,
+                IpAddress = excluded.IpAddress,
+                IsActive = excluded.IsActive;
             """;
         command.Parameters.AddWithValue("@Id", machine.Id.ToString("N"));
         command.Parameters.AddWithValue("@MachineId", machine.MachineId);
@@ -641,5 +658,19 @@ internal sealed class SqliteMachineRepository : IMachineRepository
         command.Parameters.AddWithValue("@IsActive", machine.IsActive ? 1 : 0);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static MachineEntity ReadMachine(SqliteDataReader reader)
+    {
+        return new MachineEntity
+        {
+            Id = Guid.Parse(reader.GetString(0)),
+            MachineId = reader.GetString(1),
+            MachineName = reader.GetString(2),
+            IpAddress = reader.IsDBNull(3) ? null : reader.GetString(3),
+            Status = reader.GetString(4),
+            LastSeen = reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            IsActive = reader.GetInt32(6) == 1
+        };
     }
 }

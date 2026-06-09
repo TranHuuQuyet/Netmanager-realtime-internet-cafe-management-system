@@ -15,12 +15,14 @@ await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
+await AssertCommandGuardAsync(runtime);
 
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
 Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC-01");
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
+Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
 
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
@@ -83,6 +85,39 @@ static async Task AssertWrongMachineAsync(AuthRuntime runtime)
     AssertFailure(result, AuthStatus.AccountMachineMismatch, "ACCOUNT_MACHINE_MISMATCH", "G2-04");
 }
 
+static async Task AssertCommandGuardAsync(AuthRuntime runtime)
+{
+    string guardDbPath = PrepareScratchDatabasePath("Netmanager-R3-A01");
+    DatabaseRuntime guardDatabase = await DatabaseBootstrapper.CreateAsync(guardDbPath);
+    AuthRuntime guardRuntime = await AuthBootstrapper.CreateAsync(guardDbPath);
+
+    await AssertMachineStateAsync(guardDatabase.Machines, "PC-01", expectedIsActive: true, expectedStatus: "Offline");
+
+    var user = await guardDatabase.Users.GetByUsernameAsync("client01");
+    if (user is null)
+    {
+        throw new InvalidOperationException("R3-A01 expected canonical user client01.");
+    }
+
+    var session = await guardRuntime.SessionService.OpenSessionAsync(user);
+
+    if (!string.Equals(session.MachineId, "PC-01", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R3-A01 expected a session bound to PC-01.");
+    }
+
+    var allowed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-01");
+    AssertCommandGuardSuccess(allowed, "PC-01", "R3-A01 active machine");
+
+    var deniedInactive = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-02");
+    AssertCommandGuardFailure(deniedInactive, "R3-A01 inactive machine", "UNAUTHORIZED_COMMAND");
+
+    await guardRuntime.SessionService.CloseSessionAsync(session.Id);
+
+    var deniedClosed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-01");
+    AssertCommandGuardFailure(deniedClosed, "R3-A01 closed machine", "UNAUTHORIZED_COMMAND");
+}
+
 static void AssertSuccess(AuthResult result, AuthStatus expectedStatus, string username)
 {
     if (!result.IsSuccess)
@@ -131,6 +166,27 @@ static void AssertFailure(AuthResult result, AuthStatus expectedStatus, string e
     {
         throw new InvalidOperationException($"{testName} should expose a visible error message.");
     }
+}
+
+static void AssertCommandGuardSuccess(AuthResult result, string expectedMachineId, string testName)
+{
+    AssertSuccess(result, AuthStatus.Success, testName);
+
+    if (result.Session is null)
+    {
+        throw new InvalidOperationException($"{testName} expected an active session result.");
+    }
+
+    if (!string.Equals(result.Session.MachineId, expectedMachineId, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException(
+            $"{testName} expected machine {expectedMachineId}, but got {result.Session.MachineId}.");
+    }
+}
+
+static void AssertCommandGuardFailure(AuthResult result, string testName, string expectedErrorCode)
+{
+    AssertFailure(result, AuthStatus.UnauthorizedCommand, expectedErrorCode, testName);
 }
 
 static async Task AssertUserAsync(
@@ -185,6 +241,31 @@ static async Task AssertMachineAsync(
     }
 }
 
+static async Task AssertMachineStateAsync(
+    ServerApp.Database.Contracts.IMachineRepository machines,
+    string machineId,
+    bool expectedIsActive,
+    string expectedStatus)
+{
+    var machine = await machines.GetByMachineIdAsync(machineId);
+    if (machine is null)
+    {
+        throw new InvalidOperationException($"Missing machine state check target: {machineId}");
+    }
+
+    if (machine.IsActive != expectedIsActive)
+    {
+        throw new InvalidOperationException(
+            $"{machineId}.IsActive mismatch: expected {expectedIsActive}, got {machine.IsActive}");
+    }
+
+    if (!string.Equals(machine.Status, expectedStatus, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            $"{machineId}.Status mismatch: expected {expectedStatus}, got {machine.Status}");
+    }
+}
+
 static async Task AssertSessionCountAsync(string dbPath, int expectedCount)
 {
     await using var connection = new SqliteConnection($"Data Source={dbPath}");
@@ -200,16 +281,24 @@ static async Task AssertSessionCountAsync(string dbPath, int expectedCount)
     }
 }
 
-static string PrepareScratchDatabasePath()
+static string PrepareScratchDatabasePath(string? scenarioName = null)
 {
-    var tempRoot = Path.Combine(Path.GetTempPath(), "Netmanager-G0-05");
+    var tempRoot = Path.Combine(Path.GetTempPath(), scenarioName ?? "Netmanager-G0-05");
     Directory.CreateDirectory(tempRoot);
 
     var dbPath = Path.Combine(tempRoot, "internet_cafe.g0-05.db");
-    if (File.Exists(dbPath))
-    {
-        File.Delete(dbPath);
-    }
+    DeleteIfExists(dbPath);
+    DeleteIfExists($"{dbPath}-journal");
+    DeleteIfExists($"{dbPath}-wal");
+    DeleteIfExists($"{dbPath}-shm");
 
     return dbPath;
+}
+
+static void DeleteIfExists(string path)
+{
+    if (File.Exists(path))
+    {
+        File.Delete(path);
+    }
 }

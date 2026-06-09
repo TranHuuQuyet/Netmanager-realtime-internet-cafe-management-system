@@ -17,7 +17,8 @@ public enum AuthStatus {
     AccountDisabled = 5,
     RoleMismatch = 6,
     ServerError = 7,
-    MachineAlreadyActive = 8
+    MachineAlreadyActive = 8,
+    UnauthorizedCommand = 9
 }
 
 // Trang thai vong doi cua session trong DB.
@@ -102,6 +103,7 @@ public static class AuthStatusExtensions {
             AuthStatus.RoleMismatch => "INVALID_CREDENTIALS",
             AuthStatus.ServerError => "SERVER_ERROR",
             AuthStatus.MachineAlreadyActive => "MACHINE_ALREADY_ACTIVE",
+            AuthStatus.UnauthorizedCommand => "UNAUTHORIZED_COMMAND",
             _ => "SERVER_ERROR"
         };
 }

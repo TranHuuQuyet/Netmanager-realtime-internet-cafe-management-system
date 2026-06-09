@@ -2,7 +2,7 @@
 
 Baseline date: `2026-05-25`
 Delivery deadline: `2026-07-05`
-Primary mode: `Local Multi-Instance Core Demo`
+Primary mode: `Real LAN + Local Multi-Instance Required Demo`
 
 ## Severity Rule
 
@@ -19,6 +19,7 @@ Primary mode: `Local Multi-Instance Core Demo`
 | `B-002` | Critical | TCP listener/dispatcher round-trip awaits final gate verification | `R1-N01/R1-N02` candidate uses `TcpJsonLineServer` + `PacketDispatcher`; `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` verifies authenticated `LOGIN` success/failure and controlled disconnects for malformed JSON, an unknown packet type and unopened `STATUS`. A fresh valid login succeeds after each rejected socket. | M2 + M6 | `R1/G1` | Verified Pass (M6 - 2026-06-02) |
 | `B-003` | Critical | No integrated login/status/control demo | No runtime proof for UI -> TCP -> auth or command/ACK flow | M2 + M3 + M4 + M5 | `R2-R3` | Open |
 | `B-008` | High | Client-sent `STATUS` route is missing | R2 audit on `2026-06-08` verifies real LOGIN and server-generated Online/Offline traces, but source search finds no ClientApp `STATUS` sender and `NetworkSmokeTest` confirms inbound `STATUS` is rejected as unsupported. | M2 + M4 | `R2/G2` | Open |
+| `B-009` | Critical | Promoted required scope lacks verified LAN/chat/billing persistence path | `2026-06-09` scope decision moves two physical LAN clients, 1-1 chat, SQLite `BillingSessions`, restart restore and minimal reconnect/resync into required demo scope; no integrated runtime evidence exists yet. | M2 + M3 + M4 + M5 + M6; M1 approves | `R4-R6/G5` | Open |
 | `B-004` | High | Shared wire implementation does not yet prove API `v0.2` | Existing serializer/parser needs string enum and LOGIN response/error verification | M2 + M1 | `R1/G0` | Verified PASS (M6 - 2026-05-29) |
 | `B-005` | High | Competing auth/database directions | `AuthUsers/AuthSessions` runtime path is canonical; broader `Users/Machines/Sessions` remains retained backlog | M5 + M1 | `R1/G0` | Verified PASS (M6 - 2026-06-01) |
 | `B-006` | High | Seed/admin machine docs previously drifted from selected auth runtime | Runtime path uses `admin`/`PC00`/`123`; docs and root DB are now aligned to the same canonical seed | M5 + M6 | `R1/G0` | Verified PASS (M6 - 2026-06-01) |
@@ -34,16 +35,18 @@ Primary mode: `Local Multi-Instance Core Demo`
 | Wrong `machineId` during demo | M5 + M6 | Deterministic error test in `G2` |
 | Multi-client state leak or duplicate login ambiguity | M2 + M5 | Decide behavior and test in `G4` |
 | UI freeze or crash on socket/disconnect | M2 + GUI owner | Network and disconnect verification in `G1/G4` |
+| Physical LAN or firewall setup fails at demo time | M2 + M6 | Required `G5` LAN rehearsal with two real clients and recorded endpoint |
+| Chat message routes to wrong/offline client | M2 + M3 + M4 | Required `G5` selected-client chat test and controlled offline error |
+| Billing amount or restore is wrong after restart | M5 + M3 + M6 | Required SQLite `BillingSessions` restore test and rounded-minute amount case |
+| Minimal reconnect/resync does not recover running clients after server restart | M2 + M4 + M5 | Required `G5` restart/resync evidence; polish remains retained |
 
 ## Retained Extension Risks
 
 | Extension | Current status | Rule |
 | --- | --- | --- |
 | Notification | `Conditional` | Open only after `G3` |
-| Timer display/persistence | `Conditional` | Display after stable notification; persistence later |
-| Chat | `Conditional` | Open only if `G4` passes on time |
-| Real LAN | `Conditional` | Smoke-test only after local rehearsal |
-| Reconnect polish | `Conditional` | Does not replace core disconnect stability |
+| Notification broadcast | `Conditional` | Open only after direct notification is stable |
+| Reconnect polish | `Conditional` | Does not replace required minimal reconnect/resync |
 
 An unopened or incomplete extension is recorded as `Retained - Continue After Core Release`, not removed from the product.
 

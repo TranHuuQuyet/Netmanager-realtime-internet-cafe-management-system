@@ -26,14 +26,14 @@ This contract is the verified runtime target for the recovery roadmap. UI integr
 - `LOCK`
 - `UNLOCK`
 - `ACK`
+- `TIMER` - required for timed/open-ended billing display and expiry handling after the `2026-06-09` scope update
+- `CHAT` - required for direct Admin/client 1-1 chat after the `2026-06-09` scope update
 
 ### Retained extension packet types
 
 - `NOTIFICATION` - open after `G3`
-- `TIMER` - open after notification and stable core
-- `CHAT` - open only after timely `G4`
 
-Extension packet types remain part of the product contract; scheduling gates prevent them from blocking core delivery.
+Retained packet types remain part of the product contract; scheduling gates prevent them from blocking required delivery. `TIMER` and `CHAT` were promoted into required `G5` scope by the `2026-06-09` decision.
 
 ## Transport Rules
 
@@ -202,7 +202,7 @@ Sent after authenticated login and on visible state/disconnect-related updates.
 
 Accepted `ACK.status`: `Success`, `Failed`, `Ignored`.
 
-## Retained Extension Payloads
+## Required And Retained Payloads
 
 ### `NOTIFICATION`
 
@@ -227,7 +227,7 @@ Direct message is `E1`; broadcast scope is `E5`.
 }
 ```
 
-Display is `E2`; persistence is `E6`.
+`TIMER` is required for billing display/resync. Timed rental warns at 5 minutes remaining, sends `LOCK` at expiry and does not force logout.
 
 ### `CHAT`
 
@@ -241,13 +241,32 @@ Display is `E2`; persistence is `E6`.
 
 Chat remains direct 1-1 text only: no history, group, file/image, delivery queue or emoji-specific behavior.
 
+### Billing session target
+
+Future implementation must persist billing sessions in SQLite with enough data to restore active rentals after ServerApp restart:
+
+- machine/client session reference;
+- rental mode (`timed`, `open-ended`, `extend`);
+- start time and optional expiry time;
+- status (`Active`, `Closed` or equivalent approved values);
+- rate per hour, defaulting to `10000` VND/hour;
+- active/closed restore behavior.
+
+Billing amount uses rounded-up minutes:
+
+```csharp
+chargedMinutes = Math.Ceiling(elapsedSeconds / 60.0);
+amount = Math.Ceiling(chargedMinutes * 10000 / 60.0);
+```
+
 ## Data And Session Baseline
 
 - Canonical recovery SQLite tables are `AuthUsers` and `AuthSessions`, as owned by M5's selected auth runtime.
 - Canonical recovery runtime is `AuthBootstrapper` backed by `internet_cafe.db` in the repository root; this is the only approved SQLite path for the recovery baseline.
+- Required billing/session monitor persistence uses SQLite `BillingSessions` and must restore active timed/open-ended rentals after ServerApp restart.
 - Broader `Users/Machines/Sessions` consolidation is retained future work and must not be integrated in parallel before core release.
 - Online/offline and command target state are maintained by an in-memory authenticated connection registry for core delivery.
-- Timer persistence is an extension, not a core database requirement.
+- Minimal reconnect/resync is required so running clients can sync billing/timer and receive extend/LOCK after ServerApp restart; reconnect UX polish remains retained.
 
 ## Runtime Boundary
 
@@ -260,4 +279,4 @@ Chat remains direct 1-1 text only: no history, group, file/image, delivery queue
 
 - Any field/packet/error change updates this file and its tests in the same review batch.
 - `G0` has passed with serialization producing string packet types, LOGIN request/response distinguishable, and top-level error handling matching this contract.
-- Retained extension models remain documented even while their routing is gated closed.
+- Retained extension models remain documented even while their routing is gated closed; models promoted on `2026-06-09` are verified through `G5`.

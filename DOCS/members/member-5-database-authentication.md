@@ -2,7 +2,7 @@
 
 ## Recovery Role
 
-Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineId` validation. Audit thay co hai huong persistence, nen recovery quyet dinh dung auth path trong `AuthBootstrapper` lam canonical truoc deadline. RR1 canonical seed/admin baseline da duoc dong bo va xac minh.
+Ban own canonical SQLite auth/session runtime, seed data, account-to-`machineId` validation va required billing/session persistence. Audit thay co hai huong persistence, nen recovery quyet dinh dung auth path trong `AuthBootstrapper` lam canonical truoc deadline; tu `2026-06-09`, `BillingSessions` restore la required demo scope.
 
 ## Write Scope
 
@@ -20,15 +20,18 @@ Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineI
 
 - Can M1 approve canonical schema, seed va session policy changes.
 - Can M2 consume approved auth result shape through runtime dispatcher.
+- Can M3/M4 consume billing session state for Admin monitor and Client timer/amount display.
 - Can M6 verify seed/reset, wrong-machine va session evidence.
 
 ## Boundary Rules
 
 - Canonical runtime schema: `AuthUsers`, `AuthSessions`.
+- Required billing schema target: `BillingSessions` stores active/closed billing, machine/client session reference, rental mode, start time, optional expiry time, status and rate per hour.
 - Canonical recovery accounts: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
 - Admin machine rule for recovery: `PC00` required.
 - Broader `Users/Machines/Sessions` consolidation is retained post-core work, not a parallel integration path.
 - Core online/offline status remains in-memory at networking layer.
+- Billing/session monitor is not in-memory-only; active billing must restore after ServerApp restart.
 - Provide `IAuthService`/session result behavior for M2; do not move socket logic into auth.
 - Wrong machine, disabled account and server error must map deterministically to API error codes.
 - Changes to seed/schema/session contract need M1 approval and M6 test updates.
@@ -41,20 +44,21 @@ Ban own canonical SQLite auth/session runtime, seed data va account-to-`machineI
 | `2026-05-31` | Normalize canonical SQLite path/schema/seed/admin behavior and help restore server startup build | M1 decision | Auth handoff + `G0` evidence |
 | `2026-06-07` | Provide runtime login and wrong-machine result through network call path | M2 dispatcher | `G2` cases pass |
 | `2026-06-14` | Enforce active session/machine control guard | Authenticated command route | `G3` evidence |
-| `2026-06-21` | Decide/test duplicate active login behavior | M1 approval, multi-client | `G4` evidence |
-| `2026-06-28` | Verify seed/reset instructions for rehearsal | Stable core | `G5` setup result |
-| `2026-07-05` | Support frozen demo seed/auth explanation and final blocker disposition | RC approved; M1/M6 request | Final auth/data report |
+| `2026-06-21` | Decide/test duplicate active login behavior and define billing session handoff for Admin-selected rental mode | M1 approval, multi-client, M3/M4 consumers | `G4`/billing handoff evidence |
+| `2026-06-28` | Verify seed/reset instructions, implement/verify `BillingSessions` active restore and rounded-minute billing rule | Stable core; M1 scope decision | `G5` setup/restore result |
+| `2026-07-05` | Support frozen demo seed/auth/billing explanation and final blocker disposition | RC approved; M1/M6 request | Final auth/data report |
 
 ## Retained Extension Ownership
 
-- `E6 Timer persistence` remains owned by M5 after timer display and session stability are proven.
 - Future schema consolidation and customer/reporting persistence remain retained backlog after core release.
+- Billing persistence is no longer retained work; it is required `G5` scope after the `2026-06-09` decision.
 
 ## Definition Of Done
 
 - Canonical auth path is unambiguous and callable from network flow.
 - Machine-bound login and session guard pass runtime tests.
-- Deferred persistence work remains documented without destabilizing release scope.
+- Billing sessions restore from SQLite and support timed/free rental evidence.
+- Deferred persistence outside billing remains documented without destabilizing release scope.
 
 ## RR1 Completion Note
 

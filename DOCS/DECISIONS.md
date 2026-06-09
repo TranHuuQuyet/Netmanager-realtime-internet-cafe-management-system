@@ -105,11 +105,20 @@ Each decision should include:
 - Decision: canonical recovery auth seed is closed as verified for `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, and `client02` / `123` / `PC-02`; `AuthUsers/AuthSessions` remains the canonical runtime schema
 - Reason: runtime DB now matches the documented recovery seed and removes the remaining RR1 seed/admin drift
 
+### 2026-06-09 - Promote LAN Chat And Billing Persistence Into Required Demo Scope
+
+- Owner: Member 1
+- Affected docs/code: `DOCS/TASKS.md`, `DOCS/TEST_MATRIX.md`, `DOCS/DEMO_CHECKLIST.md`, `DOCS/RUN_GUIDE.md`, `DOCS/BUGS.md`, member playbooks, future runtime modules
+- Decision: from `2026-06-09` forward, the required demo scope includes two physical LAN clients plus local multi-instance regression, 1-1 Admin/client chat, and Admin billing/session monitor backed by SQLite persistence; this supersedes the earlier retained-extension status for timer/chat/Real LAN/timer persistence without rewriting historical `R1/R2` evidence
+- Decision details: Admin selects rental mode per machine (`timed`, `open-ended`, `extend`); Client only logs into its assigned `machineId`; default billing rate is `10000` VND/hour; billing uses `chargedMinutes = Math.Ceiling(elapsedSeconds / 60.0)` and `amount = Math.Ceiling(chargedMinutes * 10000 / 60.0)`; timed demo packages may be `5-10` minutes; timed rental warns at 5 minutes remaining and sends `LOCK` at expiry without logging the client out
+- Decision details: future implementation must store active/closed billing sessions in SQLite and restore active sessions after ServerApp restart; minimal reconnect/resync is required only so a running client can sync billing/timer and receive extend/LOCK after server restart; reconnect UI polish remains retained work
+- Reason: the final cafe-management demo now requires LAN realism, direct operator/customer communication, and billable session recovery rather than local-only control
+
 ## Pending Decisions
 
 These are retained decisions that must be closed only at their owning recovery gate:
 
 - `R2/G2`: heartbeat or status emission interval.
 - `R4/G4`: duplicate active login behavior.
-- `E7`: exact reconnect retry/backoff behavior after disconnect stability passes.
+- `E7`: exact reconnect retry/backoff UX polish after the required minimal reconnect/resync path passes.
 - Post-core: logging implementation and future consolidation from `AuthUsers/AuthSessions` to broader machine/customer schema.

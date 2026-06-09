@@ -3,8 +3,8 @@
 ## Purpose / Source Of Truth
 
 Active delivery window: `2026-05-25` to `2026-07-05`.
-Mandatory release result: stable `Core Local Demo`.
-Important secondary features remain in the `Retained Extension Track`.
+Mandatory release result: stable `Real LAN + Local Multi-Instance Required Demo`.
+Important secondary features remain in the `Retained Extension Track`; timer/billing, 1-1 chat, Real LAN and billing persistence were promoted to required scope on `2026-06-09`.
 
 Source of truth:
 
@@ -16,7 +16,7 @@ Source of truth:
 - `DOCS/BUGS.md`: active blockers, risks and accepted limitations.
 - `DOCS/TEST_MATRIX.md`: runtime evidence and gate status.
 - `DOCS/RUN_GUIDE.md`: approved setup and demo seed assumptions.
-- `DOCS/DEMO_CHECKLIST.md`: core demo and retained extension presentation path.
+- `DOCS/DEMO_CHECKLIST.md`: required demo and retained extension presentation path.
 - `DOCS/members/`: individual recovery assignments and handoff rules.
 
 Rules:
@@ -28,7 +28,7 @@ Rules:
 - Members submit feature or fix branches to `develop`; no member feature branch merges directly into `main`.
 - A change may enter `main` only after M6 records a `Pass` for the integrated `develop` candidate and M1 approves the promotion.
 - If code and docs differ, runtime is not approved until the owning contract/docs and tests are aligned.
-- If a core gate is red, extension work cannot begin unless M1 records an exception that does not delay core recovery.
+- If a core gate is red, retained extension work cannot begin unless M1 records an exception that does not delay required recovery.
 
 ## Current Baseline
 
@@ -52,20 +52,27 @@ Audit date: `2026-05-25`.
 - Admin triggers `LOCK` and `UNLOCK`; client executes them.
 - Client returns `ACK`; server shows result/error.
 - Two local clients remain distinct.
+- Two physical LAN clients connect, login and remain distinct while the local path still passes.
+- Admin and selected client exchange direct 1-1 chat; non-selected client does not receive it.
+- Admin starts timed/open-ended rental and extend actions; Client does not choose rental mode.
+- Timed rental warns at 5 minutes remaining, sends `LOCK` at expiry and does not force logout.
+- Open-ended billing uses rounded-up minutes at `10000` VND/hour.
+- SQLite `BillingSessions` restores active billing after ServerApp restart.
+- Minimal reconnect/resync lets running clients sync billing/timer and receive extend/LOCK after server restart.
 - Disconnect does not crash the server.
-- Local multi-instance demo rehearses successfully on release build.
+- Local and physical LAN demos rehearse successfully on release build.
 
 ### Retained Extension Lane - Kept In Project, Gate Controlled
 
 | Priority | Feature | Open condition |
 | --- | --- | --- |
 | `E1` | Direct notification | `G3 Core Control` pass |
-| `E2` | Timer display | `E1` pass and no open High/Critical core blocker |
-| `E3` | 1-1 text chat | `G4 Multi-Client` pass by `2026-06-21` |
-| `E4` | Real LAN smoke test | Local rehearsal pass by `2026-06-28` |
+| `E2` | Timer/billing display | Promoted to required `G5` scope on `2026-06-09` |
+| `E3` | 1-1 text chat | Promoted to required `G5` scope on `2026-06-09` |
+| `E4` | Real LAN two-client demo | Promoted to required `G5` scope on `2026-06-09` |
 | `E5` | Notification broadcast | `E1` stable |
-| `E6` | Timer persistence | `E2` and core session stable |
-| `E7` | Reconnect polish | Disconnect stability pass |
+| `E6` | Billing/timer persistence | Promoted to required `G5` scope on `2026-06-09` |
+| `E7` | Reconnect polish beyond minimal resync | Required minimal reconnect/resync pass |
 
 Extension work not completed by `2026-07-05` becomes `Retained - Continue After Core Release`; it is not removed from the roadmap.
 
@@ -105,12 +112,12 @@ These features do not enter development before `G5 Release` unless M1 formally c
 
 | Member | Core delivery ownership | Retained extension ownership |
 | --- | --- | --- |
-| M1 | scope, API/auth decisions, dependency order, gate and release approval | open/continue/defer extension decision |
-| M2 | shared wire implementation, TCP, dispatcher, login/status/control routing, client registry | notification/timer/chat routing, LAN/reconnect support |
-| M3 | buildable server UI, status display, command action and ACK/error display | admin notification/timer/chat UI |
-| M4 | buildable client UI, real login result, lock/unlock reaction and ACK | client notification/timer/chat UI |
-| M5 | canonical SQLite auth/session, seed data, machine validation and session guard | timer persistence and extended session policy |
-| M6 | test evidence, blockers, docs alignment, rehearsal reporting | extension verification and continuation report |
+| M1 | scope, API/auth decisions, dependency order, promoted-scope gate and release approval | open/continue/defer retained extension decision |
+| M2 | shared wire implementation, TCP, dispatcher, login/status/control routing, client registry, LAN/chat/timer transport, minimal reconnect/resync | notification broadcast and reconnect polish support |
+| M3 | buildable server UI, status display, command action, ACK/error, admin chat UI and billing monitor | admin notification/broadcast UI |
+| M4 | buildable client UI, real login result, lock/unlock reaction, ACK, chat, timer/billing display and minimal resync | client notification/reconnect polish UI |
+| M5 | canonical SQLite auth/session, seed data, machine validation, session guard and `BillingSessions` restore | future schema consolidation and reporting persistence |
+| M6 | test evidence, blockers, docs alignment, local/LAN/chat/billing rehearsal reporting | retained extension verification and continuation report |
 
 ## Working And Handoff Rules
 
@@ -143,8 +150,8 @@ Receiving owners:
 ### Stop-Work Rules
 
 - Until `G0` passes, work is limited to build, canonical contract, canonical auth/database and round-trip foundation.
-- Until `G3` passes, do not implement extension routing.
-- Until `G4` passes, chat and LAN cannot be opened.
+- Until `G3` passes, do not implement retained extension routing.
+- Promoted chat/LAN/billing work may be prepared after the `2026-06-09` decision, but cannot be claimed ready until its upstream `G3/G4/G5` dependencies pass.
 - From `2026-07-01`, only approved demo-blocker fixes may enter the release build.
 
 ## Active Six-Week Workflow
@@ -186,36 +193,38 @@ Goal: one-client command demo works repeatedly.
 
 Gate: `G3 Core Control` passes. Passing this gate may open `E1 Direct Notification`.
 
-### R4 Multi-Client And Notification - `2026-06-15` to `2026-06-21`
+### R4 Multi-Client, LAN Readiness And Required Chat/Billing Setup - `2026-06-15` to `2026-06-21`
 
-Goal: stabilize local multi-client identity and disconnect behavior.
+Goal: stabilize local multi-client identity, LAN-capable routing, required chat setup and billing handoff.
 
 - M2/M5: route two authenticated clients and settle duplicate-login behavior.
-- M3/M4: display and maintain separated client states.
+- M3/M4: display and maintain separated client states and prepare two physical LAN clients.
 - M2/M6: verify disconnect stability.
-- Extension team: implement direct notification only if opened.
+- M2/M3/M4: implement selected-client 1-1 chat with controlled offline/wrong-target behavior.
+- M3/M5/M1: define Admin-owned timed/free/extend rental flow and `BillingSessions` handoff.
+- M2/M4/M5: define minimal reconnect/resync behavior after ServerApp restart.
 
-Gate: `G4 Multi-Client` passes. If passed on time, M1 may open timer display and 1-1 chat.
+Gate: `G4 Multi-Client` passes and required `G5` additions have clear owner handoffs.
 
-### R5 Stabilization And Opened Extensions - `2026-06-22` to `2026-06-28`
+### R5 Stabilization And Required Demo Additions - `2026-06-22` to `2026-06-28`
 
-Goal: obtain a reliable local rehearsal and finish only extensions already opened.
+Goal: obtain reliable local and physical LAN rehearsals, finish required chat, billing and restart restore.
 
 - All owners: close core blockers and run regression.
-- M6: verify clean setup and local rehearsal.
-- Extension owners: implement/test opened notification, timer or chat work.
-- M2/M6: attempt LAN smoke only after local rehearsal passes.
+- M6: verify clean setup, local rehearsal, physical LAN rehearsal and promoted required-scope tests.
+- M5/M3/M2/M4: implement/test `BillingSessions`, timed/free billing, expiry `LOCK`, restore and minimal reconnect/resync.
+- M2/M3/M4: complete selected-client chat regression.
 
 Gate: `G5 Release` candidate is ready.
 
 ### R6 Release And Demo - `2026-06-29` to `2026-07-05`
 
-Goal: freeze and deliver core safely while reporting retained extension state honestly.
+Goal: freeze and deliver required scope safely while reporting retained extension state honestly.
 
 - M1: approve RC and freeze by target date `2026-06-30`.
 - M6/team: execute two rehearsals on the RC build.
 - Team: deliver demo no later than `2026-07-05`.
-- M6: record every extension as pass, opened/incomplete, or retained after release.
+- M6: record required promoted scope as pass/fail/approved exception and every retained extension as pass, opened/incomplete, or retained after release.
 
 ## Gate Summary
 
@@ -224,15 +233,15 @@ Goal: freeze and deliver core safely while reporting retained extension state ho
 | `G0 Build & Contract` | Further integration | Build pass and shared wire/auth contract verified |
 | `G1 Network` | Login UI integration claim | Local listener/dispatcher round-trip and invalid handling; ClientApp startup smoke is supporting evidence only |
 | `G2 Auth & Status` | Control work | Real login/machine validation/status path |
-| `G3 Core Control` | Extension routing | Lock/unlock/ACK/error repeated demo |
-| `G4 Multi-Client` | Optional chat/LAN opening | Two local clients and disconnect stability |
-| `G5 Release` | RC approval | Regression, clean setup and local rehearsal |
+| `G3 Core Control` | Retained extension routing and billing expiry safety | Lock/unlock/ACK/error repeated demo |
+| `G4 Multi-Client` | Required chat/billing/LAN stabilization | Two local clients, disconnect stability and promoted-scope handoffs |
+| `G5 Release` | RC approval | Regression, clean setup, local rehearsal, physical LAN, chat, billing and restart restore |
 
 ## Deadline Guardrails
 
 - If `R1` misses `2026-05-31`, all extension work remains closed.
-- If `R3` misses `2026-06-14`, all extensions continue after the core release rather than consume demo stabilization time.
-- If `R4` misses `2026-06-21`, the mandatory demo falls back to one-client local while two-client work remains retained.
+- If `R3` misses `2026-06-14`, retained extensions continue after the core release rather than consume demo stabilization time.
+- If promoted LAN/chat/billing work misses its dependency gate, it is a required demo blocker unless M1 records an explicit exception.
 - The intended code freeze is `2026-06-30`.
 
 ## Final Definition Of Done
@@ -240,7 +249,8 @@ Goal: freeze and deliver core safely while reporting retained extension state ho
 `Core Demo Completed by 2026-07-05` requires:
 
 - `G0` through `G5` marked `Pass` with evidence;
-- two successful local rehearsals on the release candidate;
+- successful local and physical LAN rehearsals on the release candidate;
+- required chat, timed/free billing, SQLite restore and minimal reconnect/resync pass or carry explicit M1 exception;
 - no unaccepted High/Critical demo blocker;
 - README, run guide, test matrix, demo checklist and limitation report aligned to release;
 - retained extensions reported accurately without being erased from the roadmap.

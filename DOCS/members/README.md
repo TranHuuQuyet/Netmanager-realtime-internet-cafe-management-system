@@ -5,7 +5,8 @@ Read `../RECOVERY_REPORT_2026-05-25.md`, `../LEADER_FLOW.md` and `../TASKS.md` b
 
 ## Shared Rules
 
-- Core local demo is mandatory; retained extensions remain part of the project but are gate controlled.
+- Required demo scope is mandatory; retained extensions remain part of the project but are gate controlled.
+- From `2026-06-09`, Real LAN with two physical clients, 1-1 chat, billing/session monitor, SQLite billing restore and minimal reconnect/resync are required demo scope, not retained extensions.
 - Tick work in `../TASKS.md` after the member submits the required work/evidence; a tick is not a runtime pass.
 - Runtime and gate completion are counted only from verified results in `../TEST_MATRIX.md` and `../DEMO_CHECKLIST.md`.
 - Do not claim shell, draft or local uncommitted artifact as runtime delivery.
@@ -24,7 +25,7 @@ Every member playbook uses the same planning form in this order:
 4. `Dependencies` - upstream inputs or approvals needed before delivery.
 5. `Boundary Rules` - contract, evidence and integration limits.
 6. `Core Assignments` - a table with `Due`, `Task`, `Dependency` and `Required evidence`.
-7. `Retained Extension Ownership` - gated secondary scope only.
+7. `Retained Extension Ownership` - gated secondary scope only; promoted scope must be listed in core assignments.
 8. `Definition Of Done` - evidence-based completion criteria for the member.
 
 The playbooks describe ownership and handoff. Current submission status remains in `../TASKS.md`; runtime pass/fail status remains in `../TEST_MATRIX.md` and `../DEMO_CHECKLIST.md`.

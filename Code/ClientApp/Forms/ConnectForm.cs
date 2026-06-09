@@ -61,25 +61,19 @@ public partial class ConnectForm : Form
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            ClientLoginAuthResult authResult = await SendLoginAsync(
+            Packet<LoginResultPayload> response = await SendLoginAsync(
                 pendingConnection,
                 username,
                 password,
                 machineId,
                 timeout.Token);
 
-            if (!authResult.IsSuccess)
-            {
-                ShowErrorMessage(CreateLoginFailureMessage(authResult));
-                return;
-            }
-
             _connection?.Dispose();
             _connection = pendingConnection;
             pendingConnection = null;
             loginSucceeded = true;
 
-            ShowClientMainForm(authResult);
+            ShowClientMainForm(response);
         }
         catch (OperationCanceledException)
         {
@@ -124,7 +118,7 @@ public partial class ConnectForm : Form
         focusTarget.Focus();
     }
 
-    private async Task<ClientLoginAuthResult> SendLoginAsync(
+    private async Task<Packet<LoginResultPayload>> SendLoginAsync(
         TcpClientConnection connection,
         string username,
         string password,
@@ -180,10 +174,8 @@ public partial class ConnectForm : Form
 
             return response switch
             {
-                Packet<LoginResultPayload> successPacket when successPacket.Success == true
-                    => ClientLoginAuthResult.FromSuccess(successPacket, username, machineId),
-                Packet<EmptyPayload> failurePacket
-                    => ClientLoginAuthResult.FromFailure(failurePacket),
+                Packet<LoginResultPayload> successPacket when successPacket.Success == true => successPacket,
+                Packet<EmptyPayload> failurePacket => throw new InvalidOperationException(CreateLoginFailureMessage(failurePacket)),
                 Packet<LoginResultPayload> unexpectedPacket => throw new InvalidOperationException(unexpectedPacket.Message ?? "Máy chủ từ chối đăng nhập."),
                 _ => throw new InvalidDataException("Unexpected LOGIN response packet.")
             };
@@ -194,18 +186,16 @@ public partial class ConnectForm : Form
         }
     }
 
-    private static string CreateLoginFailureMessage(ClientLoginAuthResult authResult)
+    private static string CreateLoginFailureMessage(Packet<EmptyPayload> failurePacket)
     {
-        return authResult.ErrorCode switch
+        return failurePacket.Error?.Code switch
         {
             "INVALID_CREDENTIALS" => "Sai tài khoản hoặc mật khẩu.",
-            "INVALID_MACHINE_ID" => "Mã máy không hợp lệ hoặc máy chưa được đăng ký.",
             "ACCOUNT_MACHINE_MISMATCH" => "Tài khoản này không được gán cho máy đang chọn.",
-            "ACCOUNT_DISABLED" => "Tài khoản hoặc máy trạm đã bị vô hiệu hóa.",
             "MACHINE_ALREADY_ACTIVE" => "Máy này đang có phiên đăng nhập khác.",
-            "INVALID_PACKET" => authResult.ErrorMessage ?? "Gói đăng nhập không hợp lệ.",
-            "SERVER_ERROR" => "Máy chủ không thể xác thực lúc này. Vui lòng thử lại.",
-            _ => authResult.ErrorMessage
+            "INVALID_PACKET" => failurePacket.Error.Details ?? "Gói đăng nhập không hợp lệ.",
+            _ => failurePacket.Error?.Details
+                ?? failurePacket.Message
                 ?? "Máy chủ từ chối đăng nhập."
         };
     }
@@ -216,97 +206,21 @@ public partial class ConnectForm : Form
         lblMessage.Text = message;
     }
 
-    private void ShowClientMainForm(ClientLoginAuthResult authResult)
+    private void ShowClientMainForm(Packet<LoginResultPayload> loginResponse)
     {
         Hide();
+        LoginResultPayload login = loginResponse.TypedPayload;
 
         using var mainForm = new ClientMainForm(
-            authResult.Username,
-            authResult.MachineId,
+            login.Username,
+            login.MachineId,
             _launchOptions.ServerHost,
             _launchOptions.ServerPort,
-            authResult.SessionId ?? string.Empty,
-            authResult.LoginTimeUtc);
+            login.SessionId,
+            loginResponse.Timestamp);
 
         mainForm.ShowDialog(this);
         Close();
-    }
-
-    private sealed class ClientLoginAuthResult
-    {
-        private ClientLoginAuthResult(
-            bool isSuccess,
-            string? sessionId,
-            string username,
-            string machineId,
-            DateTime loginTimeUtc,
-            string? errorCode,
-            string? errorMessage)
-        {
-            IsSuccess = isSuccess;
-            SessionId = sessionId;
-            Username = username;
-            MachineId = machineId;
-            LoginTimeUtc = loginTimeUtc;
-            ErrorCode = errorCode;
-            ErrorMessage = errorMessage;
-        }
-
-        public bool IsSuccess { get; }
-
-        public string? SessionId { get; }
-
-        public string Username { get; }
-
-        public string MachineId { get; }
-
-        public DateTime LoginTimeUtc { get; }
-
-        public string? ErrorCode { get; }
-
-        public string? ErrorMessage { get; }
-
-        public static ClientLoginAuthResult FromSuccess(
-            Packet<LoginResultPayload> packet,
-            string requestedUsername,
-            string requestedMachineId)
-        {
-            LoginResultPayload payload = packet.TypedPayload
-                ?? throw new InvalidDataException("LOGIN success response is missing payload.");
-
-            if (string.IsNullOrWhiteSpace(payload.SessionId))
-            {
-                throw new InvalidDataException("LOGIN success response is missing session id.");
-            }
-
-            return new ClientLoginAuthResult(
-                isSuccess: true,
-                sessionId: payload.SessionId.Trim(),
-                username: UseServerValueOrFallback(payload.Username, requestedUsername),
-                machineId: UseServerValueOrFallback(payload.MachineId, requestedMachineId),
-                loginTimeUtc: packet.Timestamp,
-                errorCode: null,
-                errorMessage: null);
-        }
-
-        public static ClientLoginAuthResult FromFailure(Packet<EmptyPayload> packet)
-        {
-            return new ClientLoginAuthResult(
-                isSuccess: false,
-                sessionId: null,
-                username: string.Empty,
-                machineId: string.Empty,
-                loginTimeUtc: DateTime.MinValue,
-                errorCode: packet.Error?.Code,
-                errorMessage: packet.Error?.Details ?? packet.Message);
-        }
-
-        private static string UseServerValueOrFallback(string? serverValue, string fallback)
-        {
-            return string.IsNullOrWhiteSpace(serverValue)
-                ? fallback.Trim()
-                : serverValue.Trim();
-        }
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)

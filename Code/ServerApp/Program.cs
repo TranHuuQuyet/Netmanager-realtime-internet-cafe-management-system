@@ -21,15 +21,7 @@ static class Program
         {
             AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
             using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
-            using var mainForm = new MainForm();
-
-            if (networkServer is not null)
-            {
-                networkServer.StatusEmitted += status =>
-                    mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
-            }
-
-            Application.Run(mainForm);
+            Application.Run(new MainForm());
         }
     }
 

@@ -24,9 +24,9 @@ Demonstrate stable internet-cafe control behavior on one machine using the serve
 | Build RC | Solution builds and approved binaries are identifiable | `G0`, `G5` | `Blocked` |
 | Start server | Server listens locally and UI remains responsive | `G1` | `Blocked` |
 | Start clients | Two client instances connect distinctly | `G1`, `G4` | `Blocked` |
-| Valid login | `client01/PC-01` and `client02/PC-02` succeed | `G2`, `G4` | `Partial(M6 - 2026-06-08; one-client G2 pass, two-client G4 still blocked)` |
-| Wrong-machine check | Wrong `machineId` fails visibly | `G2` | `Pass(M6 - 2026-06-08)` |
-| Status view | Server displays real online/offline state | `G2` | `Partial(M6 - 2026-06-08; server-generated status visible, client-sent STATUS missing in B-008)` |
+| Valid login | `client01/PC-01` and `client02/PC-02` succeed | `G2`, `G4` | `Blocked` |
+| Wrong-machine check | Wrong `machineId` fails visibly | `G2` | `Blocked` |
+| Status view | Server displays real online/offline state | `G2` | `Blocked` |
 | Lock selected client | Selected client enters lock state only | `G3`, `G4` | `Blocked` |
 | ACK result | Admin sees command result/error | `G3` | `Blocked` |
 | Unlock selected client | Client exits lock state | `G3` | `Blocked` |

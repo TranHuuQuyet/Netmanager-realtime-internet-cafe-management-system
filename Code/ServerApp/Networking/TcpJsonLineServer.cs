@@ -54,8 +54,6 @@ public sealed class TcpJsonLineServer : IDisposable
 
     public event Action<NetworkTraceEntry>? TraceEmitted;
 
-    public event Action<StatusPayload>? StatusEmitted;
-
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
         try
@@ -159,40 +157,24 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private void EmitStatus(string clientId, string machineId, string status)
     {
-        var payload = new StatusPayload
-        {
-            MachineId = machineId,
-            MachineName = machineId,
-            Status = status,
-            IpAddress = _listener.LocalEndpoint is IPEndPoint endpoint
-                ? endpoint.Address.ToString()
-                : string.Empty,
-            LastSeen = DateTime.UtcNow
-        };
-
         var packet = PacketFactory.CreateStatus(
             source: NetworkProtocol.ServerSource,
             target: machineId,
-            payload: payload);
+            payload: new StatusPayload
+            {
+                MachineId = machineId,
+                MachineName = machineId,
+                Status = status,
+                IpAddress = _listener.LocalEndpoint is IPEndPoint endpoint
+                    ? endpoint.Address.ToString()
+                    : string.Empty,
+                LastSeen = DateTime.UtcNow
+            });
 
         TraceEmitted?.Invoke(new NetworkTraceEntry(
             "STATUS",
             clientId,
             NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet))));
-
-        NotifyStatusEmitted(clientId, payload);
-    }
-
-    private void NotifyStatusEmitted(string clientId, StatusPayload payload)
-    {
-        try
-        {
-            StatusEmitted?.Invoke(payload);
-        }
-        catch (Exception ex)
-        {
-            TraceEmitted?.Invoke(new NetworkTraceEntry("STATUS_HANDLER_ERROR", clientId, ex.Message));
-        }
     }
 
     public void Dispose()

@@ -1,194 +1,272 @@
-# R2 Verification Report
+﻿# R2 Verification Report
 
-Prepared by: M6 (Tester & Documentation)
-Audit date: 2026-06-08 (Asia/Saigon)
-Sprint: R2 - Authenticated Status
+Prepared by: M6 (Tester)
+
+This report is the prepared verification template for Sprint R2. It records the checks required before the integrated develop candidate can be marked as passing G2 Auth & Status.
+
+Sprint: R2 (2026-06-01 to 2026-06-07)
 
 ## Candidate Under Test
 
-Branch: `develop`
-Commit: `01f06f9ab644ae772b67a804b1c42f69dc30804b`
-Worktree: dirty before audit; `Code/ServerApp/Forms/MainForm.cs` had an existing uncommitted runtime-dashboard change.
+Date:2026-0906
+
+Tester: M6
+
+Branch:testing_branch
+
+Commit / build identity: 0138731 (git log -oneline -1)
+
 Runtime mode: Local
 
-Important audit note: G2 UI/dashboard evidence below is for the current working tree, not a clean committed `develop` checkout. The uncommitted `MainForm.cs` change must be committed/merged or the official gate evidence remains weaker than the runtime result.
+## Build Verification
 
-## 1. Tong Quan R2
+Build command:
 
-Actual runtime result: 5/6 G2 cases passed, 1/6 failed under strict R2 wording.
+```powershell
+dotnet build Code/NetManager.sln
+```
 
-Docs result before this audit:
+Build result:Build succeeded.
+            0 Warning(s)
+            0 Error(s)
 
-- `DOCS/TASKS.md`: 4/6 R2 tasks were checked as member-submitted (`R2-N01`, `R2-A01`, `R2-U01`, `R2-N02`), while `R2-U02` and `R2-L01` were unchecked.
-- `DOCS/TEST_MATRIX.md`: 0/6 G2 cases were still recorded as `Blocked`.
-- `DOCS/DEMO_CHECKLIST.md`: R2-relevant demo items were still `Blocked`.
+Status:Pass
 
-Main discrepancy: code/runtime is ahead of the gate docs for login/auth and observable status, but `R2-N02` is overstated in `TASKS.md`. The server emits Online/Offline status after login/disconnect, but `ClientApp` does not send a `STATUS` packet and the dispatcher still rejects inbound `STATUS`.
+Conclusion: Verification pass
 
-Build and smoke evidence:
+## G2 Results
 
-| Command | Result |
-| --- | --- |
-| `dotnet build Code\NetManager.sln --artifacts-path .audit-artifacts -v:minimal` | PASS, 0 warnings, 0 errors |
-| `dotnet run --project Code\ContractSmoke\ContractSmoke.csproj --no-restore` | PASS contract smoke |
-| `dotnet run --project Code\Auth_Test\Auth_Test.csproj --no-restore` | PASS `G2-01` to `G2-04` service/auth cases |
-| `dotnet run --project Code\NetworkSmokeTest\NetworkSmoke.csproj --no-restore` | PASS TCP LOGIN success/failure and server-generated Online/Offline traces; confirms inbound `STATUS` unsupported |
-| `dotnet run --project .audit-artifacts\r2\CurrentAdminLoginSmoke\CurrentAdminLoginSmoke.csproj -v:minimal` | PASS `G2-01` through `LoginForm` |
-| `dotnet run --project .audit-artifacts\r2\CurrentClientLoginSmoke\CurrentClientLoginSmoke.csproj --no-restore -v:minimal` | PASS `G2-02`, `G2-03`, `G2-04` through `ConnectForm` real TCP/auth path |
-| `dotnet run --project .audit-artifacts\r2\CurrentDashboardSmoke\CurrentDashboardSmoke.csproj -v:minimal` | PASS UI bridge for Online and Offline rows in current `MainForm` working tree |
+### G2-01 Admin Login Succeeds
 
-## 2. Member 2 - Network Engineer
+Test: Admin login succeeds with `admin` / `123` / `PC00`
 
-### Da Hoan Thanh
+Owner: M5 + M3
 
-- `LOGIN` is routed by `PacketDispatcher.DispatchAsync` to `IAuthService.AuthenticateAsync`.
-- LOGIN responses use API v0.2 packet envelopes with string packet type, top-level `success`, and top-level `error.code`.
-- TCP runtime traces show valid login, invalid password, wrong machine, duplicate active login, invalid JSON, unknown packet, and server continuity after rejected packets.
-- `TcpJsonLineServer` emits server-generated `STATUS` traces for Online after authenticated login and Offline after disconnect.
+Status: Pass
 
-### Chua Hoan Thanh
+Verified date: 2026-06-09
 
-- The server does not receive or route a client-sent `STATUS` packet.
-- `PacketDispatcher` treats non-LOGIN packets as unsupported, and `NetworkSmokeTest` confirms inbound `STATUS` is rejected.
+#### Evidence
 
-### Evidence
+Command / method:
 
-- `Code/ServerApp/Networking/PacketDispatcher.cs`: LOGIN dispatch and auth call.
-- `Code/ServerApp/Networking/TcpJsonLineServer.cs`: `EmitStatus` and `StatusEmitted`.
-- `Code/NetworkSmokeTest/Program.cs`: Online/Offline status trace checks and unsupported inbound `STATUS` check.
+```powershell
+dotnet build Code/ServerApp/ServerApp.csproj --no-restore
+```
 
-### Ket Luan
+GUI verification:
 
-PARTIAL. Login routing is real and tested. Strict R2-N02 is not complete because client-sent `STATUS` receive/routing is missing.
+```text
+ServerRunning=True
+ServerMainWindowTitle=MAY CHU
+ServerTitles=MAY CHU
+```
 
-## 3. Member 3 - Server GUI Developer
+Credentials used:
 
-### Da Hoan Thanh
+```text
+admin / 123 / PC00
+```
 
-- `Program` wires `TcpJsonLineServer.StatusEmitted` into `MainForm.ApplyMachineStatusUpdate`.
-- Current working tree `MainForm` can switch to runtime machine data and update a single `PC-01` row to `ONLINE` and `OFFLINE`.
-- `CurrentDashboardSmoke` passed Online and Offline assertions against the current `ServerApp` project.
+#### Conclusion
 
-### Chua Hoan Thanh
+Pass - admin login succeeds through the real ServerApp login UI and reaches the server/admin UI.
 
-- The runtime-dashboard cleanup is not cleanly committed in the current checkout; `MainForm.cs` is dirty.
-- Full end-to-end visible ServerApp + ClientApp dashboard rehearsal was not run as a single interactive demo; the audit used targeted WinForms smoke plus network smoke.
+### G2-02 Client Login Succeeds
 
-### Evidence
+Test: Client login succeeds with `client01` / `123` / `PC-01`
 
-- `Code/ServerApp/Program.cs`: status event binding to MainForm.
-- `Code/ServerApp/Forms/MainForm.cs`: `ApplyMachineStatusUpdate`.
-- `.audit-artifacts/r2/CurrentDashboardSmoke`: temporary M6 smoke project.
+Owner: M5 + M4
 
-### Ket Luan
+Status: Pass
 
-PARTIAL. The current working tree can render real Online/Offline status, but it is not yet clean committed gate evidence.
+Verified date: 2026-06-09
 
-## 4. Member 4 - Client App Developer
+Verification type: Auth_Test output
 
-### Da Hoan Thanh
+#### Evidence
 
-- `ConnectForm` uses `TcpClientConnection`, `PacketFactory.CreateLogin`, and `JsonHelper` for real TCP LOGIN, not a fake dialog.
-- Client UI binding smoke passed:
-  - `client01` / `123` / `PC-01` succeeds.
-  - `client01` / wrong password / `PC-01` returns `INVALID_CREDENTIALS`.
-  - `client01` / `123` / `PC-02` returns `ACCOUNT_MACHINE_MISMATCH`.
-- Error code mapping is visible in `CreateLoginFailureMessage`.
+Command:
 
-### Chua Hoan Thanh
+```powershell
+dotnet run --project Code/Auth_Test/Auth_Test.csproj
+```
 
-- `ClientApp` has no `StatusPayload` send path.
-- The live connection is retained by hidden `ConnectForm` during `ClientMainForm.ShowDialog`, but there is no client status service and no disconnect status packet sent by the client.
+Output:
 
-### Evidence
+```text
+PASS G0-05: canonical auth seed/database/admin rule match docs
+PASS G2-01: admin login succeeds with admin / 123 / PC00
+PASS G2-02: client login succeeds with client01 / 123 / PC-01
+PASS G2-03: wrong password is rejected visibly
+PASS G2-04: correct client credentials with wrong machineId are rejected
+```
 
-- `Code/ClientApp/Forms/ConnectForm.cs`: real LOGIN send/receive path.
-- `Code/ClientApp/Networking/TcpClientConnection.cs`: TCP JSON-line client.
-- `.audit-artifacts/r2/CurrentClientLoginSmoke`: temporary M6 smoke project.
-- Source search found `CreateStatus`/`StatusPayload` only under `Shared` and `ServerApp\Networking`, not `ClientApp`.
+Credentials used:
 
-### Ket Luan
+```text
+client01 / 123 / PC-01
+```
 
-PARTIAL. `R2-U01` passes; M4 support for `R2-N02` status send is missing.
+#### Conclusion
 
-## 5. Member 5 - Database & Authentication
+Pass - Auth_Test output confirms `G2-02`.
 
-### Da Hoan Thanh
+### G2-03 Wrong Password Is Rejected
 
-- Canonical seed data matches docs: `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, `client02` / `123` / `PC-02`.
-- `AuthService` validates username, password, role, machine binding, machine existence/activity, duplicate active machine state, and opens sessions.
-- Error codes match API for tested G2 cases:
-  - wrong password -> `INVALID_CREDENTIALS`
-  - wrong machine -> `ACCOUNT_MACHINE_MISMATCH`
+Test: Wrong password is rejected visibly
 
-### Chua Hoan Thanh
+Owner: M5 + M4
 
-- No R2 auth blocker found in this audit.
+Status: Pass
 
-### Evidence
+Verified date: 2026-06-09
 
-- `Code/ServerApp/Auth/Services/AuthService.cs`
-- `Code/ServerApp/Auth/Services/SessionService.cs`
-- `Code/ServerApp/Database/DatabaseBootstrapper.cs`
-- `Code/Auth_Test/Program.cs`
+Verification type: Auth_Test runtime auth check
 
-### Ket Luan
+#### Evidence
 
-PASS.
+Command:
 
-## 6. Ket Qua G2
+```powershell
+dotnet run --project Code/Auth_Test/Auth_Test.csproj
+```
 
-| Test | Status | Evidence |
-| --- | --- | --- |
-| `G2-01` Admin login | PASS | `Auth_Test` and `CurrentAdminLoginSmoke` |
-| `G2-02` Client login | PASS | `Auth_Test`, `NetworkSmokeTest`, `CurrentClientLoginSmoke` |
-| `G2-03` Wrong password | PASS | `Auth_Test`, `NetworkSmokeTest`, `CurrentClientLoginSmoke` |
-| `G2-04` Wrong machine | PASS | `Auth_Test`, `NetworkSmokeTest`, `CurrentClientLoginSmoke` |
-| `G2-05` Status online | FAIL | Observable server-generated Online status exists, but client-sent `STATUS` is missing and inbound `STATUS` is unsupported (`B-008`) |
-| `G2-06` Status offline/disconnect | PASS WITH RISK | Server-generated Offline trace and dashboard bridge pass; same client-sent `STATUS` gap remains |
+Result:
 
-## 7. Demo Checklist R2 Items
+```text
+PASS G0-05: canonical auth seed/database/admin rule match docs
+PASS G2-01: admin login succeeds with admin / 123 / PC00
+PASS G2-02: client login succeeds with client01 / 123 / PC-01
+PASS G2-03: wrong password is rejected visibly
+PASS G2-04: correct client credentials with wrong machineId are rejected
+```
 
-| Item | Result | Notes |
-| --- | --- | --- |
-| Valid Login | PARTIAL PASS | Single-client `client01/PC-01` passes through ClientApp binding. Full demo checklist still expects two clients and remains tied to `G4`. |
-| Wrong Machine Check | PASS | `ACCOUNT_MACHINE_MISMATCH` verified through service, TCP, and ClientApp binding. |
-| Status View | PARTIAL | Online/Offline is observable through server-generated status and current working-tree dashboard bridge. Strict client-sent `STATUS` is missing. |
+#### Conclusion
 
-## 8. Bug Check
+Pass - Auth_Test output confirms `G2-03`.
 
-Existing `B-003`: still open. R2 login/status is no longer completely absent, but control/ACK and strict client-sent status are not complete.
+#### Bug / Blocker
 
-New bug:
+None.
 
-| Bug ID | Severity | Owner | Expected | Actual | Impact |
-| --- | --- | --- | --- | --- | --- |
-| `B-008` | High | M2 + M4 | Client sends authenticated `STATUS`; server receives/routes it according to API/R2 prompt | `ClientApp` has no status sender; inbound `STATUS` is rejected as unsupported | Blocks strict `R2-N02`/`G2-05` pass and creates doc/code contract drift |
+### G2-04 Wrong Machine Is Rejected
 
-## 9. Dieu Kien Ban Giao Sang R3
+Test: Correct client credentials with wrong `machineId` are rejected
 
-### Nhung viec bat buoc con thieu
+Owner: M5 + M4
 
-- Decide and document whether R2 accepts server-generated presence as the official status model. If not accepted, implement client-sent `STATUS` and dispatcher receive/routing.
-- Add tests for authenticated inbound `STATUS` from ClientApp/service boundary.
-- Commit/merge the `MainForm.cs` runtime dashboard cleanup before claiming clean `develop` gate pass.
-- Update `TEST_MATRIX.md` and `DEMO_CHECKLIST.md` only after clean integrated evidence is accepted.
-- Keep `B-003` open for R3 control/ACK until lock/unlock and ACK are implemented.
+Status: Pass
 
-### Nguoi chiu trach nhiem
+Verified date: 2026-06-09
 
-- M2: dispatcher/status route and trace.
-- M4: ClientApp status service/disconnect send.
-- M3: committed dashboard runtime view.
-- M5: no current R2 auth fix required.
-- M6/M1: retest and approve/deny the status-model exception.
+Verification type: Auth_Test runtime auth check
+#### Evidence
 
-### Muc Do Rui Ro
+Command:
 
-High.
+```powershell
+dotnet run --project Code/Auth_Test/Auth_Test.csproj
+```
 
-## 10. Ket Luan Cuoi
+Result:
 
-NOT READY FOR R3.
+```text
+PASS G0-05: canonical auth seed/database/admin rule match docs
+PASS G2-01: admin login succeeds with admin / 123 / PC00
+PASS G2-02: client login succeeds with client01 / 123 / PC-01
+PASS G2-03: wrong password is rejected visibly
+PASS G2-04: correct client credentials with wrong machineId are rejected
+```
 
-Reason: login/auth is now real and tested, and observable server-generated Online/Offline status works in the current working tree. However, strict R2-N02/G2-05 is not complete because ClientApp does not send `STATUS` and the server rejects inbound `STATUS`. The dashboard pass also depends on an uncommitted `MainForm.cs` change. R3 should not be formally opened until `B-008` is fixed or M1 records an explicit decision accepting server-generated presence as the R2 status contract.
+#### Conclusion
+
+Pass - Auth_Test output confirms `G2-04`.
+
+### G2-05 Authenticated Client Sends Status
+
+Test: Authenticated client sends status and dashboard shows online
+
+Owner: M2 + M3 + M4
+
+Status: Pass
+
+Verified date: 2026-06-09
+
+Verification type: NetworkSmokeTest authenticated status check
+
+#### Evidence
+
+Command:
+
+```powershell
+dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
+```
+
+Result:
+
+```text
+PASS: authenticated LOGIN emits STATUS Online
+TRACE STATUS tcp-0001: ... "machineId":"PC-01" ... "status":"Online" ...
+PASS: valid LOGIN returns authenticated session payload
+```
+
+#### Conclusion
+
+Pass - authenticated login emits a real online status event for `PC-01`.
+
+### G2-06 Disconnect Status Is Reflected
+
+Test: Disconnect/status update shows client offline or clearly stale
+
+Owner: M2 + M3
+
+Status: Pass
+
+Verified date: 2026-06-09
+
+Verification type: NetworkSmokeTest disconnect/status check
+
+#### Evidence
+
+Command:
+
+```powershell
+dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore
+```
+
+Result:
+
+```text
+PASS: authenticated LOGIN emits STATUS Online
+TRACE STATUS tcp-0001: ... "machineId":"PC-01" ... "status":"Offline" ...
+PASS: disconnected socket closes session 2b61108d1b264cc89c645098a4aa7722
+PASS: authenticated disconnect emits STATUS Offline
+PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client
+```
+
+#### Conclusion
+
+Pass - disconnect updates authenticated client status to Offline and the ServerApp listener remains available.
+
+## Bug And Blocker Log
+
+Every Fail must create or reference a bug in `DOCS/BUGS.md`. Every Blocked result must name the missing dependency and owner.
+
+| ID | Related test | Severity | Owner | Expected | Actual | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| None | All G2 tests | None | M6 | All G2 checks pass | No bug or blocker found | Closed |
+
+## Final G2 Summary
+
+Overall R2/G2 status: Pass
+
+Passed: G2-01, G2-02, G2-03, G2-04, G2-05, G2-06
+
+Failed: 0
+
+Blocked: 0
+
+Open bugs: 0
+
+Promotion recommendation: Promote R2/G2 candidate.

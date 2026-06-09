@@ -13,6 +13,10 @@ public interface ISessionRepository
         string userId,
         CancellationToken cancellationToken = default);
 
+    Task<SessionRecord?> GetActiveByMachineIdAsync(
+        string machineId,
+        CancellationToken cancellationToken = default);
+
     Task<SessionRecord?> GetByIdAsync(
         string sessionId,
         CancellationToken cancellationToken = default);

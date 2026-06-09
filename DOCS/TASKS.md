@@ -24,6 +24,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `Blocked` | Bi chan boi dependency; evidence ghi ro blocker/owner |
 | `Not Started` | Chua den thu tu thuc hien |
 | `Conditional` | Extension duoc giu lai, chi mo khi core gate pass |
+| `Promoted to Required Demo Scope` | Feature tung la extension nhung da duoc M1 dua vao core demo tu `2026-06-09` tro di |
 | `Retained - Continue After Core Release` | Van thuoc roadmap nhung tiep tuc sau `2026-07-05` |
 | `Historical Artifact` | Artifact cu ton tai, khong phai delivery proof |
 
@@ -158,10 +159,19 @@ Member done: [ ]
 
 ## R3 - Core Control (`2026-06-08` to `2026-06-14`)
 
+Scope update `2026-06-09`: `G2-05/B-008` phai duoc dong hoac co M1 exception ro truoc khi claim R3+ readiness. Lock/unlock/ACK van la nen bat buoc cho chat, billing expiry va LAN demo sau nay.
+
+`R3-B01`
+Owner: `M2 + M4 + M6`
+Task: Close carry-forward `G2-05/B-008` client-sent `STATUS` gap or record an approved equivalent status policy before claiming control/chat/billing readiness
+Dependency: `G2` partial audit
+Required evidence: Updated trace/test result and bug disposition
+Member done: [ ]
+
 `R3-N01`
 Owner: `M2 + M3`
 Task: Route real `LOCK`/`UNLOCK` commands from selected client action
-Dependency: `G2` pass
+Dependency: `G2` pass; `R3-B01`
 Required evidence: Command packet trace
 Member done: [ ]
 
@@ -189,29 +199,29 @@ Member done: [ ]
 `R3-A01`
 Owner: `M5`
 Task: Enforce active session/machine guard for command target
-Dependency: `G2` pass
+Dependency: `G2` pass; `R3-B01`
 Required evidence: Auth/session test result
 Member done: [ ]
 
 `R3-Q01`
 Owner: `M6 + M1`
 Task: Run repeat one-client core demo and approve `G3`
-Dependency: All R3 tasks
+Dependency: All R3 tasks; no unaccepted `G2-05/B-008` blocker
 Required evidence: `G3` pass/bug list
 Member done: [ ]
 
-## R4 - Multi-Client And Notification (`2026-06-15` to `2026-06-21`)
+## R4 - Multi-Client, LAN Readiness And Required Chat/Billing Setup (`2026-06-15` to `2026-06-21`)
 
 `R4-N01`
 Owner: `M2 + M5`
-Task: Route two authenticated clients distinctly and decide duplicate-login behavior
+Task: Route two authenticated local clients distinctly, keep the route LAN-capable, and decide duplicate-login behavior
 Dependency: `G3` pass
 Required evidence: Routing/session test
 Member done: [ ]
 
 `R4-U01`
 Owner: `M3 + M4`
-Task: Render/maintain distinct local client instances
+Task: Render/maintain distinct local client instances and prepare Admin/Client UI for two physical LAN clients
 Dependency: `R4-N01`
 Required evidence: Two-client UI evidence
 Member done: [ ]
@@ -223,55 +233,90 @@ Dependency: `R4-N01`
 Required evidence: `G4` disconnect case
 Member done: [ ]
 
-`R4-E01`
+`R4-C01`
 Owner: `M2 + M3 + M4`
-Task: Implement direct notification if `G3` passed
-Dependency: `G3` pass
-Required evidence: `E1` test
+Task: Implement required 1-1 `CHAT` routing between Admin and the selected client; wrong/offline target must show controlled error
+Dependency: `G3` pass; `R4-N01`
+Required evidence: Selected-client chat trace and UI evidence
+Member done: [ ]
+
+`R4-B01`
+Owner: `M3 + M5 + M1`
+Task: Define required billing/session interface target: Admin selects timed/free/extend per machine, Client cannot select rental mode, default rate is `10000` VND/hour
+Dependency: `2026-06-09` scope decision
+Required evidence: Docs/API handoff note for `BillingSessions` and Admin UI ownership
+Member done: [ ]
+
+`R4-R01`
+Owner: `M2 + M4 + M5`
+Task: Define minimal reconnect/resync behavior required after ServerApp restart for billing/timer sync and extend/LOCK delivery
+Dependency: `R4-N01`; `R4-B01`
+Required evidence: Resync contract note and owner handoff
 Member done: [ ]
 
 `R4-Q01`
 Owner: `M6 + M1`
-Task: Approve `G4` and determine which retained extensions open
-Dependency: Core R4 tasks
-Required evidence: Gate/extension decision
+Task: Approve `G4`, confirm promoted required scope remains on the demo path, and keep only unpromoted features as retained extensions
+Dependency: Core R4 tasks including required chat/billing setup
+Required evidence: Gate/required-scope decision
 Member done: [ ]
 
-## R5 - Stabilization And Opened Extensions (`2026-06-22` to `2026-06-28`)
+## R5 - Stabilization And Required Demo Additions (`2026-06-22` to `2026-06-28`)
 
 `R5-Q01`
 Owner: `M6 + all owners`
-Task: Run core regression, bug triage and clean setup verification
+Task: Run core regression, bug triage and clean setup verification for local, chat, billing and LAN-ready paths
 Dependency: `G4` pass
 Required evidence: Regression report
 Member done: [ ]
 
 `R5-D01`
 Owner: `M1 + M6`
-Task: Rehearse local multi-instance primary/fallback demo
+Task: Rehearse local multi-instance regression/fallback demo
 Dependency: `R5-Q01`
 Required evidence: Rehearsal result
 Member done: [ ]
 
-`R5-E01`
+`R5-B01`
+Owner: `M5 + M2`
+Task: Implement SQLite `BillingSessions` target for active/closed billing, machine/client session reference, rental mode, start time, optional expiry, status and rate-per-hour restore behavior
+Dependency: `R4-B01`; stable auth/session path
+Required evidence: SQLite schema/reset/restore evidence
+Member done: [ ]
+
+`R5-B02`
+Owner: `M3 + M5`
+Task: Add Admin billing monitor evidence for timed rental, open-ended rental, extend action, rounded-minute amount display and active-session restore after ServerApp restart
+Dependency: `R5-B01`
+Required evidence: Admin Panel billing evidence and restore note
+Member done: [ ]
+
+`R5-B03`
 Owner: `M2 + M4`
-Task: Implement timer display if extension is opened
-Dependency: `E1` pass; no High/Critical bug
-Required evidence: `E2` test
+Task: Implement Client timed/free display evidence: countdown or temporary amount, 5-minute warning, expiry `LOCK` reaction, and no forced logout
+Dependency: `R3` control pass; `R5-B01`
+Required evidence: Client timer/billing and LOCK evidence
 Member done: [ ]
 
-`R5-E02`
+`R5-C01`
 Owner: `M2 + M3 + M4`
-Task: Implement 1-1 chat only if opened by M1
-Dependency: `G4` pass by `2026-06-21`
-Required evidence: `E3` test
+Task: Complete required 1-1 chat regression: Admin sends to selected client, client replies, other client does not receive the message
+Dependency: `R4-C01`
+Required evidence: `G5` chat test evidence
 Member done: [ ]
 
-`R5-E03`
-Owner: `M2 + M6`
-Task: Execute Real LAN smoke only after local rehearsal pass
-Dependency: `R5-D01` pass
-Required evidence: `E4` smoke note
+`R5-L01`
+Owner: `M2 + M6 + all owners`
+Task: Execute required Real LAN rehearsal with two physical clients and keep local multi-instance regression passing
+Dependency: `R5-D01` pass; LAN-capable listener/client setup
+Required evidence: Physical LAN smoke/rehearsal note and local fallback result
+Member done: [ ]
+
+`R5-R01`
+Owner: `M2 + M4 + M5 + M6`
+Task: Verify minimal reconnect/resync after ServerApp restart: Admin restores active billing from SQLite and running client can sync timer/billing and receive extend/LOCK
+Dependency: `R4-R01`; `R5-B01`
+Required evidence: Restart/resync test result
 Member done: [ ]
 
 ## R6 - Release And Demo (`2026-06-29` to `2026-07-05`)
@@ -279,13 +324,13 @@ Member done: [ ]
 `R6-L01`
 Owner: `M1`
 Task: Approve release candidate and freeze on `2026-06-30`
-Dependency: `G5` candidate
+Dependency: `G5` candidate including LAN/chat/billing/restart restore
 Required evidence: RC/freeze note
 Member done: [ ]
 
 `R6-Q01`
 Owner: `M6 + all owners`
-Task: Run two core rehearsals on RC build
+Task: Run two RC rehearsals covering local regression, physical LAN, required chat, timed/free billing, expiry LOCK and restart restore
 Dependency: `R6-L01`
 Required evidence: Two pass records
 Member done: [ ]
@@ -294,14 +339,14 @@ Member done: [ ]
 Owner: `M1 + team`
 Task: Deliver core demo by `2026-07-05`
 Dependency: `G0-G5` pass
-Required evidence: Final demo checklist
+Required evidence: Final demo checklist including promoted required scope
 Member done: [ ]
 
 `R6-D02`
 Owner: `M6`
-Task: Publish extension status: pass, opened/incomplete, or retained
-Dependency: Extension evidence
-Required evidence: Final continuation report
+Task: Publish required-scope pass/fail status and retained-extension continuation report
+Dependency: Required demo and retained extension evidence
+Required evidence: Final required-scope and continuation report
 Member done: [ ]
 
 ## Retained Extension Track
@@ -309,12 +354,12 @@ Member done: [ ]
 | ID | Feature | Primary owners | Open condition | Before deadline target | Status |
 | --- | --- | --- | --- | --- | --- |
 | `E1` | Direct notification | M2, M3, M4, M6 | `G3` pass | Demonstrate if opened | `Conditional` |
-| `E2` | Timer display | M2, M4, M6 | `E1` pass and no High/Critical blocker | Demonstrate if opened | `Conditional` |
-| `E3` | 1-1 text chat | M2, M3, M4, M6 | `G4` pass by `2026-06-21` | Attempt only if opened | `Conditional` |
-| `E4` | Real LAN smoke | M2, M6 | Local rehearsal pass by `2026-06-28` | Smoke evidence, not core gate | `Conditional` |
+| `E2` | Timer/billing display | M2, M3, M4, M5, M6 | Promoted by `2026-06-09` decision | Required `G5` demo evidence | `Promoted to Required Demo Scope` |
+| `E3` | 1-1 text chat | M2, M3, M4, M6 | Promoted by `2026-06-09` decision | Required `G5` demo evidence | `Promoted to Required Demo Scope` |
+| `E4` | Real LAN two-client demo | M2, M6, all UI owners | Promoted by `2026-06-09` decision | Required physical LAN evidence | `Promoted to Required Demo Scope` |
 | `E5` | Notification broadcast | M2, M3, M4 | `E1` stable | Continue after core if needed | `Conditional` |
-| `E6` | Timer persistence | M5, M2 | `E2` and core session stable | Continue after core if needed | `Conditional` |
-| `E7` | Reconnect polish | M2, M4 | Disconnect core test pass | Continue after core if needed | `Conditional` |
+| `E6` | Billing/timer persistence | M5, M2 | Promoted by `2026-06-09` decision | Required SQLite restore evidence | `Promoted to Required Demo Scope` |
+| `E7` | Reconnect polish beyond minimal resync | M2, M4 | Required minimal reconnect/resync pass | Continue after core if needed | `Conditional` |
 
 ## Retained Product Backlog
 
@@ -327,6 +372,6 @@ Member done: [ ]
 
 ## Gate Counting Rule
 
-Core delivery is complete only when `G0` through `G5` in `DOCS/TEST_MATRIX.md` are `Pass`, final local rehearsal passes twice, and no unaccepted High/Critical blocker remains. Retained extensions remain part of NetManager regardless of whether they are finished by core release.
+Core delivery is complete only when `G0` through `G5` in `DOCS/TEST_MATRIX.md` are `Pass`, final local and physical LAN rehearsals pass, required chat/billing/restart restore pass, and no unaccepted High/Critical blocker remains. Retained extensions remain part of NetManager regardless of whether they are finished by core release.
 
 Branch promotion does not replace gate counting: work merged into `develop` is only an integration candidate. It enters `main` only after the applicable M6 `Pass` evidence is recorded and M1 approves promotion.

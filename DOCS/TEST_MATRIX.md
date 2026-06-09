@@ -12,6 +12,7 @@ Core delivery deadline: `2026-07-05`
 | `Blocked`     | Cannot execute because a required implementation/dependency is missing or failing |
 | `Evidence Submitted` | Implementation evidence passes locally and awaits M6 verification          |
 | `Conditional` | Retained extension test, not opened until its gate allows work                    |
+| `Promoted to Required Demo Scope` | Former extension test moved into required `G5` scope by the `2026-06-09` decision |
 | `Not Run`     | Runnable gate has not yet been executed                                           |
 
 Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tables below are the active recovery matrix.
@@ -66,6 +67,7 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 
 | ID      | Test                                                           | Mode  | Owner                | Initial status |
 | ------- | -------------------------------------------------------------- | ----- | -------------------- | -------------- |
+| `G3-00` | `G2-05/B-008` status policy is fixed or explicitly accepted before control readiness is claimed | Local | M1 + M2 + M4 + M6 | `Blocked` |
 | `G3-01` | Admin locks authenticated target client                        | Local | M2 + M3 + M4         | `Blocked`      |
 | `G3-02` | Client returns visible ACK after lock                          | Local | M2 + M3 + M4         | `Blocked`      |
 | `G3-03` | Admin unlocks target client and client exits lock state        | Local | M2 + M3 + M4         | `Blocked`      |
@@ -88,20 +90,22 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G5-01` | Clean setup follows current run guide                          | Local | M6                   | `Blocked`      |
 | `G5-02` | Full core regression passes                                    | Local | M6 + all core owners | `Blocked`      |
 | `G5-03` | Local multi-instance rehearsal passes twice on RC              | Local | M1 + M6              | `Blocked`      |
-| `G5-04` | No unaccepted High/Critical demo blocker remains               | Both  | M1 + M6              | `Blocked`      |
-| `G5-05` | Release docs match approved build and retained extension state | Local | M6                   | `Blocked`      |
+| `G5-04` | Two physical LAN clients connect/login and remain distinct while local fallback still passes | Real LAN + Local | M2 + M3 + M4 + M5 + M6 | `Blocked` |
+| `G5-05` | Admin and selected client exchange 1-1 chat; non-selected client does not receive it | Local + LAN | M2 + M3 + M4 + M6 | `Blocked` |
+| `G5-06` | Admin starts timed rental package `5-10` minutes; Admin/Client show countdown, warn at 5 minutes, and expiry sends `LOCK` without logout | Local + LAN | M2 + M3 + M4 + M5 + M6 | `Blocked` |
+| `G5-07` | Open-ended rental amount uses rounded-minute formula; `61` seconds charges `2` minutes at `10000` VND/hour | Local | M3 + M5 + M6 | `Blocked` |
+| `G5-08` | ServerApp restart restores active `BillingSessions` from SQLite and Admin Panel continues calculating time/amount | Local | M3 + M5 + M6 | `Blocked` |
+| `G5-09` | Minimal reconnect/resync lets a running client sync billing/timer and receive extend/LOCK after ServerApp restart | Local + LAN | M2 + M4 + M5 + M6 | `Blocked` |
+| `G5-10` | No unaccepted High/Critical demo blocker remains               | Both  | M1 + M6              | `Blocked`      |
+| `G5-11` | Release docs match approved build, required promoted scope and retained extension state | Both | M6 | `Blocked` |
 
 ## Retained Extension Tests
 
 | ID      | Feature case                                                   | Open condition             | Owner             | Status        |
 | ------- | -------------------------------------------------------------- | -------------------------- | ----------------- | ------------- |
 | `E1-01` | Admin sends direct notification and correct client displays it | `G3` pass                  | M2 + M3 + M4 + M6 | `Conditional` |
-| `E2-01` | Client displays timer update and expiry behavior is documented | `E1` pass; no core blocker | M2 + M4 + M6      | `Conditional` |
-| `E3-01` | Admin and client exchange 1-1 text chat                        | `G4` pass on time          | M2 + M3 + M4 + M6 | `Conditional` |
-| `E4-01` | One real LAN client connects and completes a smoke path        | Local rehearsal pass       | M2 + M6           | `Conditional` |
 | `E5-01` | Notification broadcasts only to intended active clients        | `E1` stable                | M2 + GUI owners   | `Conditional` |
-| `E6-01` | Timer survives required session persistence scenario           | `E2` and session stable    | M5 + M6           | `Conditional` |
-| `E7-01` | Client reconnect UX behaves according to approved policy       | Disconnect core pass       | M2 + M4 + M6      | `Conditional` |
+| `E7-01` | Client reconnect UX polish behaves according to approved policy beyond required minimal resync | `G5-09` pass | M2 + M4 + M6 | `Conditional` |
 
 ## Evidence Rule
 
@@ -109,4 +113,4 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 - Every `Pass` must record test date, tested `develop` commit/build identity, mode q tester.
 - M6 `Pass` evidence on the integrated `develop` candidate is required before M1 may approve a merge/promotion into `main`.
 - A `Fail` or `Blocked` candidate remains outside `main` and is corrected through the feature/fix to `develop` flow.
-- Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting.
+- Extension tests remain visible even if recorded as `Retained - Continue After Core Release` in final reporting; tests promoted by the `2026-06-09` decision are counted under `G5`, not under retained extensions.

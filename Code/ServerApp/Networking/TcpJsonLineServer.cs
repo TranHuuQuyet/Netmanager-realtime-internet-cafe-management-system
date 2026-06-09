@@ -106,21 +106,22 @@ public sealed class TcpJsonLineServer : IDisposable
         {
             PacketDispatchResult result = await _dispatcher.DispatchAsync(message, cancellationToken).ConfigureAwait(false);
 
-            if (result.OpenedSessionId is not null)
+            if (result.BindSessionId is not null)
             {
-                if (!_sessionBindings.TryAdd(connection.ClientId, result.OpenedSessionId))
+                if (!TryBindSession(connection.ClientId, result.BindSessionId))
                 {
-                    await _sessions.CloseSessionAsync(result.OpenedSessionId, cancellationToken).ConfigureAwait(false);
+                    await _sessions.CloseSessionAsync(result.BindSessionId, cancellationToken).ConfigureAwait(false);
                     connection.Disconnect();
                     return;
                 }
+            }
 
-                if (!string.IsNullOrWhiteSpace(result.MachineId))
-                {
-                    string machineId = result.MachineId.Trim();
-                    _machineBindings[connection.ClientId] = machineId;
-                    EmitStatus(connection.ClientId, machineId, "Online");
-                }
+            if (!string.IsNullOrWhiteSpace(result.MachineId)
+                && !string.IsNullOrWhiteSpace(result.MachineStatus))
+            {
+                string machineId = result.MachineId.Trim();
+                _machineBindings[connection.ClientId] = machineId;
+                EmitStatus(connection.ClientId, machineId, result.MachineStatus.Trim());
             }
 
             TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, result.Response));
@@ -133,28 +134,46 @@ public sealed class TcpJsonLineServer : IDisposable
         }
     }
 
+    private bool TryBindSession(string clientId, string sessionId)
+    {
+        if (_sessionBindings.TryGetValue(clientId, out string? existingSessionId))
+        {
+            return string.Equals(existingSessionId, sessionId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return _sessionBindings.TryAdd(clientId, sessionId);
+    }
+
     private void ClientDisconnected(ClientConnection connection)
     {
         _connections.TryRemove(connection.ClientId, out _);
-
-        if (_sessionBindings.TryRemove(connection.ClientId, out var sessionId))
-        {
-            try
-            {
-                _sessions.CloseSessionAsync(sessionId).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                TraceEmitted?.Invoke(new NetworkTraceEntry("SESSION_ERROR", connection.ClientId, ex.Message));
-            }
-        }
-
-        if (_machineBindings.TryRemove(connection.ClientId, out var machineId))
-        {
-            EmitStatus(connection.ClientId, machineId, "Offline");
-        }
-
+        CleanupClientState(connection.ClientId);
         TraceEmitted?.Invoke(new NetworkTraceEntry("DISCONNECTED", connection.ClientId, string.Empty));
+    }
+
+    private void CleanupClientState(string clientId)
+    {
+        if (_sessionBindings.TryRemove(clientId, out var sessionId))
+        {
+            CloseBoundSession(clientId, sessionId);
+        }
+
+        if (_machineBindings.TryRemove(clientId, out var machineId))
+        {
+            EmitStatus(clientId, machineId, "Offline");
+        }
+    }
+
+    private void CloseBoundSession(string clientId, string sessionId)
+    {
+        try
+        {
+            _sessions.CloseSessionAsync(sessionId).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            TraceEmitted?.Invoke(new NetworkTraceEntry("SESSION_ERROR", clientId, ex.Message));
+        }
     }
 
     private void EmitStatus(string clientId, string machineId, string status)
@@ -199,12 +218,19 @@ public sealed class TcpJsonLineServer : IDisposable
     {
         _stopTokenSource.Cancel();
 
-        foreach (ClientConnection connection in _connections.Values)
+        foreach (ClientConnection connection in _connections.Values.ToArray())
         {
+            connection.MessageReceived -= ClientMessageReceived;
+            connection.Disconnected -= ClientDisconnected;
+            _connections.TryRemove(connection.ClientId, out _);
+            CleanupClientState(connection.ClientId);
+            TraceEmitted?.Invoke(new NetworkTraceEntry("DISCONNECTED", connection.ClientId, string.Empty));
             connection.Dispose();
         }
 
         _connections.Clear();
+        _sessionBindings.Clear();
+        _machineBindings.Clear();
         _listener.Stop();
         _stopTokenSource.Dispose();
     }

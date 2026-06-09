@@ -1,10 +1,21 @@
+using ClientApp.Networking;
+using Shared.DTOs.RequestPayloads;
+using Shared.Networking;
+using Shared.Packets;
+using Shared.Utilities.JsonHelper;
+
 namespace ClientApp.Forms;
 
 public sealed class ClientMainForm : Form
 {
+    private readonly TcpClientConnection _connection;
     private readonly DateTime _loginTimeUtc;
+    private readonly string _machineId;
+    private readonly string _sessionId;
+    private readonly string _serverEndpoint;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
     private TextBox _usedTimeTextBox = null!;
+    private TextBox _serverTextBox = null!;
 
     public ClientMainForm(
         string username,
@@ -12,9 +23,14 @@ public sealed class ClientMainForm : Form
         string host,
         int port,
         string sessionId,
-        DateTime loginTimeUtc)
+        DateTime loginTimeUtc,
+        TcpClientConnection connection)
     {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _loginTimeUtc = DateTime.SpecifyKind(loginTimeUtc, DateTimeKind.Utc);
+        _machineId = machineId.Trim();
+        _sessionId = sessionId.Trim();
+        _serverEndpoint = $"{host}:{port}";
 
         Text = "Máy trạm";
         ClientSize = new Size(420, 380);
@@ -51,6 +67,13 @@ public sealed class ClientMainForm : Form
         _sessionTimer.Tick += (_, _) => UpdateUsedTime();
         _sessionTimer.Start();
         UpdateUsedTime();
+
+        _connection.Connected += Connection_Connected;
+        _connection.Disconnected += Connection_Disconnected;
+        _connection.ReconnectFailed += Connection_ReconnectFailed;
+        UpdateServerConnectionStatus(_connection.IsConnected
+            ? "connected"
+            : "disconnected - reconnecting");
     }
 
     private static string MachineCaption(string machineId)
@@ -85,6 +108,7 @@ public sealed class ClientMainForm : Form
         _usedTimeTextBox = AddInfoRow(infoLayout, 2, "Thời gian sử dụng", "00:00:00");
         AddInfoRow(infoLayout, 3, "Máy chủ", $"{host}:{port}");
         AddInfoRow(infoLayout, 4, "Giờ đăng nhập", FormatLoginTime(_loginTimeUtc));
+        _serverTextBox = infoLayout.GetControlFromPosition(1, 3) as TextBox ?? _serverTextBox;
         return infoLayout;
     }
 
@@ -165,6 +189,61 @@ public sealed class ClientMainForm : Form
         _usedTimeTextBox.Text = $"{(int)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
     }
 
+    private async void Connection_Connected()
+    {
+        UpdateServerConnectionStatus("connected");
+        await SendResumeStatusAsync();
+    }
+
+    private void Connection_Disconnected()
+    {
+        UpdateServerConnectionStatus("disconnected - reconnecting");
+    }
+
+    private void Connection_ReconnectFailed(Exception _)
+    {
+        UpdateServerConnectionStatus("waiting for server");
+    }
+
+    private async Task SendResumeStatusAsync()
+    {
+        try
+        {
+            var statusPacket = PacketFactory.CreateStatus(
+                source: _machineId,
+                target: NetworkProtocol.ServerSource,
+                payload: new StatusPayload
+                {
+                    MachineId = _machineId,
+                    SessionId = _sessionId,
+                    MachineName = _machineId,
+                    Status = "Online",
+                    LastSeen = DateTime.UtcNow
+                },
+                requestId: Guid.NewGuid().ToString("N"));
+
+            await _connection.SendAsync(JsonHelper.SerializeToJson(statusPacket));
+        }
+        catch (Exception)
+        {
+            UpdateServerConnectionStatus("connected - status pending");
+        }
+    }
+
+    private void UpdateServerConnectionStatus(string status)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => UpdateServerConnectionStatus(status));
+            return;
+        }
+
+        if (!IsDisposed)
+        {
+            _serverTextBox.Text = $"{_serverEndpoint} ({status})";
+        }
+    }
+
     private static string ShortSessionId(string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
@@ -182,6 +261,9 @@ public sealed class ClientMainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _connection.Connected -= Connection_Connected;
+        _connection.Disconnected -= Connection_Disconnected;
+        _connection.ReconnectFailed -= Connection_ReconnectFailed;
         _sessionTimer.Stop();
         _sessionTimer.Dispose();
         base.OnFormClosed(e);

@@ -21,7 +21,7 @@ static class Program
         {
             AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
             using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
-            using var mainForm = new MainForm();
+            using var mainForm = new MainForm(authRuntime.Machines);
 
             if (networkServer is not null)
             {
@@ -49,7 +49,7 @@ static class Program
         var server = new TcpJsonLineServer(
             IPAddress.Loopback,
             5000,
-            new PacketDispatcher(authRuntime.Auth),
+            new PacketDispatcher(authRuntime.Auth, authRuntime.SessionRepository, authRuntime.Machines),
             authRuntime.SessionService);
 
         try

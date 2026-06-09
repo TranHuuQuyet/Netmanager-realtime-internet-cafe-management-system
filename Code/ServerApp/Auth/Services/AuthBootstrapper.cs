@@ -8,6 +8,7 @@ namespace ServerApp.Auth.Services;
 public sealed record AuthRuntime(
     IUserRepository Users,
     ISessionRepository SessionRepository,
+    IMachineRepository Machines,
     ISessionService SessionService,
     IAuthService Auth);
 
@@ -21,7 +22,7 @@ public static class AuthBootstrapper {
         ISessionService sessionService = new SessionService(database.Sessions, database.Machines);
         IAuthService auth = new AuthService(database.Users, database.Machines, sessionService);
 
-        return new AuthRuntime(database.Users, database.Sessions, sessionService, auth);
+        return new AuthRuntime(database.Users, database.Sessions, database.Machines, sessionService, auth);
     }
 
     // Helper cho UI form khi chi can IAuthService, khong can dereference AuthRuntime.

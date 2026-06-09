@@ -1,25 +1,39 @@
+using ServerApp.Database.Contracts;
+using ServerApp.Database.Entities;
+
 namespace ServerApp;
 
 public partial class MainForm : Form
 {
     private const string SampleMachinePrefix = "PC";
 
+    private readonly IMachineRepository? _machines;
     private bool _isSelectingMachine;
     private bool _isRuntimeMachineDataActive;
     private string? _selectedMachineName;
 
     public MainForm()
+        : this(null)
     {
+    }
+
+    public MainForm(IMachineRepository? machines)
+    {
+        _machines = machines;
         InitializeComponent();
         ConfigureR1ShellState();
     }
 
-    private void MainForm_Load(object sender, EventArgs e)
+    private async void MainForm_Load(object sender, EventArgs e)
     {
-        LoadSampleMachineData();
         LoadSampleCustomerData();
-        SelectMachine("PC01");
-        lblServerStatus.Text = UiStrings.MainServerStatus;
+
+        if (!await TryLoadRuntimeMachineDataAsync())
+        {
+            LoadSampleMachineData();
+            SelectMachine("PC01");
+            lblServerStatus.Text = UiStrings.MainServerStatus;
+        }
     }
 
     private void ConfigureR1ShellState()
@@ -64,6 +78,49 @@ public partial class MainForm : Form
             dgvMachines.Rows.Add(machineNumber, machineNumber, statuses[index], machineName);
             pnlMachineCards.Controls.Add(CreateMachineCard(machineName, statuses[index]));
         }
+    }
+
+    private async Task<bool> TryLoadRuntimeMachineDataAsync()
+    {
+        if (_machines is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            IReadOnlyList<MachineEntity> machines = await _machines.ListAsync();
+            if (machines.Count == 0)
+            {
+                return false;
+            }
+
+            LoadRuntimeMachineData(machines);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            lblServerStatus.Text = $"Không thể tải dữ liệu máy thật: {ex.Message}";
+            return false;
+        }
+    }
+
+    private void LoadRuntimeMachineData(IReadOnlyList<MachineEntity> machines)
+    {
+        EnsureRuntimeMachineDataActive();
+
+        foreach (MachineEntity machine in machines)
+        {
+            string machineName = NormalizeMachineId(machine.MachineId);
+            string status = NormalizeStatus(machine.Status);
+
+            UpsertMachineRow(machineName, status);
+            UpsertMachineCard(machineName, status);
+        }
+
+        string firstMachineName = NormalizeMachineId(machines[0].MachineId);
+        SelectMachine(firstMachineName);
+        lblServerStatus.Text = string.Format(UiStrings.MainSelectedMachineStatusTemplate, firstMachineName);
     }
 
     public void ApplyMachineStatusUpdate(string machineId, string status)

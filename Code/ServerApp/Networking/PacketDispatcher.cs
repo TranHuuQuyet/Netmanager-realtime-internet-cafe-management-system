@@ -6,18 +6,31 @@ using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Models;
+using ServerApp.Database.Contracts;
+using ServerApp.Database.Models;
 
 namespace ServerApp.Networking;
 
-public sealed record PacketDispatchResult(string Response, string? OpenedSessionId = null, string? MachineId = null);
+public sealed record PacketDispatchResult(
+    string Response,
+    string? BindSessionId = null,
+    string? MachineId = null,
+    string? MachineStatus = null);
 
 public sealed class PacketDispatcher
 {
     private readonly IAuthService _authService;
+    private readonly ISessionRepository _sessions;
+    private readonly IMachineRepository _machines;
 
-    public PacketDispatcher(IAuthService authService)
+    public PacketDispatcher(
+        IAuthService authService,
+        ISessionRepository sessions,
+        IMachineRepository machines)
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+        _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
+        _machines = machines ?? throw new ArgumentNullException(nameof(machines));
     }
 
     public async Task<PacketDispatchResult> DispatchAsync(string inboundLine, CancellationToken cancellationToken = default)
@@ -27,6 +40,7 @@ public sealed class PacketDispatcher
         return packet switch
         {
             Packet<LoginPayload> loginPacket => await DispatchLoginAsync(loginPacket, cancellationToken).ConfigureAwait(false),
+            Packet<StatusPayload> statusPacket => await DispatchStatusAsync(statusPacket, cancellationToken).ConfigureAwait(false),
             Packet typedPacket => throw new InvalidDataException($"Unsupported packet type: {typedPacket.Type}"),
             _ => throw new InvalidDataException("Unsupported packet envelope.")
         };
@@ -85,7 +99,60 @@ public sealed class PacketDispatcher
             requestId: loginPacket.RequestId,
             message: result.Message);
 
-        return new PacketDispatchResult(SerializeResponse(response), result.Session.Id, result.User.MachineId);
+        return new PacketDispatchResult(
+            SerializeResponse(response),
+            BindSessionId: result.Session.Id,
+            MachineId: result.User.MachineId,
+            MachineStatus: "Online");
+    }
+
+    private async Task<PacketDispatchResult> DispatchStatusAsync(
+        Packet<StatusPayload> statusPacket,
+        CancellationToken cancellationToken)
+    {
+        StatusPayload? payload = statusPacket.TypedPayload;
+        if (payload is null)
+        {
+            return CreateStatusAck(statusPacket, string.Empty, "Rejected", "STATUS payload is required.");
+        }
+
+        string machineId = payload.MachineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return CreateStatusAck(statusPacket, string.Empty, "Rejected", "STATUS machineId is required.");
+        }
+
+        string? sessionId = string.IsNullOrWhiteSpace(payload.SessionId)
+            ? null
+            : payload.SessionId.Trim();
+
+        if (sessionId is not null)
+        {
+            SessionRecord? session = await _sessions.GetByIdAsync(sessionId, cancellationToken).ConfigureAwait(false);
+            if (session is null
+                || session.State == SessionState.Revoked
+                || !string.Equals(session.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                return CreateStatusAck(statusPacket, machineId, "Rejected", "STATUS session is not valid for this machine.");
+            }
+        }
+
+        string status = string.IsNullOrWhiteSpace(payload.Status)
+            ? "Online"
+            : payload.Status.Trim();
+        DateTime lastSeen = payload.LastSeen == default
+            ? DateTime.UtcNow
+            : payload.LastSeen.ToUniversalTime();
+
+        await _machines.UpdateStatusAsync(machineId, status, lastSeen, cancellationToken).ConfigureAwait(false);
+
+        PacketDispatchResult ack = CreateStatusAck(statusPacket, machineId, "Accepted", "STATUS accepted.");
+        return ack with
+        {
+            BindSessionId = sessionId,
+            MachineId = machineId,
+            MachineStatus = status
+        };
     }
 
     private static PacketDispatchResult CreateLoginFailure(
@@ -99,6 +166,27 @@ public sealed class PacketDispatcher
             errorCode: errorCode,
             details: details,
             requestId: loginPacket.RequestId);
+
+        return new PacketDispatchResult(SerializeResponse(response));
+    }
+
+    private static PacketDispatchResult CreateStatusAck(
+        Packet<StatusPayload> statusPacket,
+        string machineId,
+        string status,
+        string message)
+    {
+        var response = PacketFactory.CreateAck(
+            source: NetworkProtocol.ServerSource,
+            target: statusPacket.Source,
+            payload: new AckPayload
+            {
+                MachineId = machineId,
+                AckFor = statusPacket.Type.ToString(),
+                Status = status,
+                Message = message
+            },
+            requestId: statusPacket.RequestId);
 
         return new PacketDispatchResult(SerializeResponse(response));
     }

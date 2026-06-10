@@ -201,7 +201,7 @@ Owner: `M5`
 Task: Enforce active session/machine guard for command target
 Dependency: `G2` pass; `R3-B01`
 Required evidence: Auth/session test result
-Member done: [ ]
+Member done: [x]
 
 `R3-Q01`
 Owner: `M6 + M1`

@@ -13,4 +13,7 @@ public interface ISessionService{
 
     // Lay session active hien tai cua user de kiem tra trang thai dang dang nhap.
     Task<SessionInfo?> GetActiveSessionAsync(string userId, CancellationToken cancellationToken = default);
+
+    // Xac thuc target command co session active va machine hop le hay khong.
+    Task<AuthResult> AuthorizeCommandTargetAsync(string machineId, CancellationToken cancellationToken = default);
 }

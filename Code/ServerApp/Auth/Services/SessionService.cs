@@ -98,6 +98,39 @@ public sealed class SessionService : ISessionService {
         }
     }
 
+    public async Task<AuthResult> AuthorizeCommandTargetAsync(string machineId, CancellationToken cancellationToken = default) {
+        machineId = Normalize(machineId);
+
+        if (string.IsNullOrWhiteSpace(machineId)) {
+            return AuthResult.Failure(AuthStatus.UnauthorizedCommand, "Command target machine is required.");
+        }
+
+        try {
+            var machine = await _machines.GetByMachineIdAsync(machineId, cancellationToken).ConfigureAwait(false);
+            if (machine is null || !machine.IsActive) {
+                return AuthResult.Failure(AuthStatus.UnauthorizedCommand, "Command target is not available.");
+            }
+
+            var activeSession = await _sessions.GetActiveByMachineIdAsync(machineId, cancellationToken).ConfigureAwait(false);
+            if (activeSession is null || !string.Equals(activeSession.MachineId, machineId, StringComparison.OrdinalIgnoreCase)) {
+                return AuthResult.Failure(AuthStatus.UnauthorizedCommand, "Command target has no active session.");
+            }
+
+            var user = new UserSummary(
+                activeSession.UserId,
+                activeSession.Username,
+                (AuthUserRole)activeSession.Role,
+                activeSession.MachineId ?? string.Empty,
+                true,
+                activeSession.StartedAtUtc);
+
+            return AuthResult.Success(user, ToSessionInfo(activeSession), "Command target accepted.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException) {
+            throw new InvalidOperationException("Failed to authorize command target.", ex);
+        }
+    }
+
     // Chuyen SessionRecord trong DB thanh SessionInfo domain object.
     private static SessionInfo ToSessionInfo(SessionRecord record)
         => new(
@@ -109,6 +142,8 @@ public sealed class SessionService : ISessionService {
             (AuthSessionState)record.State,
             record.StartedAtUtc,
             record.EndedAtUtc);
+
+    private static string Normalize(string? value) => value?.Trim() ?? string.Empty;
 
     private const string MachineStatusOnline = "Online";
     private const string MachineStatusOffline = "Offline";

@@ -441,6 +441,31 @@ internal sealed class SqliteSessionRepository : ISessionRepository
         return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<SessionRecord?> GetActiveByMachineIdAsync(string machineId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, UserId, Username, Role, MachineId, State, StartedAtUtc, EndedAtUtc
+            FROM AuthSessions
+            WHERE MachineId = @MachineId AND State = @State
+            ORDER BY StartedAtUtc DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@MachineId", machineId.Trim());
+        command.Parameters.AddWithValue("@State", (int)SessionState.Active);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<SessionRecord?> GetByIdAsync(string sessionId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sessionId))

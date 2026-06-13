@@ -72,6 +72,11 @@ internal static class UiStrings
     public static string MainRuntimeStatusUpdatedTemplate => Get(nameof(MainRuntimeStatusUpdatedTemplate), "Đã nhận cập nhật trạng thái runtime cho {0}: {1}.");
     public static string MainNoMachineSelectedStatus => Get(nameof(MainNoMachineSelectedStatus), "Vui lòng chọn một máy trước.");
     public static string MainActionPendingTemplate => Get(nameof(MainActionPendingTemplate), "{0} cho {1}: đang chờ backend.");
+    public static string MainCommandSubmittingTemplate => Get(nameof(MainCommandSubmittingTemplate), "{0} for {1}: sending through command service.");
+    public static string MainCommandResultTemplate => Get(nameof(MainCommandResultTemplate), "{0} for {1}: {2}. {3}");
+    public static string MainCommandErrorTemplate => Get(nameof(MainCommandErrorTemplate), "{0} for {1}: {2}. {3}");
+    public static string MainCommandLockReason => Get(nameof(MainCommandLockReason), "Admin UI lock request");
+    public static string MainCommandUnlockReason => Get(nameof(MainCommandUnlockReason), "Admin UI unlock request");
     public static string MainCustomerActionPendingTemplate => Get(nameof(MainCustomerActionPendingTemplate), "{0} khách hàng: đang chờ backend.");
     public static string MainPendingAction => Get(nameof(MainPendingAction), "Thao tác");
 }

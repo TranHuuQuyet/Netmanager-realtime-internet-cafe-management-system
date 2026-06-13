@@ -1,25 +1,35 @@
 using ServerApp.Database.Contracts;
 using ServerApp.Database.Entities;
+using ServerApp.Presentation;
+using Shared.Enums;
 
 namespace ServerApp;
 
 public partial class MainForm : Form
 {
     private const string SampleMachinePrefix = "PC";
+    private const string AdminCommandIssuer = "ServerApp.MainForm";
 
     private readonly IMachineRepository? _machines;
+    private readonly IAdminCommandService _adminCommands;
     private bool _isSelectingMachine;
     private bool _isRuntimeMachineDataActive;
     private string? _selectedMachineName;
 
     public MainForm()
-        : this(null)
+        : this(null, null)
     {
     }
 
     public MainForm(IMachineRepository? machines)
+        : this(machines, null)
+    {
+    }
+
+    public MainForm(IMachineRepository? machines, IAdminCommandService? adminCommands)
     {
         _machines = machines;
+        _adminCommands = adminCommands ?? new UnavailableAdminCommandService();
         InitializeComponent();
         ConfigureR1ShellState();
     }
@@ -143,6 +153,19 @@ public partial class MainForm : Form
             UiStrings.MainRuntimeStatusUpdatedTemplate,
             normalizedMachineId,
             normalizedStatus);
+    }
+
+    public void ApplyCommandResultUpdate(AdminCommandResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyCommandResultUpdate(result));
+            return;
+        }
+
+        lblServerStatus.Text = FormatCommandResult(result);
     }
 
     private Panel CreateMachineCard(string machineName, string status)
@@ -291,13 +314,20 @@ public partial class MainForm : Form
         txtChatMessage.Focus();
     }
 
-    private void MachineAction_Click(object? sender, EventArgs e)
+    private async void MachineAction_Click(object? sender, EventArgs e)
     {
-        string action = sender switch
+        CommandType? command = sender switch
         {
-            Button button when button == btnLockMachine => UiStrings.MainLockMachine,
-            Button button when button == btnUnlockMachine => UiStrings.MainUnlockMachine,
-            Button button when button == btnShutdownMachine => UiStrings.MainShutdownMachine,
+            Button button when button == btnLockMachine => CommandType.LOCK,
+            Button button when button == btnUnlockMachine => CommandType.UNLOCK,
+            _ => null
+        };
+
+        string action = command switch
+        {
+            CommandType.LOCK => UiStrings.MainLockMachine,
+            CommandType.UNLOCK => UiStrings.MainUnlockMachine,
+            _ when sender == btnShutdownMachine => UiStrings.MainShutdownMachine,
             _ => UiStrings.MainPendingAction
         };
 
@@ -307,7 +337,44 @@ public partial class MainForm : Form
             return;
         }
 
-        lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
+        if (command is null)
+        {
+            lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
+            return;
+        }
+
+        await SendMachineCommandAsync(command.Value, action, _selectedMachineName);
+    }
+
+    private async Task SendMachineCommandAsync(CommandType command, string action, string machineName)
+    {
+        var request = new AdminCommandRequest(
+            machineName,
+            command,
+            AdminCommandIssuer,
+            command == CommandType.LOCK
+                ? UiStrings.MainCommandLockReason
+                : UiStrings.MainCommandUnlockReason);
+
+        lblServerStatus.Text = string.Format(UiStrings.MainCommandSubmittingTemplate, action, machineName);
+        SetMachineActionButtonsEnabled(false);
+
+        try
+        {
+            AdminCommandResult result = await _adminCommands.SendAsync(request);
+            ApplyCommandResultUpdate(result);
+        }
+        catch (Exception ex)
+        {
+            ApplyCommandResultUpdate(AdminCommandResult.ControlledError(
+                request,
+                "COMMAND_SERVICE_ERROR",
+                ex.Message));
+        }
+        finally
+        {
+            SetMachineActionButtonsEnabled(_isRuntimeMachineDataActive);
+        }
     }
 
     private void CustomerAction_Click(object? sender, EventArgs e)
@@ -368,6 +435,9 @@ public partial class MainForm : Form
         _isRuntimeMachineDataActive = true;
         lblMachineTitle.Text = UiStrings.MainMachineTitle;
         _selectedMachineName = null;
+        SetMachineActionButtonsEnabled(true);
+        btnLockMachine.Text = UiStrings.MainLockMachine;
+        btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
 
         bool previousSelectingState = _isSelectingMachine;
         _isSelectingMachine = true;
@@ -437,6 +507,29 @@ public partial class MainForm : Form
 
     private static string FormatMachineLabel(string machineName, string status)
         => $"{machineName} - {status}";
+
+    private static string FormatCommandResult(AdminCommandResult result)
+    {
+        string template = result.IsError
+            ? UiStrings.MainCommandErrorTemplate
+            : UiStrings.MainCommandResultTemplate;
+        string status = result.IsError && !string.IsNullOrWhiteSpace(result.ErrorCode)
+            ? result.ErrorCode
+            : result.Status;
+
+        return string.Format(
+            template,
+            result.Command,
+            result.MachineId,
+            status,
+            result.Message);
+    }
+
+    private void SetMachineActionButtonsEnabled(bool enabled)
+    {
+        btnLockMachine.Enabled = enabled;
+        btnUnlockMachine.Enabled = enabled;
+    }
 
     private static string NormalizeMachineId(string machineId)
         => string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId.Trim();

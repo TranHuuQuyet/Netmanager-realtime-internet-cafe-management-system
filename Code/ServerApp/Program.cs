@@ -21,7 +21,7 @@ static class Program
         {
             AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
             using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
-            using var mainForm = new MainForm(authRuntime.Machines);
+            using var mainForm = new MainForm(authRuntime.Machines, networkServer);
 
             if (networkServer is not null)
             {

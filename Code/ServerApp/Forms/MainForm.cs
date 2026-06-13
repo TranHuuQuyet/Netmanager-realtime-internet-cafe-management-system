@@ -1,5 +1,6 @@
 using ServerApp.Database.Contracts;
 using ServerApp.Database.Entities;
+using ServerApp.Networking;
 
 namespace ServerApp;
 
@@ -8,18 +9,20 @@ public partial class MainForm : Form
     private const string SampleMachinePrefix = "PC";
 
     private readonly IMachineRepository? _machines;
+    private readonly TcpJsonLineServer? _networkServer;
     private bool _isSelectingMachine;
     private bool _isRuntimeMachineDataActive;
     private string? _selectedMachineName;
 
     public MainForm()
-        : this(null)
+        : this(null, null)
     {
     }
 
-    public MainForm(IMachineRepository? machines)
+    public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer = null)
     {
         _machines = machines;
+        _networkServer = networkServer;
         InitializeComponent();
         ConfigureR1ShellState();
     }
@@ -41,13 +44,13 @@ public partial class MainForm : Form
         lblMachineTitle.Text = UiStrings.MainMachineTitleSample;
         lblServerStatus.Text = UiStrings.MainServerStatus;
 
-        btnLockMachine.Text = UiStrings.MainLockMachinePending;
-        btnLockMachine.Width = 155;
-        btnLockMachine.Enabled = false;
+        btnLockMachine.Text = UiStrings.MainLockMachine;
+        btnLockMachine.Width = 120;
+        btnLockMachine.Enabled = true;
 
-        btnUnlockMachine.Text = UiStrings.MainUnlockMachinePending;
-        btnUnlockMachine.Width = 170;
-        btnUnlockMachine.Enabled = false;
+        btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
+        btnUnlockMachine.Width = 120;
+        btnUnlockMachine.Enabled = true;
     }
 
     private void LoadSampleMachineData()
@@ -291,23 +294,50 @@ public partial class MainForm : Form
         txtChatMessage.Focus();
     }
 
-    private void MachineAction_Click(object? sender, EventArgs e)
+    private async void MachineAction_Click(object? sender, EventArgs e)
     {
-        string action = sender switch
-        {
-            Button button when button == btnLockMachine => UiStrings.MainLockMachine,
-            Button button when button == btnUnlockMachine => UiStrings.MainUnlockMachine,
-            Button button when button == btnShutdownMachine => UiStrings.MainShutdownMachine,
-            _ => UiStrings.MainPendingAction
-        };
-
         if (string.IsNullOrWhiteSpace(_selectedMachineName))
         {
             lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
             return;
         }
 
-        lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
+        bool isLockCommand = sender == btnLockMachine;
+        bool isUnlockCommand = sender == btnUnlockMachine;
+        if (!isLockCommand && !isUnlockCommand)
+        {
+            string action = sender is Button button && button == btnShutdownMachine
+                ? UiStrings.MainShutdownMachine
+                : UiStrings.MainPendingAction;
+            lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
+            return;
+        }
+
+        if (_networkServer is null)
+        {
+            lblServerStatus.Text = "Network server is not running.";
+            return;
+        }
+
+        string commandName = isLockCommand ? UiStrings.MainLockMachine : UiStrings.MainUnlockMachine;
+        lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, commandName, _selectedMachineName);
+
+        try
+        {
+            bool sent = await _networkServer.SendMachineCommandAsync(
+                _selectedMachineName,
+                lockMachine: isLockCommand,
+                issuedBy: "admin",
+                reason: commandName);
+
+            lblServerStatus.Text = sent
+                ? $"{commandName} sent to {_selectedMachineName}."
+                : $"Cannot send {commandName} to {_selectedMachineName}.";
+        }
+        catch (Exception ex)
+        {
+            lblServerStatus.Text = $"Command send failed: {ex.Message}";
+        }
     }
 
     private void CustomerAction_Click(object? sender, EventArgs e)

@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using Microsoft.Data.Sqlite;
 using Shared.Enums;
+using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
 using Shared.Networking;
@@ -23,7 +25,7 @@ try
     using var server = new TcpJsonLineServer(
         IPAddress.Loopback,
         port: 0,
-        new PacketDispatcher(authRuntime.Auth),
+        new PacketDispatcher(authRuntime.Auth, authRuntime.SessionRepository, authRuntime.Machines),
         authRuntime.SessionService);
     server.TraceEmitted += trace =>
     {
@@ -43,6 +45,7 @@ try
     Console.WriteLine($"ServerApp listener active on 127.0.0.1:{port}");
 
     await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
+    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
     await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
@@ -69,6 +72,60 @@ finally
     {
         File.Delete(databasePath);
     }
+}
+
+static async Task AssertAdminUiLockUnlockCommandTraceAsync(
+    int port,
+    AuthRuntime authRuntime,
+    TcpJsonLineServer server,
+    List<NetworkTraceEntry> traces)
+{
+    string sessionId;
+
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
+
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        object response = await SendLoginOnStreamAsync(stream, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        await WaitForStatusTraceAsync(traces, "PC-01", "Online");
+
+        using var mainForm = new ServerApp.MainForm(authRuntime.Machines, server);
+        mainForm.ApplyMachineStatusUpdate("PC-01", "Online");
+
+        await InvokeSendMachineCommandAsync(mainForm, CommandType.LOCK, "Lock", "PC-01");
+        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01");
+        Console.WriteLine("PASS: admin UI Lock action emits real LOCK JSON command packet");
+
+        await InvokeSendMachineCommandAsync(mainForm, CommandType.UNLOCK, "Unlock", "PC-01");
+        await WaitForCommandTraceAsync(traces, PacketType.UNLOCK, "PC-01");
+        Console.WriteLine("PASS: admin UI Unlock action emits real UNLOCK JSON command packet");
+    }
+
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, sessionId);
+}
+
+static async Task InvokeSendMachineCommandAsync(
+    ServerApp.MainForm mainForm,
+    CommandType command,
+    string action,
+    string machineName)
+{
+    MethodInfo handler = typeof(ServerApp.MainForm)
+        .GetMethod("SendMachineCommandAsync", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("Could not find MainForm.SendMachineCommandAsync.");
+
+    object? result = handler.Invoke(mainForm, [command, action, machineName]);
+    if (result is not Task task)
+    {
+        throw new InvalidOperationException("MainForm.SendMachineCommandAsync did not return a Task.");
+    }
+
+    await task.ConfigureAwait(false);
 }
 
 static async Task AssertLoginSuccessAsync(int port, ISessionRepository sessions)
@@ -280,6 +337,52 @@ static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string 
     }
 
     throw new InvalidOperationException($"Session {sessionId} remained active after socket disconnect.");
+}
+
+static async Task WaitForCommandTraceAsync(List<NetworkTraceEntry> traces, PacketType commandType, string machineId)
+{
+    using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+    while (!timeoutTokenSource.IsCancellationRequested)
+    {
+        NetworkTraceEntry[] snapshot;
+        lock (traces)
+        {
+            snapshot = [.. traces];
+        }
+
+        foreach (NetworkTraceEntry trace in snapshot)
+        {
+            if (!string.Equals(trace.Direction, "OUT_COMMAND", StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(trace.Message))
+            {
+                continue;
+            }
+
+            object packet = JsonHelper.DeserializePacket(trace.Message);
+            if (commandType == PacketType.LOCK
+                && packet is Packet<LockPayload> lockPacket
+                && lockPacket.Type == PacketType.LOCK
+                && string.Equals(lockPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"COMMAND JSON LOCK  : {trace.Message}");
+                return;
+            }
+
+            if (commandType == PacketType.UNLOCK
+                && packet is Packet<UnlockPayload> unlockPacket
+                && unlockPacket.Type == PacketType.UNLOCK
+                && string.Equals(unlockPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"COMMAND JSON UNLOCK: {trace.Message}");
+                return;
+            }
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25), timeoutTokenSource.Token);
+    }
+
+    throw new InvalidOperationException($"{commandType} command JSON trace for {machineId} was not emitted.");
 }
 
 static async Task WaitForStatusTraceAsync(List<NetworkTraceEntry> traces, string machineId, string status)

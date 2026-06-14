@@ -1,5 +1,6 @@
 using ServerApp.Database.Contracts;
 using ServerApp.Database.Entities;
+using ServerApp.Networking;
 using ServerApp.Presentation;
 using Shared.Enums;
 
@@ -17,12 +18,12 @@ public partial class MainForm : Form
     private string? _selectedMachineName;
 
     public MainForm()
-        : this(null, null)
+        : this(null, (IAdminCommandService?)null)
     {
     }
 
     public MainForm(IMachineRepository? machines)
-        : this(machines, null)
+        : this(machines, (IAdminCommandService?)null)
     {
     }
 
@@ -32,6 +33,15 @@ public partial class MainForm : Form
         _adminCommands = adminCommands ?? new UnavailableAdminCommandService();
         InitializeComponent();
         ConfigureR1ShellState();
+    }
+
+    public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer)
+        : this(
+            machines,
+            networkServer is null
+                ? null
+                : new NetworkAdminCommandService(networkServer))
+    {
     }
 
     private async void MainForm_Load(object sender, EventArgs e)
@@ -51,13 +61,13 @@ public partial class MainForm : Form
         lblMachineTitle.Text = UiStrings.MainMachineTitleSample;
         lblServerStatus.Text = UiStrings.MainServerStatus;
 
-        btnLockMachine.Text = UiStrings.MainLockMachinePending;
-        btnLockMachine.Width = 155;
-        btnLockMachine.Enabled = false;
+        btnLockMachine.Text = UiStrings.MainLockMachine;
+        btnLockMachine.Width = 120;
+        btnLockMachine.Enabled = true;
 
-        btnUnlockMachine.Text = UiStrings.MainUnlockMachinePending;
-        btnUnlockMachine.Width = 170;
-        btnUnlockMachine.Enabled = false;
+        btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
+        btnUnlockMachine.Width = 120;
+        btnUnlockMachine.Enabled = true;
     }
 
     private void LoadSampleMachineData()
@@ -541,6 +551,28 @@ public partial class MainForm : Form
     {
         string digits = new(machineName.Where(char.IsDigit).ToArray());
         return int.TryParse(digits, out int machineNumber) ? machineNumber : 0;
+    }
+
+    private sealed class NetworkAdminCommandService(TcpJsonLineServer networkServer) : IAdminCommandService
+    {
+        public async Task<AdminCommandResult> SendAsync(
+            AdminCommandRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            bool sent = await networkServer.SendMachineCommandAsync(
+                request.MachineId,
+                lockMachine: request.Command == CommandType.LOCK,
+                issuedBy: request.IssuedBy,
+                reason: request.Reason,
+                cancellationToken).ConfigureAwait(false);
+
+            return sent
+                ? AdminCommandResult.Submitted(request, "Command sent to client.")
+                : AdminCommandResult.ControlledError(
+                    request,
+                    "COMMAND_SEND_FAILED",
+                    "Cannot send command to client.");
+        }
     }
 
     private void LoadSampleCustomerData()

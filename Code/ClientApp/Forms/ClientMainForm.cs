@@ -17,6 +17,7 @@ public sealed class ClientMainForm : Form
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
     private readonly ClientRuntimeCommandHandler _commandHandler;
     private LockScreenForm? _lockScreen;
+    private bool _isLockedByServer;
     private TextBox _usedTimeTextBox = null!;
     private TextBox _serverTextBox = null!;
 
@@ -238,11 +239,13 @@ public sealed class ClientMainForm : Form
 
         if (_lockScreen is { IsDisposed: false })
         {
+            SetClientSurfaceLocked(true);
             _lockScreen.Activate();
             UpdateServerConnectionStatus("connected - locked by server");
             return;
         }
 
+        SetClientSurfaceLocked(true);
         _lockScreen = new LockScreenForm();
         _lockScreen.FormClosed += LockScreen_FormClosed;
         _lockScreen.Show(this);
@@ -271,6 +274,7 @@ public sealed class ClientMainForm : Form
             _lockScreen = null;
         }
 
+        SetClientSurfaceLocked(false);
         UpdateServerConnectionStatus("connected - unlocked by server");
     }
 
@@ -282,6 +286,17 @@ public sealed class ClientMainForm : Form
         }
 
         _lockScreen = null;
+        SetClientSurfaceLocked(false);
+    }
+
+    private void SetClientSurfaceLocked(bool locked)
+    {
+        _isLockedByServer = locked;
+
+        foreach (Control control in Controls)
+        {
+            control.Enabled = !locked;
+        }
     }
 
     private async Task SendResumeStatusAsync()
@@ -354,6 +369,11 @@ public sealed class ClientMainForm : Form
             _lockScreen.FormClosed -= LockScreen_FormClosed;
             _lockScreen.UnlockFromServer();
             _lockScreen = null;
+        }
+
+        if (_isLockedByServer)
+        {
+            SetClientSurfaceLocked(false);
         }
 
         _sessionTimer.Stop();

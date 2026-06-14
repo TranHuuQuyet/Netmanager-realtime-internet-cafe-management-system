@@ -116,9 +116,7 @@ partial class ConnectForm
         txtMachineId.Dock = DockStyle.Fill;
         txtMachineId.Margin = new Padding(3, 9, 3, 3);
         txtMachineId.Name = "txtMachineId";
-        txtMachineId.ReadOnly = true;
         txtMachineId.TabIndex = 3;
-        txtMachineId.TabStop = false;
         // 
         // buttonPanel
         // 

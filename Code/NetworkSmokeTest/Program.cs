@@ -46,6 +46,7 @@ try
 
     await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
     await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces);
+    await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
     await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
@@ -56,11 +57,6 @@ try
         authRuntime.SessionRepository,
         """{"type":"UNKNOWN","source":"PC-01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
         "unknown packet type");
-    await AssertRejectedLineDoesNotStopServerAsync(
-        port,
-        authRuntime.SessionRepository,
-        """{"type":"STATUS","source":"PC-01","target":"server","requestId":"unsupported-status","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
-        "packet type without an open route");
 
     Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
 }
@@ -86,9 +82,14 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
     {
         await tcpClient.ConnectAsync(IPAddress.Loopback, port);
         await using NetworkStream stream = tcpClient.GetStream();
+        using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+        await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+        {
+            AutoFlush = true
+        };
 
         Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
-        object response = await SendLoginOnStreamAsync(stream, loginPacket);
+        object response = await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
         Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
         sessionId = resultPacket.TypedPayload.SessionId;
 
@@ -99,14 +100,77 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
 
         await InvokeSendMachineCommandAsync(mainForm, CommandType.LOCK, "Lock", "PC-01");
         await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01");
+        await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01");
         Console.WriteLine("PASS: admin UI Lock action emits real LOCK JSON command packet");
 
         await InvokeSendMachineCommandAsync(mainForm, CommandType.UNLOCK, "Unlock", "PC-01");
         await WaitForCommandTraceAsync(traces, PacketType.UNLOCK, "PC-01");
+        await AssertCommandReceivedAsync(reader, PacketType.UNLOCK, "PC-01");
         Console.WriteLine("PASS: admin UI Unlock action emits real UNLOCK JSON command packet");
+
+        await authRuntime.SessionService.CloseSessionAsync(sessionId);
+        TryShutdown(tcpClient);
     }
 
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, sessionId);
+}
+
+static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository sessions)
+{
+    string sessionId;
+
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
+        using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+        await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+        {
+            AutoFlush = true
+        };
+
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        object response = await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        var statusPacket = PacketFactory.CreateStatus(
+            source: "PC-01",
+            target: NetworkProtocol.ServerSource,
+            payload: new StatusPayload
+            {
+                MachineId = "PC-01",
+                SessionId = sessionId,
+                MachineName = "PC-01",
+                Status = "Online",
+                IpAddress = IPAddress.Loopback.ToString(),
+                LastSeen = DateTime.UtcNow
+            },
+            requestId: $"status-{Guid.NewGuid():N}");
+
+        string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(statusPacket));
+        Console.WriteLine($"CLIENT OUT: {outboundLine}");
+        await writer.WriteLineAsync(outboundLine);
+
+        string inboundLine = await ReadRequiredLineAsync(reader, "STATUS ACK");
+        Console.WriteLine($"CLIENT IN : {inboundLine}");
+
+        var ackPacket = JsonHelper.DeserializePacket(inboundLine) as Packet<AckPayload>
+            ?? throw new InvalidOperationException("Client expected STATUS ACK packet.");
+
+        if (ackPacket.TypedPayload.AckFor != PacketType.STATUS.ToString()
+            || ackPacket.TypedPayload.Status != "Accepted"
+            || !string.Equals(ackPacket.TypedPayload.MachineId, "PC-01", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("STATUS route did not return an Accepted ACK for PC-01.");
+        }
+
+        AssertMatchingRequestId(statusPacket, ackPacket);
+        Console.WriteLine("PASS: authenticated STATUS route returns Accepted ACK");
+        TryShutdown(tcpClient);
+    }
+
+    await WaitForClosedSessionAsync(sessions, sessionId);
 }
 
 static async Task InvokeSendMachineCommandAsync(
@@ -270,16 +334,20 @@ static async Task<object> SendLoginOnStreamAsync(NetworkStream stream, Packet<Lo
         AutoFlush = true
     };
 
+    return await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
+}
+
+static async Task<object> SendLoginOnOpenStreamAsync(
+    StreamReader reader,
+    StreamWriter writer,
+    Packet<LoginPayload> loginPacket)
+{
     string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(loginPacket));
     Console.WriteLine($"CLIENT OUT: {outboundLine}");
 
     await writer.WriteLineAsync(outboundLine);
 
-    string? inboundLine = await reader.ReadLineAsync();
-    if (string.IsNullOrWhiteSpace(inboundLine))
-    {
-        throw new InvalidOperationException("Client did not receive a LOGIN JSON-line packet.");
-    }
+    string inboundLine = await ReadRequiredLineAsync(reader, "LOGIN response");
 
     Console.WriteLine($"CLIENT IN : {inboundLine}");
     return JsonHelper.DeserializePacket(inboundLine);
@@ -305,8 +373,7 @@ static async Task AssertRejectedLineDoesNotStopServerAsync(
         Console.WriteLine($"CLIENT OUT: {outboundLine}");
         await writer.WriteLineAsync(outboundLine);
 
-        using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        string? inboundLine = await reader.ReadLineAsync(timeoutTokenSource.Token);
+        string? inboundLine = await ReadOptionalLineAsync(reader, scenario, TimeSpan.FromSeconds(2));
 
         if (inboundLine is not null)
         {
@@ -321,11 +388,20 @@ static async Task AssertRejectedLineDoesNotStopServerAsync(
 
 static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string sessionId)
 {
-    using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+    DateTime deadlineUtc = DateTime.UtcNow.AddSeconds(2);
 
-    while (!timeoutTokenSource.IsCancellationRequested)
+    while (DateTime.UtcNow < deadlineUtc)
     {
-        var session = await sessions.GetByIdAsync(sessionId, timeoutTokenSource.Token);
+        var readTask = sessions.GetByIdAsync(sessionId);
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(1));
+        Task completedTask = await Task.WhenAny(readTask, timeoutTask);
+
+        if (completedTask != readTask)
+        {
+            throw new TimeoutException($"Timed out reading session {sessionId}.");
+        }
+
+        var session = await readTask;
 
         if (session?.State == ServerApp.Auth.Models.SessionState.Closed)
         {
@@ -333,10 +409,35 @@ static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string 
             return;
         }
 
-        await Task.Delay(TimeSpan.FromMilliseconds(25), timeoutTokenSource.Token);
+        await Task.Delay(TimeSpan.FromMilliseconds(25));
     }
 
     throw new InvalidOperationException($"Session {sessionId} remained active after socket disconnect.");
+}
+
+static async Task AssertCommandReceivedAsync(StreamReader reader, PacketType commandType, string machineId)
+{
+    string inboundLine = await ReadRequiredLineAsync(reader, $"{commandType} command");
+    Console.WriteLine($"CLIENT IN : {inboundLine}");
+
+    object packet = JsonHelper.DeserializePacket(inboundLine);
+    if (commandType == PacketType.LOCK
+        && packet is Packet<LockPayload> lockPacket
+        && lockPacket.Type == PacketType.LOCK
+        && string.Equals(lockPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    if (commandType == PacketType.UNLOCK
+        && packet is Packet<UnlockPayload> unlockPacket
+        && unlockPacket.Type == PacketType.UNLOCK
+        && string.Equals(unlockPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+    {
+        return;
+    }
+
+    throw new InvalidOperationException($"Client did not receive expected {commandType} command for {machineId}.");
 }
 
 static async Task WaitForCommandTraceAsync(List<NetworkTraceEntry> traces, PacketType commandType, string machineId)
@@ -420,10 +521,49 @@ static async Task WaitForStatusTraceAsync(List<NetworkTraceEntry> traces, string
     throw new InvalidOperationException($"STATUS {status} for {machineId} was not emitted.");
 }
 
-static void AssertMatchingRequestId(Packet<LoginPayload> request, Packet response)
+static async Task<string> ReadRequiredLineAsync(StreamReader reader, string scenario)
+{
+    string? line = await ReadOptionalLineAsync(reader, scenario, TimeSpan.FromSeconds(5));
+    if (string.IsNullOrWhiteSpace(line))
+    {
+        throw new InvalidOperationException($"Client did not receive a JSON-line packet for {scenario}.");
+    }
+
+    return line;
+}
+
+static async Task<string?> ReadOptionalLineAsync(StreamReader reader, string scenario, TimeSpan timeout)
+{
+    using var timeoutTokenSource = new CancellationTokenSource(timeout);
+
+    try
+    {
+        return await reader.ReadLineAsync(timeoutTokenSource.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        throw new TimeoutException($"Timed out waiting for {scenario}.");
+    }
+}
+
+static void TryShutdown(TcpClient tcpClient)
+{
+    try
+    {
+        tcpClient.Client.Shutdown(SocketShutdown.Both);
+    }
+    catch (SocketException)
+    {
+    }
+    catch (ObjectDisposedException)
+    {
+    }
+}
+
+static void AssertMatchingRequestId(Packet request, Packet response)
 {
     if (response.RequestId != request.RequestId)
     {
-        throw new InvalidOperationException("LOGIN response requestId did not match LOGIN requestId.");
+        throw new InvalidOperationException($"{request.Type} response requestId did not match requestId.");
     }
 }

@@ -1,4 +1,5 @@
 using ClientApp.Networking;
+using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.Networking;
 using Shared.Packets;
@@ -14,6 +15,8 @@ public sealed class ClientMainForm : Form
     private readonly string _sessionId;
     private readonly string _serverEndpoint;
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
+    private readonly ClientRuntimeCommandHandler _commandHandler;
+    private LockScreenForm? _lockScreen;
     private TextBox _usedTimeTextBox = null!;
     private TextBox _serverTextBox = null!;
 
@@ -68,12 +71,22 @@ public sealed class ClientMainForm : Form
         _sessionTimer.Start();
         UpdateUsedTime();
 
+        _commandHandler = new ClientRuntimeCommandHandler(_connection, _machineId);
+        _commandHandler.LockRequested += ApplyLockCommand;
+        _commandHandler.UnlockRequested += ApplyUnlockCommand;
+        _commandHandler.InvalidPacketIgnored += CommandHandler_InvalidPacketIgnored;
+
         _connection.Connected += Connection_Connected;
         _connection.Disconnected += Connection_Disconnected;
         _connection.ReconnectFailed += Connection_ReconnectFailed;
         UpdateServerConnectionStatus(_connection.IsConnected
             ? "connected"
             : "disconnected - reconnecting");
+
+        if (_connection.IsConnected)
+        {
+            _ = SendResumeStatusAsync();
+        }
     }
 
     private static string MachineCaption(string machineId)
@@ -205,6 +218,72 @@ public sealed class ClientMainForm : Form
         UpdateServerConnectionStatus("waiting for server");
     }
 
+    private void CommandHandler_InvalidPacketIgnored()
+    {
+        UpdateServerConnectionStatus("connected - ignored invalid packet");
+    }
+
+    private void ApplyLockCommand(LockPayload payload)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyLockCommand(payload));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_lockScreen is { IsDisposed: false })
+        {
+            _lockScreen.Activate();
+            UpdateServerConnectionStatus("connected - locked by server");
+            return;
+        }
+
+        _lockScreen = new LockScreenForm();
+        _lockScreen.FormClosed += LockScreen_FormClosed;
+        _lockScreen.Show(this);
+        UpdateServerConnectionStatus("connected - locked by server");
+    }
+
+    private void ApplyUnlockCommand(UnlockPayload payload)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyUnlockCommand(payload));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (_lockScreen is { IsDisposed: false })
+        {
+            _lockScreen.UnlockFromServer();
+        }
+        else
+        {
+            _lockScreen = null;
+        }
+
+        UpdateServerConnectionStatus("connected - unlocked by server");
+    }
+
+    private void LockScreen_FormClosed(object? sender, FormClosedEventArgs e)
+    {
+        if (sender is LockScreenForm lockScreen)
+        {
+            lockScreen.FormClosed -= LockScreen_FormClosed;
+        }
+
+        _lockScreen = null;
+    }
+
     private async Task SendResumeStatusAsync()
     {
         try
@@ -261,9 +340,22 @@ public sealed class ClientMainForm : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        _commandHandler.LockRequested -= ApplyLockCommand;
+        _commandHandler.UnlockRequested -= ApplyUnlockCommand;
+        _commandHandler.InvalidPacketIgnored -= CommandHandler_InvalidPacketIgnored;
+        _commandHandler.Dispose();
+
         _connection.Connected -= Connection_Connected;
         _connection.Disconnected -= Connection_Disconnected;
         _connection.ReconnectFailed -= Connection_ReconnectFailed;
+
+        if (_lockScreen is { IsDisposed: false })
+        {
+            _lockScreen.FormClosed -= LockScreen_FormClosed;
+            _lockScreen.UnlockFromServer();
+            _lockScreen = null;
+        }
+
         _sessionTimer.Stop();
         _sessionTimer.Dispose();
         base.OnFormClosed(e);

@@ -14,24 +14,10 @@ using ServerApp.Networking;
 using ServerApp.Auth.Services;
 namespace ServerApp.Networking;
 
-public sealed record MachineCommandSendResult(
-    bool Sent,
-    string Status,
-    string Message,
-    string? ErrorCode = null,
-    string? RequestId = null);
-
-public sealed record MachineCommandAckResult(
-    string MachineId,
-    CommandType Command,
-    string Status,
-    string Message,
-    bool IsError,
-    string? ErrorCode,
-    string RequestId);
-
 public sealed class TcpJsonLineServer : IDisposable
 {
+    private static readonly TimeSpan PendingCommandTimeout = TimeSpan.FromSeconds(30);
+
     private sealed record PendingMachineCommand(
         string ClientId,
         string MachineId,
@@ -84,8 +70,27 @@ public sealed class TcpJsonLineServer : IDisposable
     public event Action<StatusPayload>? StatusEmitted;
 
     public event Action<MachineCommandAckResult>? CommandResultEmitted;
-// hàm gửi lệnh xuống máy client  trả về bool
+
+    [Obsolete("Use SendMachineCommandWithResultAsync to preserve requestId, pending tracking and deterministic command results.")]
     public async Task<bool> SendMachineCommandAsync(
+        string machineId,
+        bool lockMachine,
+        string issuedBy,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        MachineCommandSendResult result = await SendMachineCommandWithResultAsync(
+            machineId,
+            lockMachine,
+            issuedBy,
+            reason,
+            cancellationToken).ConfigureAwait(false);
+
+        return result.Sent;
+    }
+// hàm gửi lệnh xuống máy client  trả về bool
+    [Obsolete("Legacy command path retained only for local reference; use SendMachineCommandWithResultAsync.")]
+    private async Task<bool> SendMachineCommandLegacyAsync(
         string machineId,// id máy 
         bool lockMachine,// lệnh khoá và mở khoá
         string issuedBy,// người ra lệnh
@@ -185,6 +190,15 @@ public sealed class TcpJsonLineServer : IDisposable
             return new MachineCommandSendResult(false, "Error", errorMessage, errorCode);
         }
 
+        AuthResult authorization = await _sessions.AuthorizeCommandTargetAsync(targetMachineId, cancellationToken).ConfigureAwait(false);
+        if (!authorization.IsSuccess)
+        {
+            const string errorCode = "UNAUTHORIZED_COMMAND";
+            string errorMessage = authorization.Message;
+            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineCommandSendResult(false, "Error", errorMessage, errorCode);
+        }
+
         string requestId = Guid.NewGuid().ToString("N");
         PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
         CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
@@ -223,6 +237,7 @@ public sealed class TcpJsonLineServer : IDisposable
         try
         {
             await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            _ = ExpirePendingCommandAsync(requestId, PendingCommandTimeout, _stopTokenSource.Token);
             return new MachineCommandSendResult(true, "Submitted", "Command sent to client.", RequestId: requestId);
         }
         catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
@@ -302,13 +317,25 @@ public sealed class TcpJsonLineServer : IDisposable
                 EmitStatus(connection.ClientId, machineId, result.MachineStatus.Trim());
             }
 
+            if (!string.IsNullOrWhiteSpace(result.CommandErrorCode))
+            {
+                EmitCommandAckError(
+                    connection.ClientId,
+                    result.MachineId ?? string.Empty,
+                    result.CommandErrorCommand ?? CommandType.LOCK,
+                    result.CommandErrorCode,
+                    result.CommandErrorMessage ?? result.CommandErrorCode,
+                    result.CommandErrorRequestId);
+                return;
+            }
+
             if (result.RequiresMachineBinding
                 && !IsMachineBoundToClient(connection.ClientId, result.MachineId))
             {
                 EmitCommandAckError(
                     connection.ClientId,
                     result.MachineId ?? string.Empty,
-                    CommandType.LOCK,
+                    ParseAckCommand(result.CommandAckPacket?.TypedPayload.AckFor),
                     "UNAUTHORIZED_COMMAND",
                     "ACK machine does not match authenticated connection.",
                     result.CommandAckPacket?.RequestId);
@@ -423,7 +450,7 @@ public sealed class TcpJsonLineServer : IDisposable
             status,
             string.IsNullOrWhiteSpace(payload.Message) ? "Command ACK received." : payload.Message!,
             IsError: !isSuccess,
-            ErrorCode: isSuccess ? null : $"COMMAND_ACK_{status.ToUpperInvariant()}",
+            ErrorCode: isSuccess ? null : GetAckErrorCode(status),
             requestId);
 
         TraceEmitted?.Invoke(new NetworkTraceEntry(
@@ -443,25 +470,64 @@ public sealed class TcpJsonLineServer : IDisposable
     {
         TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ACK_ERROR", clientId, $"{errorCode}: {message}"));
 
-        if (!string.IsNullOrWhiteSpace(requestId))
-        {
-            NotifyCommandResultEmitted(
-                clientId,
-                new MachineCommandAckResult(
-                    string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId,
-                    command,
-                    "Error",
-                    message,
-                    IsError: true,
-                    errorCode,
-                    requestId));
-        }
+        NotifyCommandResultEmitted(
+            clientId,
+            new MachineCommandAckResult(
+                string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId,
+                command,
+                "Error",
+                message,
+                IsError: true,
+                errorCode,
+                requestId ?? string.Empty));
     }
 
     private static CommandType ParseAckCommand(string? ackFor)
         => string.Equals(ackFor, PacketType.UNLOCK.ToString(), StringComparison.OrdinalIgnoreCase)
             ? CommandType.UNLOCK
             : CommandType.LOCK;
+
+    private static string GetAckErrorCode(string status)
+        => string.Equals(status, "Ignored", StringComparison.OrdinalIgnoreCase)
+            ? "COMMAND_ACK_IGNORED"
+            : "COMMAND_ACK_FAILED";
+
+    private async Task ExpirePendingCommandAsync(
+        string requestId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(timeout, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (_pendingCommands.TryRemove(requestId, out PendingMachineCommand? pendingCommand))
+        {
+            EmitPendingCommandError(
+                pendingCommand,
+                "COMMAND_ACK_TIMEOUT",
+                "Client did not ACK command before timeout.");
+        }
+    }
+
+    private void EmitPendingCommandError(
+        PendingMachineCommand pendingCommand,
+        string errorCode,
+        string message)
+    {
+        EmitCommandAckError(
+            pendingCommand.ClientId,
+            pendingCommand.MachineId,
+            pendingCommand.Command,
+            errorCode,
+            message,
+            pendingCommand.RequestId);
+    }
 
     private void NotifyCommandResultEmitted(string clientId, MachineCommandAckResult result)
     {
@@ -498,7 +564,13 @@ public sealed class TcpJsonLineServer : IDisposable
         {
             if (string.Equals(pendingCommand.Value.ClientId, clientId, StringComparison.OrdinalIgnoreCase))
             {
-                _pendingCommands.TryRemove(pendingCommand.Key, out _);
+                if (_pendingCommands.TryRemove(pendingCommand.Key, out PendingMachineCommand? removedCommand))
+                {
+                    EmitPendingCommandError(
+                        removedCommand,
+                        "COMMAND_CLIENT_DISCONNECTED",
+                        "Client disconnected before ACK.");
+                }
             }
         }
     }

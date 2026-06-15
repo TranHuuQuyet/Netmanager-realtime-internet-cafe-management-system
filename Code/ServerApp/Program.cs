@@ -29,14 +29,7 @@ static class Program
                 networkServer.StatusEmitted += status =>
                     mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
                 networkServer.CommandResultEmitted += result =>
-                    mainForm.ApplyCommandResultUpdate(new AdminCommandResult(
-                        result.MachineId,
-                        result.Command,
-                        result.Status,
-                        result.Message,
-                        result.IsError,
-                        result.ErrorCode,
-                        result.RequestId));
+                    mainForm.ApplyCommandResultUpdate(AdminCommandResultMapper.FromNetworkAck(result));
             }
 
             Application.Run(mainForm);

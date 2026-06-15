@@ -1,6 +1,7 @@
 using System.IO;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
+using Shared.Enums;
 using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
@@ -18,6 +19,10 @@ public sealed record PacketDispatchResult(
     string? MachineStatus = null,
     bool RequiresMachineBinding = false,
     Packet<AckPayload>? CommandAckPacket = null,
+    string? CommandErrorCode = null,
+    string? CommandErrorMessage = null,
+    CommandType? CommandErrorCommand = null,
+    string? CommandErrorRequestId = null,
     string? TraceDirection = null,
     string? TraceMessage = null);
 
@@ -201,25 +206,45 @@ public sealed class PacketDispatcher
         AckPayload? payload = ackPacket.TypedPayload;
         if (payload is null)
         {
-            return CreateCommandAckError("UNKNOWN", "INVALID_PACKET", "ACK payload is required.");
+            return CreateCommandAckError(
+                "UNKNOWN",
+                CommandType.LOCK,
+                "INVALID_PACKET",
+                "ACK payload is required.",
+                ackPacket.RequestId);
         }
 
         string machineId = payload.MachineId?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(machineId))
         {
-            return CreateCommandAckError(string.Empty, "INVALID_MACHINE_ID", "ACK machineId is required.");
+            return CreateCommandAckError(
+                string.Empty,
+                ParseCommandOrDefault(payload.AckFor),
+                "INVALID_MACHINE_ID",
+                "ACK machineId is required.",
+                ackPacket.RequestId);
         }
 
         if (string.IsNullOrWhiteSpace(ackPacket.RequestId))
         {
-            return CreateCommandAckError(machineId, "ACK_REQUEST_ID_REQUIRED", "ACK requestId is required.");
+            return CreateCommandAckError(
+                machineId,
+                ParseCommandOrDefault(payload.AckFor),
+                "ACK_REQUEST_ID_REQUIRED",
+                "ACK requestId is required.",
+                ackPacket.RequestId);
         }
 
         string ackFor = payload.AckFor?.Trim() ?? string.Empty;
-        if (!Enum.TryParse(ackFor, ignoreCase: true, out Shared.Enums.PacketType ackForType)
-            || ackForType is not (Shared.Enums.PacketType.LOCK or Shared.Enums.PacketType.UNLOCK))
+        if (!Enum.TryParse(ackFor, ignoreCase: true, out PacketType ackForType)
+            || ackForType is not (PacketType.LOCK or PacketType.UNLOCK))
         {
-            return CreateCommandAckError(machineId, "ACK_TYPE_MISMATCH", "ACK must reference LOCK or UNLOCK.");
+            return CreateCommandAckError(
+                machineId,
+                ParseCommandOrDefault(payload.AckFor),
+                "ACK_TYPE_MISMATCH",
+                "ACK must reference LOCK or UNLOCK.",
+                ackPacket.RequestId);
         }
 
         string status = payload.Status?.Trim() ?? string.Empty;
@@ -227,7 +252,12 @@ public sealed class PacketDispatcher
             && !string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(status, "Ignored", StringComparison.OrdinalIgnoreCase))
         {
-            return CreateCommandAckError(machineId, "INVALID_PACKET", "ACK status must be Success, Failed or Ignored.");
+            return CreateCommandAckError(
+                machineId,
+                ToCommandType(ackForType),
+                "INVALID_PACKET",
+                "ACK status must be Success, Failed or Ignored.",
+                ackPacket.RequestId);
         }
 
         string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(ackPacket));
@@ -240,12 +270,31 @@ public sealed class PacketDispatcher
             TraceMessage: message);
     }
 
-    private static PacketDispatchResult CreateCommandAckError(string machineId, string errorCode, string message)
+    private static PacketDispatchResult CreateCommandAckError(
+        string machineId,
+        CommandType command,
+        string errorCode,
+        string message,
+        string? requestId)
         => new(
             Response: null,
             MachineId: machineId,
+            CommandErrorCode: errorCode,
+            CommandErrorMessage: message,
+            CommandErrorCommand: command,
+            CommandErrorRequestId: requestId ?? string.Empty,
             TraceDirection: "COMMAND_ACK_ERROR",
             TraceMessage: $"{errorCode}: {message}");
+
+    private static CommandType ParseCommandOrDefault(string? ackFor)
+        => Enum.TryParse(ackFor?.Trim(), ignoreCase: true, out PacketType packetType)
+            ? ToCommandType(packetType)
+            : CommandType.LOCK;
+
+    private static CommandType ToCommandType(PacketType packetType)
+        => packetType == PacketType.UNLOCK
+            ? CommandType.UNLOCK
+            : CommandType.LOCK;
 
     private static string SerializeResponse(Packet response)
     {

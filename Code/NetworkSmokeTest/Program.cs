@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 using Shared.Enums;
 using Shared.DTOs.CommandPayloads;
@@ -14,6 +15,8 @@ using ServerApp.Database.Contracts;
 using ServerApp.Networking;
 
 Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");
+WindowsFormsSynchronizationContext.AutoInstall = false;
+SynchronizationContext.SetSynchronizationContext(null);
 
 string databasePath = Path.Combine(Path.GetTempPath(), $"netmanager-network-smoke-{Guid.NewGuid():N}.db");
 
@@ -77,7 +80,7 @@ finally
 
     if (File.Exists(databasePath))
     {
-        File.Delete(databasePath);
+        DeleteTempDatabase(databasePath);
     }
 }
 
@@ -111,7 +114,7 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
         SynchronizationContext.SetSynchronizationContext(null);
         mainForm.ApplyMachineStatusUpdate("PC-01", "Online");
 
-        await InvokeSendMachineCommandAsync(mainForm, CommandType.LOCK, "Lock", "PC-01").ConfigureAwait(false);
+        ClickMachineActionButton(mainForm, "btnLockMachine");
         await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01").ConfigureAwait(false);
         Packet lockCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01").ConfigureAwait(false);
         await SendCommandAckAsync(
@@ -169,6 +172,13 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             "Maybe",
             "Invalid ACK status.").ConfigureAwait(false);
         await WaitForCommandAckErrorTraceAsync(traces, "INVALID_PACKET").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            lockCommand.RequestId!,
+            CommandType.LOCK,
+            "PC-01",
+            isError: true,
+            expectedErrorCode: "INVALID_PACKET").ConfigureAwait(false);
 
         await SendCommandAckAsync(stream, lockCommand, "PC-01", "Success", "Lock applied.").ConfigureAwait(false);
         await WaitForCommandAckTraceAsync(traces, lockCommand, "PC-01", "Success").ConfigureAwait(false);
@@ -181,9 +191,24 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             expectedErrorCode: null).ConfigureAwait(false);
         Console.WriteLine("PASS: admin UI Lock action emits real LOCK JSON command packet and receives typed ACK");
 
-        await InvokeSendMachineCommandAsync(mainForm, CommandType.UNLOCK, "Unlock", "PC-01").ConfigureAwait(false);
+        ClickMachineActionButton(mainForm, "btnUnlockMachine");
         await WaitForCommandTraceAsync(traces, PacketType.UNLOCK, "PC-01").ConfigureAwait(false);
         Packet unlockCommand = await AssertCommandReceivedAsync(reader, PacketType.UNLOCK, "PC-01").ConfigureAwait(false);
+        await SendCommandAckAsync(
+            stream,
+            unlockCommand,
+            "PC-02",
+            "Success",
+            "Wrong machine unlock ACK.").ConfigureAwait(false);
+        await WaitForCommandAckErrorTraceAsync(traces, "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            unlockCommand.RequestId!,
+            CommandType.UNLOCK,
+            "PC-02",
+            isError: true,
+            expectedErrorCode: "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
+
         await SendCommandAckAsync(stream, unlockCommand, "PC-01", "Success", "Unlock applied.").ConfigureAwait(false);
         await WaitForCommandAckTraceAsync(traces, unlockCommand, "PC-01", "Success").ConfigureAwait(false);
         await WaitForCommandResultAsync(
@@ -197,8 +222,25 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
 
         await AssertCommandErrorAsync(server, traces).ConfigureAwait(false);
 
-        await authRuntime.SessionService.CloseSessionAsync(sessionId);
+        lock (traces)
+        {
+            traces.Clear();
+        }
+
+        ClickMachineActionButton(mainForm, "btnLockMachine");
+        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01").ConfigureAwait(false);
+        Packet disconnectedCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01").ConfigureAwait(false);
         TryShutdown(tcpClient);
+        await WaitForCommandResultAsync(
+            commandResults,
+            disconnectedCommand.RequestId!,
+            CommandType.LOCK,
+            "PC-01",
+            isError: true,
+            expectedErrorCode: "COMMAND_CLIENT_DISCONNECTED").ConfigureAwait(false);
+        Console.WriteLine("PASS: pending command emits typed COMMAND_CLIENT_DISCONNECTED on client disconnect");
+
+        await authRuntime.SessionService.CloseSessionAsync(sessionId);
     }
 
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, sessionId);
@@ -262,23 +304,41 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
     await WaitForClosedSessionAsync(sessions, sessionId);
 }
 
-static async Task InvokeSendMachineCommandAsync(
-    ServerApp.MainForm mainForm,
-    CommandType command,
-    string action,
-    string machineName)
+static void ClickMachineActionButton(ServerApp.MainForm mainForm, string buttonName)
 {
-    MethodInfo handler = typeof(ServerApp.MainForm)
-        .GetMethod("SendMachineCommandAsync", BindingFlags.Instance | BindingFlags.NonPublic)
-        ?? throw new InvalidOperationException("Could not find MainForm.SendMachineCommandAsync.");
+    SynchronizationContext.SetSynchronizationContext(null);
 
-    object? result = handler.Invoke(mainForm, [command, action, machineName]);
-    if (result is not Task task)
+    FieldInfo field = typeof(ServerApp.MainForm)
+        .GetField(buttonName, BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException($"Could not find MainForm.{buttonName}.");
+
+    if (field.GetValue(mainForm) is not Button button)
     {
-        throw new InvalidOperationException("MainForm.SendMachineCommandAsync did not return a Task.");
+        throw new InvalidOperationException($"MainForm.{buttonName} is not a Button.");
     }
 
-    await task.ConfigureAwait(false);
+    MethodInfo onClick = typeof(Button)
+        .GetMethod("OnClick", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("Could not find Button.OnClick.");
+
+    onClick.Invoke(button, [EventArgs.Empty]);
+}
+
+static void DeleteTempDatabase(string databasePath)
+{
+    for (int attempt = 0; attempt < 5; attempt++)
+    {
+        try
+        {
+            File.Delete(databasePath);
+            return;
+        }
+        catch (IOException) when (attempt < 4)
+        {
+            Thread.Sleep(100);
+            SqliteConnection.ClearAllPools();
+        }
+    }
 }
 
 static async Task AssertLoginSuccessAsync(int port, ISessionRepository sessions)

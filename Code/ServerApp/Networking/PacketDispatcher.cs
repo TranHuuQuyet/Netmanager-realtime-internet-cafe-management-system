@@ -17,6 +17,7 @@ public sealed record PacketDispatchResult(
     string? MachineId = null,
     string? MachineStatus = null,
     bool RequiresMachineBinding = false,
+    Packet<AckPayload>? CommandAckPacket = null,
     string? TraceDirection = null,
     string? TraceMessage = null);
 
@@ -209,11 +210,16 @@ public sealed class PacketDispatcher
             return CreateCommandAckError(string.Empty, "INVALID_MACHINE_ID", "ACK machineId is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(ackPacket.RequestId))
+        {
+            return CreateCommandAckError(machineId, "ACK_REQUEST_ID_REQUIRED", "ACK requestId is required.");
+        }
+
         string ackFor = payload.AckFor?.Trim() ?? string.Empty;
         if (!Enum.TryParse(ackFor, ignoreCase: true, out Shared.Enums.PacketType ackForType)
             || ackForType is not (Shared.Enums.PacketType.LOCK or Shared.Enums.PacketType.UNLOCK))
         {
-            return CreateCommandAckError(machineId, "UNSUPPORTED_PACKET", "ACK must reference LOCK or UNLOCK.");
+            return CreateCommandAckError(machineId, "ACK_TYPE_MISMATCH", "ACK must reference LOCK or UNLOCK.");
         }
 
         string status = payload.Status?.Trim() ?? string.Empty;
@@ -229,6 +235,7 @@ public sealed class PacketDispatcher
             Response: null,
             MachineId: machineId,
             RequiresMachineBinding: true,
+            CommandAckPacket: ackPacket,
             TraceDirection: "COMMAND_ACK",
             TraceMessage: message);
     }

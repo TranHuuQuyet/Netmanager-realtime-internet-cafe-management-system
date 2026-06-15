@@ -21,6 +21,7 @@ try
 {
     AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(databasePath);
     List<NetworkTraceEntry> traces = [];
+    List<MachineCommandAckResult> commandResults = [];
 
     using var server = new TcpJsonLineServer(
         IPAddress.Loopback,
@@ -39,13 +40,23 @@ try
             Console.WriteLine($"TRACE {trace.Direction} {trace.ClientId}: {trace.Message}");
         }
     };
+    server.CommandResultEmitted += result =>
+    {
+        lock (commandResults)
+        {
+            commandResults.Add(result);
+        }
+
+        Console.WriteLine(
+            $"COMMAND RESULT {result.Command} {result.MachineId}: {result.Status} {result.ErrorCode ?? string.Empty} {result.RequestId}");
+    };
 
     server.Start();
     int port = server.LocalEndpoint.Port;
     Console.WriteLine($"ServerApp listener active on 127.0.0.1:{port}");
 
     await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
-    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces);
+    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
     await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
@@ -74,7 +85,8 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
     int port,
     AuthRuntime authRuntime,
     TcpJsonLineServer server,
-    List<NetworkTraceEntry> traces)
+    List<NetworkTraceEntry> traces,
+    List<MachineCommandAckResult> commandResults)
 {
     string sessionId;
 
@@ -102,8 +114,71 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
         await InvokeSendMachineCommandAsync(mainForm, CommandType.LOCK, "Lock", "PC-01").ConfigureAwait(false);
         await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01").ConfigureAwait(false);
         Packet lockCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01").ConfigureAwait(false);
+        await SendCommandAckAsync(
+            stream,
+            lockCommand,
+            "PC-02",
+            "Success",
+            "Wrong machine ACK.").ConfigureAwait(false);
+        await WaitForCommandAckErrorTraceAsync(traces, "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            lockCommand.RequestId!,
+            CommandType.LOCK,
+            "PC-02",
+            isError: true,
+            expectedErrorCode: "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
+
+        string unknownRequestId = $"ack-missing-{Guid.NewGuid():N}";
+        await SendCommandAckAsync(
+            stream,
+            lockCommand,
+            "PC-01",
+            "Success",
+            "Unknown request ACK.",
+            requestIdOverride: unknownRequestId).ConfigureAwait(false);
+        await WaitForCommandAckErrorTraceAsync(traces, "ACK_UNKNOWN_REQUEST").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            unknownRequestId,
+            CommandType.LOCK,
+            "PC-01",
+            isError: true,
+            expectedErrorCode: "ACK_UNKNOWN_REQUEST").ConfigureAwait(false);
+
+        await SendCommandAckAsync(
+            stream,
+            lockCommand,
+            "PC-01",
+            "Success",
+            "Wrong type ACK.",
+            ackForOverride: PacketType.UNLOCK.ToString()).ConfigureAwait(false);
+        await WaitForCommandAckErrorTraceAsync(traces, "ACK_TYPE_MISMATCH").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            lockCommand.RequestId!,
+            CommandType.LOCK,
+            "PC-01",
+            isError: true,
+            expectedErrorCode: "ACK_TYPE_MISMATCH").ConfigureAwait(false);
+
+        await SendCommandAckAsync(
+            stream,
+            lockCommand,
+            "PC-01",
+            "Maybe",
+            "Invalid ACK status.").ConfigureAwait(false);
+        await WaitForCommandAckErrorTraceAsync(traces, "INVALID_PACKET").ConfigureAwait(false);
+
         await SendCommandAckAsync(stream, lockCommand, "PC-01", "Success", "Lock applied.").ConfigureAwait(false);
         await WaitForCommandAckTraceAsync(traces, lockCommand, "PC-01", "Success").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            lockCommand.RequestId!,
+            CommandType.LOCK,
+            "PC-01",
+            isError: false,
+            expectedErrorCode: null).ConfigureAwait(false);
         Console.WriteLine("PASS: admin UI Lock action emits real LOCK JSON command packet and receives typed ACK");
 
         await InvokeSendMachineCommandAsync(mainForm, CommandType.UNLOCK, "Unlock", "PC-01").ConfigureAwait(false);
@@ -111,6 +186,13 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
         Packet unlockCommand = await AssertCommandReceivedAsync(reader, PacketType.UNLOCK, "PC-01").ConfigureAwait(false);
         await SendCommandAckAsync(stream, unlockCommand, "PC-01", "Success", "Unlock applied.").ConfigureAwait(false);
         await WaitForCommandAckTraceAsync(traces, unlockCommand, "PC-01", "Success").ConfigureAwait(false);
+        await WaitForCommandResultAsync(
+            commandResults,
+            unlockCommand.RequestId!,
+            CommandType.UNLOCK,
+            "PC-01",
+            isError: false,
+            expectedErrorCode: null).ConfigureAwait(false);
         Console.WriteLine("PASS: admin UI Unlock action emits real UNLOCK JSON command packet and receives typed ACK");
 
         await AssertCommandErrorAsync(server, traces).ConfigureAwait(false);
@@ -452,7 +534,9 @@ static Task SendCommandAckAsync(
     Packet commandPacket,
     string machineId,
     string status,
-    string message)
+    string message,
+    string? requestIdOverride = null,
+    string? ackForOverride = null)
 {
     var ackPacket = PacketFactory.CreateAck(
         source: machineId,
@@ -460,11 +544,11 @@ static Task SendCommandAckAsync(
         payload: new AckPayload
         {
             MachineId = machineId,
-            AckFor = commandPacket.Type.ToString(),
+            AckFor = ackForOverride ?? commandPacket.Type.ToString(),
             Status = status,
             Message = message
         },
-        requestId: commandPacket.RequestId);
+        requestId: requestIdOverride ?? commandPacket.RequestId);
 
     string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(ackPacket));
     Console.WriteLine($"CLIENT OUT: {outboundLine}");
@@ -486,21 +570,72 @@ static Task SendCommandAckAsync(
     return Task.CompletedTask;
 }
 
+static async Task WaitForCommandResultAsync(
+    List<MachineCommandAckResult> commandResults,
+    string requestId,
+    CommandType command,
+    string machineId,
+    bool isError,
+    string? expectedErrorCode)
+{
+    DateTime deadlineUtc = DateTime.UtcNow.AddSeconds(2);
+
+    while (DateTime.UtcNow < deadlineUtc)
+    {
+        MachineCommandAckResult[] snapshot;
+        lock (commandResults)
+        {
+            snapshot = [.. commandResults];
+        }
+
+        foreach (MachineCommandAckResult result in snapshot)
+        {
+            if (result.RequestId == requestId
+                && result.Command == command
+                && string.Equals(result.MachineId, machineId, StringComparison.OrdinalIgnoreCase)
+                && result.IsError == isError
+                && string.Equals(result.ErrorCode, expectedErrorCode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25)).ConfigureAwait(false);
+    }
+
+    throw new InvalidOperationException(
+        $"Command result {command}/{machineId}/{requestId}/{expectedErrorCode ?? "OK"} was not emitted.");
+}
+
 static async Task AssertCommandErrorAsync(TcpJsonLineServer server, List<NetworkTraceEntry> traces)
 {
+    MachineCommandSendResult invalidMachineResult = await server.SendMachineCommandWithResultAsync(
+        " ",
+        lockMachine: true,
+        issuedBy: "NetworkSmokeTest",
+        reason: "invalid machine command test");
+
+    if (invalidMachineResult.Sent || invalidMachineResult.ErrorCode != "INVALID_MACHINE_ID")
+    {
+        throw new InvalidOperationException("Blank machine command did not return deterministic INVALID_MACHINE_ID.");
+    }
+
+    await WaitForCommandErrorTraceAsync(traces, string.Empty, "INVALID_MACHINE_ID");
+    Console.WriteLine("PASS: invalid machine command returns deterministic INVALID_MACHINE_ID error");
+
     MachineCommandSendResult result = await server.SendMachineCommandWithResultAsync(
         "PC-99",
         lockMachine: true,
         issuedBy: "NetworkSmokeTest",
         reason: "offline command test");
 
-    if (result.Sent || result.ErrorCode != "MACHINE_NOT_CONNECTED")
+    if (result.Sent || result.ErrorCode != "MACHINE_OFFLINE")
     {
-        throw new InvalidOperationException("Offline machine command did not return deterministic MACHINE_NOT_CONNECTED.");
+        throw new InvalidOperationException("Offline machine command did not return deterministic MACHINE_OFFLINE.");
     }
 
-    await WaitForCommandErrorTraceAsync(traces, "PC-99", "MACHINE_NOT_CONNECTED");
-    Console.WriteLine("PASS: offline command returns deterministic MACHINE_NOT_CONNECTED error");
+    await WaitForCommandErrorTraceAsync(traces, "PC-99", "MACHINE_OFFLINE");
+    Console.WriteLine("PASS: offline command returns deterministic MACHINE_OFFLINE error");
 }
 
 static async Task WaitForCommandTraceAsync(List<NetworkTraceEntry> traces, PacketType commandType, string machineId)
@@ -590,6 +725,33 @@ static async Task WaitForCommandAckTraceAsync(
     }
 
     throw new InvalidOperationException($"{commandPacket.Type} ACK trace for {machineId} was not emitted.");
+}
+
+static async Task WaitForCommandAckErrorTraceAsync(List<NetworkTraceEntry> traces, string errorCode)
+{
+    DateTime deadlineUtc = DateTime.UtcNow.AddSeconds(2);
+
+    while (DateTime.UtcNow < deadlineUtc)
+    {
+        NetworkTraceEntry[] snapshot;
+        lock (traces)
+        {
+            snapshot = [.. traces];
+        }
+
+        foreach (NetworkTraceEntry trace in snapshot)
+        {
+            if (string.Equals(trace.Direction, "COMMAND_ACK_ERROR", StringComparison.Ordinal)
+                && trace.Message.Contains(errorCode, StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25)).ConfigureAwait(false);
+    }
+
+    throw new InvalidOperationException($"{errorCode} command ACK error trace was not emitted.");
 }
 
 static async Task WaitForCommandErrorTraceAsync(List<NetworkTraceEntry> traces, string machineId, string errorCode)

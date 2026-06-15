@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
+using Shared.Enums;
 using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
@@ -20,14 +21,32 @@ public sealed record MachineCommandSendResult(
     string? ErrorCode = null,
     string? RequestId = null);
 
+public sealed record MachineCommandAckResult(
+    string MachineId,
+    CommandType Command,
+    string Status,
+    string Message,
+    bool IsError,
+    string? ErrorCode,
+    string RequestId);
+
 public sealed class TcpJsonLineServer : IDisposable
 {
+    private sealed record PendingMachineCommand(
+        string ClientId,
+        string MachineId,
+        PacketType PacketType,
+        CommandType Command,
+        string RequestId,
+        DateTime CreatedUtc);
+
     private readonly TcpListener _listener;
     private readonly PacketDispatcher _dispatcher;
     private readonly ISessionService _sessions;
     private readonly ConcurrentDictionary<string, ClientConnection> _connections = new();
     private readonly ConcurrentDictionary<string, string> _sessionBindings = new();
     private readonly ConcurrentDictionary<string, string> _machineBindings = new();
+    private readonly ConcurrentDictionary<string, PendingMachineCommand> _pendingCommands = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _stopTokenSource = new();
     private Task? _acceptLoopTask;
     private int _nextClientNumber;
@@ -63,6 +82,8 @@ public sealed class TcpJsonLineServer : IDisposable
     public event Action<NetworkTraceEntry>? TraceEmitted;
 
     public event Action<StatusPayload>? StatusEmitted;
+
+    public event Action<MachineCommandAckResult>? CommandResultEmitted;
 // hàm gửi lệnh xuống máy client  trả về bool
     public async Task<bool> SendMachineCommandAsync(
         string machineId,// id máy 
@@ -99,6 +120,8 @@ public sealed class TcpJsonLineServer : IDisposable
         }
 
         string requestId = Guid.NewGuid().ToString("N");
+        PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
+        CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
         Packet packet = lockMachine
             ? PacketFactory.CreateLock(
                 source: NetworkProtocol.ServerSource,
@@ -156,13 +179,15 @@ public sealed class TcpJsonLineServer : IDisposable
         if (string.IsNullOrWhiteSpace(clientId)
             || !_connections.TryGetValue(clientId, out ClientConnection? connection))
         {
-            const string errorCode = "MACHINE_NOT_CONNECTED";
-            const string errorMessage = "Machine is not connected.";
+            const string errorCode = "MACHINE_OFFLINE";
+            const string errorMessage = "Machine is offline or not connected.";
             TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
             return new MachineCommandSendResult(false, "Error", errorMessage, errorCode);
         }
 
         string requestId = Guid.NewGuid().ToString("N");
+        PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
+        CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
         Packet packet = lockMachine
             ? PacketFactory.CreateLock(
                 source: NetworkProtocol.ServerSource,
@@ -187,6 +212,13 @@ public sealed class TcpJsonLineServer : IDisposable
 
         string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
         TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_COMMAND", clientId, message));
+        _pendingCommands[requestId] = new PendingMachineCommand(
+            clientId,
+            targetMachineId,
+            packetType,
+            commandType,
+            requestId,
+            DateTime.UtcNow);
 
         try
         {
@@ -196,6 +228,7 @@ public sealed class TcpJsonLineServer : IDisposable
         catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
         {
             const string errorCode = "COMMAND_SEND_FAILED";
+            _pendingCommands.TryRemove(requestId, out _);
             TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
             return new MachineCommandSendResult(false, "Error", ex.Message, errorCode, requestId);
         }
@@ -272,10 +305,19 @@ public sealed class TcpJsonLineServer : IDisposable
             if (result.RequiresMachineBinding
                 && !IsMachineBoundToClient(connection.ClientId, result.MachineId))
             {
-                TraceEmitted?.Invoke(new NetworkTraceEntry(
-                    "COMMAND_ACK_ERROR",
+                EmitCommandAckError(
                     connection.ClientId,
-                    "UNAUTHORIZED_COMMAND: ACK machine does not match authenticated connection."));
+                    result.MachineId ?? string.Empty,
+                    CommandType.LOCK,
+                    "UNAUTHORIZED_COMMAND",
+                    "ACK machine does not match authenticated connection.",
+                    result.CommandAckPacket?.RequestId);
+                return;
+            }
+
+            if (result.CommandAckPacket is not null)
+            {
+                HandleCommandAck(connection.ClientId, result.CommandAckPacket);
                 return;
             }
 
@@ -317,6 +359,122 @@ public sealed class TcpJsonLineServer : IDisposable
             && string.Equals(boundMachineId, machineId.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
+    private void HandleCommandAck(string clientId, Packet<AckPayload> ackPacket)
+    {
+        AckPayload payload = ackPacket.TypedPayload;
+        string requestId = ackPacket.RequestId ?? string.Empty;
+        string machineId = payload.MachineId.Trim();
+
+        if (!_pendingCommands.TryGetValue(requestId, out PendingMachineCommand? pendingCommand))
+        {
+            EmitCommandAckError(
+                clientId,
+                machineId,
+                ParseAckCommand(payload.AckFor),
+                "ACK_UNKNOWN_REQUEST",
+                "ACK requestId does not match a pending command.",
+                requestId);
+            return;
+        }
+
+        if (!string.Equals(pendingCommand.ClientId, clientId, StringComparison.OrdinalIgnoreCase))
+        {
+            EmitCommandAckError(
+                clientId,
+                machineId,
+                pendingCommand.Command,
+                "UNAUTHORIZED_COMMAND",
+                "ACK came from a different authenticated connection.",
+                requestId);
+            return;
+        }
+
+        if (!string.Equals(pendingCommand.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+        {
+            EmitCommandAckError(
+                clientId,
+                machineId,
+                pendingCommand.Command,
+                "ACK_MACHINE_MISMATCH",
+                "ACK machineId does not match the pending command.",
+                requestId);
+            return;
+        }
+
+        if (!string.Equals(pendingCommand.PacketType.ToString(), payload.AckFor, StringComparison.OrdinalIgnoreCase))
+        {
+            EmitCommandAckError(
+                clientId,
+                machineId,
+                pendingCommand.Command,
+                "ACK_TYPE_MISMATCH",
+                "ACK type does not match the pending command.",
+                requestId);
+            return;
+        }
+
+        _pendingCommands.TryRemove(requestId, out _);
+
+        string status = payload.Status.Trim();
+        bool isSuccess = string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase);
+        var result = new MachineCommandAckResult(
+            machineId,
+            pendingCommand.Command,
+            status,
+            string.IsNullOrWhiteSpace(payload.Message) ? "Command ACK received." : payload.Message!,
+            IsError: !isSuccess,
+            ErrorCode: isSuccess ? null : $"COMMAND_ACK_{status.ToUpperInvariant()}",
+            requestId);
+
+        TraceEmitted?.Invoke(new NetworkTraceEntry(
+            isSuccess ? "COMMAND_ACK" : "COMMAND_ACK_ERROR",
+            clientId,
+            NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(ackPacket))));
+        NotifyCommandResultEmitted(clientId, result);
+    }
+
+    private void EmitCommandAckError(
+        string clientId,
+        string machineId,
+        CommandType command,
+        string errorCode,
+        string message,
+        string? requestId)
+    {
+        TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ACK_ERROR", clientId, $"{errorCode}: {message}"));
+
+        if (!string.IsNullOrWhiteSpace(requestId))
+        {
+            NotifyCommandResultEmitted(
+                clientId,
+                new MachineCommandAckResult(
+                    string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId,
+                    command,
+                    "Error",
+                    message,
+                    IsError: true,
+                    errorCode,
+                    requestId));
+        }
+    }
+
+    private static CommandType ParseAckCommand(string? ackFor)
+        => string.Equals(ackFor, PacketType.UNLOCK.ToString(), StringComparison.OrdinalIgnoreCase)
+            ? CommandType.UNLOCK
+            : CommandType.LOCK;
+
+    private void NotifyCommandResultEmitted(string clientId, MachineCommandAckResult result)
+    {
+        try
+        {
+            CommandResultEmitted?.Invoke(result);
+        }
+        catch (Exception ex)
+        {
+            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_RESULT_HANDLER_ERROR", clientId, ex.Message));
+        }
+    }
+
     private void ClientDisconnected(ClientConnection connection)
     {
         _connections.TryRemove(connection.ClientId, out _);
@@ -334,6 +492,14 @@ public sealed class TcpJsonLineServer : IDisposable
         if (_machineBindings.TryRemove(clientId, out var machineId))
         {
             EmitStatus(clientId, machineId, "Offline");
+        }
+
+        foreach (KeyValuePair<string, PendingMachineCommand> pendingCommand in _pendingCommands.ToArray())
+        {
+            if (string.Equals(pendingCommand.Value.ClientId, clientId, StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingCommands.TryRemove(pendingCommand.Key, out _);
+            }
         }
     }
 

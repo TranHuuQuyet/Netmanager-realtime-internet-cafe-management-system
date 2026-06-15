@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using ServerApp.Auth.Contracts;
 using ServerApp.Auth.Services;
 using ServerApp.Networking;
+using ServerApp.Presentation;
 
 namespace ServerApp;
 
@@ -27,6 +28,15 @@ static class Program
             {
                 networkServer.StatusEmitted += status =>
                     mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
+                networkServer.CommandResultEmitted += result =>
+                    mainForm.ApplyCommandResultUpdate(new AdminCommandResult(
+                        result.MachineId,
+                        result.Command,
+                        result.Status,
+                        result.Message,
+                        result.IsError,
+                        result.ErrorCode,
+                        result.RequestId));
             }
 
             Application.Run(mainForm);

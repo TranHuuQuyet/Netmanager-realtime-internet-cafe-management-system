@@ -29,7 +29,7 @@ Demonstrate stable internet-cafe control behavior with two physical LAN clients 
 | Start clients | Two physical LAN clients connect distinctly; two local instances still pass regression/fallback | `G1`, `G4`, `G5` | `Blocked` |
 | Valid login | `client01/PC-01` and `client02/PC-02` succeed | `G2`, `G4` | `Partial(M6 - 2026-06-08; one-client G2 pass, two-client G4 still blocked)` |
 | Wrong-machine check | Wrong `machineId` fails visibly | `G2` | `Pass(M6 - 2026-06-08)` |
-| Status view | Server displays real online/offline state | `G2` | `Partial(M6 - 2026-06-08; server-generated status visible, client-sent STATUS missing in B-008)` |
+| Status view | Server displays real online/offline state | `G2` | `Pass(local audit - 2026-06-15; B-008 closed for client-sent STATUS; two-client G4 still blocked)` |
 | Lock selected client | Selected client enters lock state only | `G3`, `G4` | `Blocked` |
 | ACK result | Admin sees command result/error | `G3` | `Blocked` |
 | Unlock selected client | Client exits lock state | `G3` | `Blocked` |

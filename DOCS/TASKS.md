@@ -50,8 +50,9 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `R1-U01` customer-flow shell correction - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; a temporary .NET 8 smoke verifies username/password-only login, read-only configured machine identity, hidden endpoint, no local lock action, `--machine-id PC-02` launch configuration, rejected invalid launch configuration, honest pending-login status and passive lock surface with `UnlockFromServer()` release hook | `Verified Pass` for corrected client shell ownership/UX only; TCP UI login and server-routed `LOCK`/`UNLOCK`/`ACK` remain pending runtime gates |
 | `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Verified Pass` for presentation/client startup only; login/status/control routing and ACK remain pending their runtime gates |
 | `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Verified Pass`; canonical seed/admin rule da khop runtime DB va `G0-05` da dong |
+| `B-008/G2-05` client-sent STATUS closure - `2026-06-15`, `testing_branch` commit `222c68c` | `ClientMainForm.SendResumeStatusAsync()` sends authenticated `STATUS`; `PacketDispatcher.DispatchStatusAsync()` accepts it and returns typed `ACK`; `TcpJsonLineServer.StatusEmitted` remains wired to `MainForm.ApplyMachineStatusUpdate`; `dotnet build Code\NetManager.sln --no-restore -v:minimal`, `NetworkSmokeTest`, `Auth_Test` and `ContractSmoke` pass | `Verified Pass` for `B-008/G2-05` local audit; closes the status blocker and unblocks `R3-B01/G3-00` only, while full `G3` control demo remains tracked separately |
 
-`G0` contract/auth/build baseline and `G1` network foundation are verified pass in the recovery log. ClientApp UI login/status/control remain tracked under `R2/G2` and later gates.
+`G0` contract/auth/build baseline, `G1` network foundation and the `B-008/G2-05` client-sent status gap are verified pass in the recovery log. ClientApp control remains tracked under `R3/G3` and later gates.
 
 ## R1 - Foundation Repair (`2026-05-25` to `2026-05-31`)
 
@@ -166,7 +167,7 @@ Owner: `M2 + M4 + M6`
 Task: Close carry-forward `G2-05/B-008` client-sent `STATUS` gap or record an approved equivalent status policy before claiming control/chat/billing readiness
 Dependency: `G2` partial audit
 Required evidence: Updated trace/test result and bug disposition
-Member done: [ ]
+Member done: [x]
 
 `R3-N01`
 Owner: `M2 + M3`

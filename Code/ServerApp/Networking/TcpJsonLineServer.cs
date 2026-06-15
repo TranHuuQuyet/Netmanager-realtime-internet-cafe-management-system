@@ -13,6 +13,13 @@ using ServerApp.Networking;
 using ServerApp.Auth.Services;
 namespace ServerApp.Networking;
 
+public sealed record MachineCommandSendResult(
+    bool Sent,
+    string Status,
+    string Message,
+    string? ErrorCode = null,
+    string? RequestId = null);
+
 public sealed class TcpJsonLineServer : IDisposable
 {
     private readonly TcpListener _listener;
@@ -120,6 +127,80 @@ public sealed class TcpJsonLineServer : IDisposable
         return true;
     }
 
+    public async Task<MachineCommandSendResult> SendMachineCommandWithResultAsync(
+        string machineId,
+        bool lockMachine,
+        string issuedBy,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        string targetMachineId = machineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(targetMachineId))
+        {
+            const string errorCode = "INVALID_MACHINE_ID";
+            const string errorMessage = "Machine ID is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineCommandSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string clientId = string.Empty;
+        foreach (KeyValuePair<string, string> binding in _machineBindings)
+        {
+            if (string.Equals(binding.Value, targetMachineId, StringComparison.OrdinalIgnoreCase))
+            {
+                clientId = binding.Key;
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId)
+            || !_connections.TryGetValue(clientId, out ClientConnection? connection))
+        {
+            const string errorCode = "MACHINE_NOT_CONNECTED";
+            const string errorMessage = "Machine is not connected.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineCommandSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string requestId = Guid.NewGuid().ToString("N");
+        Packet packet = lockMachine
+            ? PacketFactory.CreateLock(
+                source: NetworkProtocol.ServerSource,
+                target: targetMachineId,
+                payload: new LockPayload
+                {
+                    MachineId = targetMachineId,
+                    IssuedBy = issuedBy,
+                    Reason = reason
+                },
+                requestId: requestId)
+            : PacketFactory.CreateUnlock(
+                source: NetworkProtocol.ServerSource,
+                target: targetMachineId,
+                payload: new UnlockPayload
+                {
+                    MachineId = targetMachineId,
+                    IssuedBy = issuedBy,
+                    Reason = reason
+                },
+                requestId: requestId);
+
+        string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
+        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_COMMAND", clientId, message));
+
+        try
+        {
+            await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            return new MachineCommandSendResult(true, "Submitted", "Command sent to client.", RequestId: requestId);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            const string errorCode = "COMMAND_SEND_FAILED";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
+            return new MachineCommandSendResult(false, "Error", ex.Message, errorCode, requestId);
+        }
+    }
+
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
         try
@@ -188,8 +269,29 @@ public sealed class TcpJsonLineServer : IDisposable
                 EmitStatus(connection.ClientId, machineId, result.MachineStatus.Trim());
             }
 
-            TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, result.Response));
-            await connection.SendAsync(result.Response, cancellationToken).ConfigureAwait(false);
+            if (result.RequiresMachineBinding
+                && !IsMachineBoundToClient(connection.ClientId, result.MachineId))
+            {
+                TraceEmitted?.Invoke(new NetworkTraceEntry(
+                    "COMMAND_ACK_ERROR",
+                    connection.ClientId,
+                    "UNAUTHORIZED_COMMAND: ACK machine does not match authenticated connection."));
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.TraceDirection))
+            {
+                TraceEmitted?.Invoke(new NetworkTraceEntry(
+                    result.TraceDirection,
+                    connection.ClientId,
+                    result.TraceMessage ?? string.Empty));
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.Response))
+            {
+                TraceEmitted?.Invoke(new NetworkTraceEntry("OUT", connection.ClientId, result.Response));
+                await connection.SendAsync(result.Response, cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException or JsonException)
         {
@@ -206,6 +308,13 @@ public sealed class TcpJsonLineServer : IDisposable
         }
 
         return _sessionBindings.TryAdd(clientId, sessionId);
+    }
+
+    private bool IsMachineBoundToClient(string clientId, string? machineId)
+    {
+        return !string.IsNullOrWhiteSpace(machineId)
+            && _machineBindings.TryGetValue(clientId, out string? boundMachineId)
+            && string.Equals(boundMachineId, machineId.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private void ClientDisconnected(ClientConnection connection)

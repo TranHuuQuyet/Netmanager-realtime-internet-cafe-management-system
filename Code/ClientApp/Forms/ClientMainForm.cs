@@ -1,6 +1,7 @@
 using ClientApp.Networking;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
+using Shared.Enums;
 using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
@@ -224,11 +225,11 @@ public sealed class ClientMainForm : Form
         UpdateServerConnectionStatus("connected - ignored invalid packet");
     }
 
-    private void ApplyLockCommand(LockPayload payload)
+    private void ApplyLockCommand(Packet<LockPayload> packet)
     {
         if (InvokeRequired)
         {
-            BeginInvoke(() => ApplyLockCommand(payload));
+            BeginInvoke(() => ApplyLockCommand(packet));
             return;
         }
 
@@ -242,6 +243,7 @@ public sealed class ClientMainForm : Form
             SetClientSurfaceLocked(true);
             _lockScreen.Activate();
             UpdateServerConnectionStatus("connected - locked by server");
+            _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Lock already applied.");
             return;
         }
 
@@ -250,13 +252,14 @@ public sealed class ClientMainForm : Form
         _lockScreen.FormClosed += LockScreen_FormClosed;
         _lockScreen.Show(this);
         UpdateServerConnectionStatus("connected - locked by server");
+        _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Lock applied.");
     }
 
-    private void ApplyUnlockCommand(UnlockPayload payload)
+    private void ApplyUnlockCommand(Packet<UnlockPayload> packet)
     {
         if (InvokeRequired)
         {
-            BeginInvoke(() => ApplyUnlockCommand(payload));
+            BeginInvoke(() => ApplyUnlockCommand(packet));
             return;
         }
 
@@ -276,6 +279,7 @@ public sealed class ClientMainForm : Form
 
         SetClientSurfaceLocked(false);
         UpdateServerConnectionStatus("connected - unlocked by server");
+        _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Unlock applied.");
     }
 
     private void LockScreen_FormClosed(object? sender, FormClosedEventArgs e)
@@ -321,6 +325,30 @@ public sealed class ClientMainForm : Form
         catch (Exception)
         {
             UpdateServerConnectionStatus("connected - status pending");
+        }
+    }
+
+    private async Task SendCommandAckAsync(PacketType commandType, string? requestId, string status, string message)
+    {
+        try
+        {
+            var ackPacket = PacketFactory.CreateAck(
+                source: _machineId,
+                target: NetworkProtocol.ServerSource,
+                payload: new AckPayload
+                {
+                    MachineId = _machineId,
+                    AckFor = commandType.ToString(),
+                    Status = status,
+                    Message = message
+                },
+                requestId: requestId);
+
+            await _connection.SendAsync(JsonHelper.SerializeToJson(ackPacket));
+        }
+        catch (Exception)
+        {
+            UpdateServerConnectionStatus("connected - command ACK pending");
         }
     }
 

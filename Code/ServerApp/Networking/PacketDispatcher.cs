@@ -12,10 +12,13 @@ using ServerApp.Database.Models;
 namespace ServerApp.Networking;
 
 public sealed record PacketDispatchResult(
-    string Response,
+    string? Response,
     string? BindSessionId = null,
     string? MachineId = null,
-    string? MachineStatus = null);
+    string? MachineStatus = null,
+    bool RequiresMachineBinding = false,
+    string? TraceDirection = null,
+    string? TraceMessage = null);
 
 public sealed class PacketDispatcher
 {
@@ -41,6 +44,7 @@ public sealed class PacketDispatcher
         {
             Packet<LoginPayload> loginPacket => await DispatchLoginAsync(loginPacket, cancellationToken).ConfigureAwait(false),
             Packet<StatusPayload> statusPacket => await DispatchStatusAsync(statusPacket, cancellationToken).ConfigureAwait(false),
+            Packet<AckPayload> ackPacket => DispatchAck(ackPacket),
             Packet typedPacket => throw new InvalidDataException($"Unsupported packet type: {typedPacket.Type}"),
             _ => throw new InvalidDataException("Unsupported packet envelope.")
         };
@@ -190,6 +194,51 @@ public sealed class PacketDispatcher
 
         return new PacketDispatchResult(SerializeResponse(response));
     }
+
+    private static PacketDispatchResult DispatchAck(Packet<AckPayload> ackPacket)
+    {
+        AckPayload? payload = ackPacket.TypedPayload;
+        if (payload is null)
+        {
+            return CreateCommandAckError("UNKNOWN", "INVALID_PACKET", "ACK payload is required.");
+        }
+
+        string machineId = payload.MachineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return CreateCommandAckError(string.Empty, "INVALID_MACHINE_ID", "ACK machineId is required.");
+        }
+
+        string ackFor = payload.AckFor?.Trim() ?? string.Empty;
+        if (!Enum.TryParse(ackFor, ignoreCase: true, out Shared.Enums.PacketType ackForType)
+            || ackForType is not (Shared.Enums.PacketType.LOCK or Shared.Enums.PacketType.UNLOCK))
+        {
+            return CreateCommandAckError(machineId, "UNSUPPORTED_PACKET", "ACK must reference LOCK or UNLOCK.");
+        }
+
+        string status = payload.Status?.Trim() ?? string.Empty;
+        if (!string.Equals(status, "Success", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(status, "Ignored", StringComparison.OrdinalIgnoreCase))
+        {
+            return CreateCommandAckError(machineId, "INVALID_PACKET", "ACK status must be Success, Failed or Ignored.");
+        }
+
+        string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(ackPacket));
+        return new PacketDispatchResult(
+            Response: null,
+            MachineId: machineId,
+            RequiresMachineBinding: true,
+            TraceDirection: "COMMAND_ACK",
+            TraceMessage: message);
+    }
+
+    private static PacketDispatchResult CreateCommandAckError(string machineId, string errorCode, string message)
+        => new(
+            Response: null,
+            MachineId: machineId,
+            TraceDirection: "COMMAND_ACK_ERROR",
+            TraceMessage: $"{errorCode}: {message}");
 
     private static string SerializeResponse(Packet response)
     {

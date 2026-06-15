@@ -1,5 +1,7 @@
 using System.Text.Json;
 using Shared.DTOs.CommandPayloads;
+using Shared.DTOs.RequestPayloads;
+using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 
@@ -17,9 +19,9 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
         _connection.MessageReceived += Connection_MessageReceived;
     }
 
-    public event Action<LockPayload>? LockRequested;
+    public event Action<Packet<LockPayload>>? LockRequested;
 
-    public event Action<UnlockPayload>? UnlockRequested;
+    public event Action<Packet<UnlockPayload>>? UnlockRequested;
 
     public event Action? InvalidPacketIgnored;
 
@@ -31,13 +33,35 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
 
             switch (packet)
             {
-                case Packet<LockPayload> lockPacket
-                    when IsCommandForThisMachine(lockPacket.TypedPayload.MachineId, lockPacket.Target):
-                    LockRequested?.Invoke(lockPacket.TypedPayload);
+                case Packet<LockPayload> lockPacket:
+                    if (IsCommandForThisMachine(lockPacket.TypedPayload.MachineId, lockPacket.Target))
+                    {
+                        LockRequested?.Invoke(lockPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            lockPacket,
+                            ResolveCommandMachineId(lockPacket.TypedPayload.MachineId, lockPacket.Target),
+                            "Ignored",
+                            "LOCK ignored because target machine does not match this client.");
+                    }
+
                     break;
-                case Packet<UnlockPayload> unlockPacket
-                    when IsCommandForThisMachine(unlockPacket.TypedPayload.MachineId, unlockPacket.Target):
-                    UnlockRequested?.Invoke(unlockPacket.TypedPayload);
+                case Packet<UnlockPayload> unlockPacket:
+                    if (IsCommandForThisMachine(unlockPacket.TypedPayload.MachineId, unlockPacket.Target))
+                    {
+                        UnlockRequested?.Invoke(unlockPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            unlockPacket,
+                            ResolveCommandMachineId(unlockPacket.TypedPayload.MachineId, unlockPacket.Target),
+                            "Ignored",
+                            "UNLOCK ignored because target machine does not match this client.");
+                    }
+
                     break;
             }
         }
@@ -49,11 +73,38 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
 
     private bool IsCommandForThisMachine(string? payloadMachineId, string? packetTarget)
     {
-        string commandMachineId = string.IsNullOrWhiteSpace(payloadMachineId)
+        string commandMachineId = ResolveCommandMachineId(payloadMachineId, packetTarget);
+
+        return string.Equals(commandMachineId, _machineId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveCommandMachineId(string? payloadMachineId, string? packetTarget)
+        => string.IsNullOrWhiteSpace(payloadMachineId)
             ? packetTarget?.Trim() ?? string.Empty
             : payloadMachineId.Trim();
 
-        return string.Equals(commandMachineId, _machineId, StringComparison.OrdinalIgnoreCase);
+    private async Task SendCommandAckAsync(Packet commandPacket, string machineId, string status, string message)
+    {
+        try
+        {
+            var ackPacket = PacketFactory.CreateAck(
+                source: _machineId,
+                target: NetworkProtocol.ServerSource,
+                payload: new AckPayload
+                {
+                    MachineId = string.IsNullOrWhiteSpace(machineId) ? _machineId : machineId,
+                    AckFor = commandPacket.Type.ToString(),
+                    Status = status,
+                    Message = message
+                },
+                requestId: commandPacket.RequestId);
+
+            await _connection.SendAsync(JsonHelper.SerializeToJson(ackPacket)).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            InvalidPacketIgnored?.Invoke();
+        }
     }
 
     public void Dispose()

@@ -559,19 +559,20 @@ public partial class MainForm : Form
             AdminCommandRequest request,
             CancellationToken cancellationToken = default)
         {
-            bool sent = await networkServer.SendMachineCommandAsync(
+            MachineCommandSendResult commandResult = await networkServer.SendMachineCommandWithResultAsync(
                 request.MachineId,
                 lockMachine: request.Command == CommandType.LOCK,
                 issuedBy: request.IssuedBy,
                 reason: request.Reason,
                 cancellationToken).ConfigureAwait(false);
 
-            return sent
-                ? AdminCommandResult.Submitted(request, "Command sent to client.")
+            return commandResult.Sent
+                ? AdminCommandResult.Submitted(request, commandResult.Message, commandResult.RequestId)
                 : AdminCommandResult.ControlledError(
                     request,
-                    "COMMAND_SEND_FAILED",
-                    "Cannot send command to client.");
+                    commandResult.ErrorCode ?? "COMMAND_SEND_FAILED",
+                    commandResult.Message,
+                    commandResult.RequestId);
         }
     }
 

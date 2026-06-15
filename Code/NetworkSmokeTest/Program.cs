@@ -15,6 +15,7 @@ using ServerApp.Database.Contracts;
 using ServerApp.Networking;
 
 Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");
+// The smoke runs WinForms handlers without a message loop, so keep continuations on thread-pool context.
 WindowsFormsSynchronizationContext.AutoInstall = false;
 SynchronizationContext.SetSynchronizationContext(null);
 
@@ -91,6 +92,7 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
     List<NetworkTraceEntry> traces,
     List<MachineCommandAckResult> commandResults)
 {
+    // Command feature flow: login client, click admin UI buttons, receive JSON command, then ACK success/error paths.
     string sessionId;
 
     using (var tcpClient = new TcpClient())
@@ -306,6 +308,7 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
 
 static void ClickMachineActionButton(ServerApp.MainForm mainForm, string buttonName)
 {
+    // Exercise the same button Click event path the real admin UI uses, without showing a WinForms window.
     SynchronizationContext.SetSynchronizationContext(null);
 
     FieldInfo field = typeof(ServerApp.MainForm)
@@ -669,6 +672,7 @@ static async Task WaitForCommandResultAsync(
 
 static async Task AssertCommandErrorAsync(TcpJsonLineServer server, List<NetworkTraceEntry> traces)
 {
+    // Send-time errors are deterministic before any ACK exists.
     MachineCommandSendResult invalidMachineResult = await server.SendMachineCommandWithResultAsync(
         " ",
         lockMachine: true,

@@ -14,10 +14,29 @@ using ServerApp.Networking;
 using ServerApp.Auth.Services;
 namespace ServerApp.Networking;
 
+// TCP JSON-line server của ServerApp.
+//
+// Vai trò chính:
+// - Lắng nghe client kết nối TCP.
+// - Nhận từng dòng JSON, đưa qua PacketDispatcher.
+// - Bind session/machine vào đúng TCP connection sau LOGIN/STATUS.
+// - Gửi LOCK/UNLOCK từ admin UI xuống đúng máy client.
+// - Theo dõi pending command và biến ACK thành typed result cho UI.
+//
+// Một command admin hoàn chỉnh đi qua flow:
+// Admin click -> SendMachineCommandWithResultAsync -> gửi packet -> lưu pending requestId
+// -> client ACK -> HandleCommandAck -> CommandResultEmitted -> MainForm hiển thị kết quả.
 public sealed class TcpJsonLineServer : IDisposable
 {
     private static readonly TimeSpan PendingCommandTimeout = TimeSpan.FromSeconds(30);
 
+    // Một command đã gửi xuống client nhưng chưa nhận ACK cuối.
+    //
+    // Cần lưu đủ thông tin để validate ACK:
+    // - ACK phải đến từ đúng TCP clientId.
+    // - ACK phải đúng machineId.
+    // - ACK phải đúng requestId.
+    // - ACK phải đúng loại command LOCK/UNLOCK.
     private sealed record PendingMachineCommand(
         string ClientId,
         string MachineId,
@@ -55,6 +74,10 @@ public sealed class TcpJsonLineServer : IDisposable
 
     public void Start()
     {
+        // Start server đúng một lần.
+        //
+        // Sau khi listener.Start(), AcceptLoopAsync chạy nền để nhận client mới.
+        // Không await ở đây vì UI vẫn cần tiếp tục chạy.
         if (_isStarted)
         {
             return;
@@ -69,6 +92,14 @@ public sealed class TcpJsonLineServer : IDisposable
 
     public event Action<StatusPayload>? StatusEmitted;
 
+    // Event đưa kết quả command cuối cùng sang tầng UI.
+    //
+    // Có thể được emit khi:
+    // - client ACK success
+    // - client ACK Failed/Ignored
+    // - ACK sai requestId/type/machine
+    // - client disconnect trước ACK
+    // - pending command timeout
     public event Action<MachineCommandAckResult>? CommandResultEmitted;
 
     [Obsolete("Use SendMachineCommandWithResultAsync to preserve requestId, pending tracking and deterministic command results.")]
@@ -79,6 +110,10 @@ public sealed class TcpJsonLineServer : IDisposable
         string reason,
         CancellationToken cancellationToken = default)
     {
+        // API cũ chỉ trả bool.
+        //
+        // Giữ lại để code cũ không gãy, nhưng toàn bộ flow thật được chuyển sang
+        // SendMachineCommandWithResultAsync để vẫn có requestId, pending tracking và error code.
         MachineCommandSendResult result = await SendMachineCommandWithResultAsync(
             machineId,
             lockMachine,
@@ -162,6 +197,13 @@ public sealed class TcpJsonLineServer : IDisposable
         string reason,
         CancellationToken cancellationToken = default)
     {
+        // Submit command flow:
+        // - validate machineId
+        // - tìm TCP client đang bind với machineId
+        // - gọi authorization guard để chắc machine có active session hợp lệ
+        // - tạo packet LOCK/UNLOCK có requestId
+        // - gửi xuống socket
+        // - lưu pending command để ACK sau này có thể đối chiếu
         string targetMachineId = machineId?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(targetMachineId))
         {
@@ -251,6 +293,11 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
+        // Vòng lặp nhận client TCP mới.
+        //
+        // Mỗi client được gán clientId dạng tcp-0001, tcp-0002...
+        // Sau đó server đăng ký event MessageReceived/Disconnected
+        // và để ClientConnection tự chạy ReceiveLoopAsync.
         try
         {
             while (!cancellationToken.IsCancellationRequested)
@@ -273,12 +320,15 @@ public sealed class TcpJsonLineServer : IDisposable
         }
         catch (OperationCanceledException)
         {
+            // Server đang stop/dispose nên vòng accept bị hủy bình thường.
         }
         catch (ObjectDisposedException)
         {
+            // Listener đã bị dispose trong lúc AcceptTcpClientAsync đang chờ.
         }
         catch (SocketException ex)
         {
+            // Lỗi socket ở tầng listener, ví dụ port bị đóng hoặc network stack lỗi.
             TraceEmitted?.Invoke(new NetworkTraceEntry("SERVER_ERROR", string.Empty, ex.Message));
         }
     }
@@ -293,6 +343,13 @@ public sealed class TcpJsonLineServer : IDisposable
         string message,
         CancellationToken cancellationToken)
     {
+        // Receive message flow:
+        // - trace raw JSON client gửi lên
+        // - dispatcher parse và validate packet
+        // - nếu LOGIN/STATUS thành công thì bind session/machine với connection
+        // - nếu ACK lỗi format thì emit typed result
+        // - nếu ACK hợp lệ format thì check binding/pending command
+        // - nếu có response thì gửi lại client
         TraceEmitted?.Invoke(new NetworkTraceEntry("IN", connection.ClientId, message));
 
         try
@@ -364,6 +421,13 @@ public sealed class TcpJsonLineServer : IDisposable
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or FormatException or JsonException)
         {
+            // Lỗi packet/stream ở client hiện tại.
+            //
+            // Thường xảy ra khi:
+            // - client gửi JSON sai format
+            // - packet type không deserialize được
+            // - payload thiếu/sai schema nặng
+            // - stream lỗi trong lúc xử lý
             TraceEmitted?.Invoke(new NetworkTraceEntry("DISPATCH_ERROR", connection.ClientId, ex.Message));
             connection.Disconnect();
         }
@@ -371,6 +435,10 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private bool TryBindSession(string clientId, string sessionId)
     {
+        // Mỗi TCP connection chỉ được bind một sessionId.
+        //
+        // Nếu cùng connection cố đổi sessionId, server đóng connection để tránh
+        // một socket giả danh nhiều phiên đăng nhập khác nhau.
         if (_sessionBindings.TryGetValue(clientId, out string? existingSessionId))
         {
             return string.Equals(existingSessionId, sessionId, StringComparison.OrdinalIgnoreCase);
@@ -381,6 +449,9 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private bool IsMachineBoundToClient(string clientId, string? machineId)
     {
+        // ACK command phải đến từ đúng connection đã bind với machineId đó.
+        //
+        // Chặn trường hợp client A gửi ACK thay cho máy B.
         return !string.IsNullOrWhiteSpace(machineId)
             && _machineBindings.TryGetValue(clientId, out string? boundMachineId)
             && string.Equals(boundMachineId, machineId.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -388,6 +459,13 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private void HandleCommandAck(string clientId, Packet<AckPayload> ackPacket)
     {
+        // ACK validation flow:
+        // - requestId phải tồn tại trong _pendingCommands
+        // - ACK phải đến từ đúng TCP client đã nhận command
+        // - machineId trong ACK phải khớp command đang pending
+        // - ackFor phải khớp LOCK/UNLOCK đã gửi
+        //
+        // Nếu một bước sai, server emit typed error result cho admin UI.
         AckPayload payload = ackPacket.TypedPayload;
         string requestId = ackPacket.RequestId ?? string.Empty;
         string machineId = payload.MachineId.Trim();
@@ -468,6 +546,12 @@ public sealed class TcpJsonLineServer : IDisposable
         string message,
         string? requestId)
     {
+        // Tạo result lỗi dạng typed cho ACK/command.
+        //
+        // Khác với trace string thuần:
+        // - UI/M3 đọc được machineId, command, errorCode, requestId rõ ràng.
+        // - Test có thể assert deterministic error code.
+        // - Admin thấy kết quả cuối thay vì chỉ có log COMMAND_ACK_ERROR.
         TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ACK_ERROR", clientId, $"{errorCode}: {message}"));
 
         NotifyCommandResultEmitted(
@@ -483,11 +567,17 @@ public sealed class TcpJsonLineServer : IDisposable
     }
 
     private static CommandType ParseAckCommand(string? ackFor)
+        // ACK malformed vẫn cần command type để UI hiển thị.
+        // Nếu không parse được thì fallback LOCK để giữ result không null.
         => string.Equals(ackFor, PacketType.UNLOCK.ToString(), StringComparison.OrdinalIgnoreCase)
             ? CommandType.UNLOCK
             : CommandType.LOCK;
 
     private static string GetAckErrorCode(string status)
+        // Status hợp lệ nhưng không thành công được map thành fixed error code.
+        //
+        // Failed  -> COMMAND_ACK_FAILED
+        // Ignored -> COMMAND_ACK_IGNORED
         => string.Equals(status, "Ignored", StringComparison.OrdinalIgnoreCase)
             ? "COMMAND_ACK_IGNORED"
             : "COMMAND_ACK_FAILED";
@@ -497,6 +587,10 @@ public sealed class TcpJsonLineServer : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        // Timeout flow:
+        // - sau khi gửi command thành công, server chờ ACK trong PendingCommandTimeout
+        // - nếu ACK đến trước, pending command đã bị remove nên timeout không làm gì
+        // - nếu client im lặng, server remove pending và emit COMMAND_ACK_TIMEOUT
         try
         {
             await Task.Delay(timeout, cancellationToken).ConfigureAwait(false);
@@ -520,6 +614,11 @@ public sealed class TcpJsonLineServer : IDisposable
         string errorCode,
         string message)
     {
+        // Dùng lại format lỗi ACK cho các lỗi lifecycle của pending command.
+        //
+        // Ví dụ:
+        // - client disconnect trước ACK
+        // - client không ACK trước timeout
         EmitCommandAckError(
             pendingCommand.ClientId,
             pendingCommand.MachineId,
@@ -531,6 +630,10 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private void NotifyCommandResultEmitted(string clientId, MachineCommandAckResult result)
     {
+        // Gọi event handler của UI/service boundary.
+        //
+        // Nếu UI handler lỗi, server chỉ trace lỗi đó,
+        // không để một exception UI làm chết TCP server.
         try
         {
             CommandResultEmitted?.Invoke(result);
@@ -550,6 +653,10 @@ public sealed class TcpJsonLineServer : IDisposable
 
     private void CleanupClientState(string clientId)
     {
+        // Cleanup khi client disconnect:
+        // - đóng session đang bind
+        // - emit máy Offline
+        // - mọi command pending của client này nhận COMMAND_CLIENT_DISCONNECTED
         if (_sessionBindings.TryRemove(clientId, out var sessionId))
         {
             CloseBoundSession(clientId, sessionId);

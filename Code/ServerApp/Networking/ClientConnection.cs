@@ -12,6 +12,17 @@ using Shared.Networking;
 
 namespace ServerApp.Networking;
 
+// Đại diện cho một client TCP đang kết nối tới ServerApp.
+//
+// Nhiệm vụ:
+// - Đọc từng dòng JSON từ NetworkStream.
+// - Gửi từng dòng JSON về client.
+// - Báo event MessageReceived khi client gửi packet.
+// - Báo event Disconnected khi socket đóng hoặc lỗi.
+//
+// Lưu ý:
+// - Class này không hiểu LOGIN/STATUS/ACK là gì.
+// - Nó chỉ quản lý stream/socket; TcpJsonLineServer mới xử lý protocol.
 public class ClientConnection : IDisposable
 {
     public string ClientId { get; }
@@ -82,6 +93,10 @@ public class ClientConnection : IDisposable
 
     public bool TryBindSession(string sessionId)
     {
+        // Bind sessionId vào connection hiện tại.
+        //
+        // Chỉ bind một lần để tránh một socket đổi session giữa chừng.
+        // Nếu connection đã disconnect hoặc đã có sessionId thì trả false.
         if (string.IsNullOrWhiteSpace(sessionId))
             return false;
 
@@ -99,6 +114,15 @@ public class ClientConnection : IDisposable
     public async Task SendAsync(string message, CancellationToken cancellationToken = default)
     {
         // kiểm tra input với điều kiện
+        // Send flow:
+        // - validate message đúng format JSON-line protocol
+        // - dùng SemaphoreSlim để tránh nhiều thread ghi vào cùng stream một lúc
+        // - nếu socket/stream lỗi thì disconnect connection
+        //
+        // Lỗi thường xảy ra khi:
+        // - client mất mạng
+        // - client đóng app trong lúc server đang gửi
+        // - NetworkStream đã bị dispose
         string outgoingMessage = NetworkProtocol.ValidateOutgoingMessage(message);
 
         if (IsDisconnected)
@@ -115,11 +139,18 @@ public class ClientConnection : IDisposable
         }
         catch (IOException)
         {
+            // Lỗi ghi stream.
+            //
+            // Thường xảy ra khi:
+            // - client mất mạng
+            // - client tắt app đột ngột
+            // - socket bị đóng giữa lúc server đang WriteLineAsync
             Console.WriteLine($"[SERVER] Cannot send message to client: {ClientId}");
             Disconnect();
         }
         catch (ObjectDisposedException)
         {
+            // Stream/socket đã bị dispose trước hoặc trong lúc send.
             Disconnect();
         }
         finally
@@ -135,6 +166,13 @@ public class ClientConnection : IDisposable
         cancellationToken = tín hiệu huỷ từ bên ngoài truyền vào.
         _disconnectTokenSource.Token = tín hiệu huỷ nội bộ khi client connection bị disconnect.
 */
+        // Receive flow:
+        // - đọc từng dòng text cho tới khi gặp newline
+        // - bỏ qua dòng rỗng
+        // - bắn event MessageReceived để server xử lý packet
+        // - nếu stream lỗi hoặc token bị hủy thì disconnect
+        //
+        // Hàm này chạy nền cho từng client connection.
         using CancellationTokenSource linkedTokenSource =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disconnectTokenSource.Token);
 
@@ -168,6 +206,12 @@ public class ClientConnection : IDisposable
         } // Xảy ra khi CancellationToken bị huỷ.
         catch (OperationCanceledException)
         {
+            // Read loop bị hủy bởi cancellation token.
+            //
+            // Thường xảy ra khi:
+            // - server đang Dispose/Stop
+            // - Disconnect() đã hủy _disconnectTokenSource
+            // - test chủ động đóng connection
         }// Lỗi đọc/ghi stream.
          //
          // Thường xảy ra khi:
@@ -180,6 +224,12 @@ public class ClientConnection : IDisposable
         } // Lỗi trực tiếp từ tầng TCP/socket.
         catch (SocketException)
         {
+            // Lỗi trực tiếp từ tầng TCP/socket.
+            //
+            // Thường xảy ra khi:
+            // - connection bị reset
+            // - network stack báo lỗi socket
+            // - client đóng kết nối không theo flow bình thường
             Console.WriteLine($"[SERVER] Socket error from client: {ClientId}");
         }
         finally
@@ -190,6 +240,11 @@ public class ClientConnection : IDisposable
 
     public void Disconnect()
     {
+        // Disconnect flow:
+        // - đánh dấu disconnected dưới lock để chỉ chạy một lần
+        // - hủy token để ReceiveLoopAsync dừng lại
+        // - dispose reader/writer/stream/tcpClient
+        // - emit Disconnected cho TcpJsonLineServer cleanup binding/session/pending command
         bool shouldNotify;
 
         lock (_stateLock)

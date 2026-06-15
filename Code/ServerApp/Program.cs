@@ -28,6 +28,7 @@ static class Program
             {
                 networkServer.StatusEmitted += status =>
                     mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
+                // Network emits typed command results; presentation owns the UI-facing shape.
                 networkServer.CommandResultEmitted += result =>
                     mainForm.ApplyCommandResultUpdate(AdminCommandResultMapper.FromNetworkAck(result));
             }

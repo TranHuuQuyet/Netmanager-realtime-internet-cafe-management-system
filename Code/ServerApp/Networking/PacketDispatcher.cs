@@ -12,6 +12,16 @@ using ServerApp.Database.Models;
 
 namespace ServerApp.Networking;
 
+// Kết quả sau khi PacketDispatcher đọc một JSON-line từ client.
+//
+// Dispatcher không trực tiếp giữ TCP connection.
+// Nó chỉ phân loại packet và trả metadata để TcpJsonLineServer xử lý tiếp.
+//
+// Các nhánh chính:
+// - Response: packet server cần gửi lại client, ví dụ LOGIN response hoặc STATUS ACK.
+// - BindSessionId/MachineId/MachineStatus: thông tin để server bind session/machine vào connection.
+// - CommandAckPacket: ACK hợp lệ về mặt payload, cần server check binding + pending command.
+// - CommandError*: ACK sai format, cần server emit typed result cho UI.
 public sealed record PacketDispatchResult(
     string? Response,
     string? BindSessionId = null,
@@ -19,6 +29,7 @@ public sealed record PacketDispatchResult(
     string? MachineStatus = null,
     bool RequiresMachineBinding = false,
     Packet<AckPayload>? CommandAckPacket = null,
+    // ACK validation errors are carried as structured fields so the server can emit typed UI results.
     string? CommandErrorCode = null,
     string? CommandErrorMessage = null,
     CommandType? CommandErrorCommand = null,
@@ -26,6 +37,17 @@ public sealed record PacketDispatchResult(
     string? TraceDirection = null,
     string? TraceMessage = null);
 
+// Chịu trách nhiệm parse packet và validate payload ở tầng protocol/business nhẹ.
+//
+// Flow:
+// - LOGIN: gọi AuthService, tạo LOGIN success/failure response.
+// - STATUS: validate session/machine, update machine status, trả ACK.
+// - ACK: validate hình dạng ACK command, chưa quyết định ACK có khớp pending command hay không.
+//
+// Không làm ở đây:
+// - Không gửi socket.
+// - Không biết clientId TCP.
+// - Không biết pending command đang nằm trong server nào.
 public sealed class PacketDispatcher
 {
     private readonly IAuthService _authService;
@@ -44,6 +66,12 @@ public sealed class PacketDispatcher
 
     public async Task<PacketDispatchResult> DispatchAsync(string inboundLine, CancellationToken cancellationToken = default)
     {
+        // Điểm vào chung cho mọi JSON-line client gửi lên server.
+        //
+        // Thường lỗi khi:
+        // - JSON sai format
+        // - type không thuộc enum PacketType
+        // - payload không đúng schema packet tương ứng
         object packet = JsonHelper.DeserializePacket(inboundLine);
 
         return packet switch
@@ -60,6 +88,11 @@ public sealed class PacketDispatcher
         Packet<LoginPayload> loginPacket,
         CancellationToken cancellationToken)
     {
+        // LOGIN flow:
+        // - kiểm tra payload/requestId/role
+        // - gọi AuthService để xác thực user
+        // - nếu thành công, trả sessionId và machineId cho client
+        // - nếu thất bại, trả LOGIN failure có error code deterministic
         LoginPayload? payload = loginPacket.TypedPayload;
 
         if (payload is null)
@@ -120,6 +153,10 @@ public sealed class PacketDispatcher
         Packet<StatusPayload> statusPacket,
         CancellationToken cancellationToken)
     {
+        // STATUS flow:
+        // - client báo trạng thái máy hiện tại
+        // - nếu có sessionId thì session phải tồn tại, chưa revoke, và khớp machineId
+        // - server update repository rồi trả ACK Accepted/Rejected
         StatusPayload? payload = statusPacket.TypedPayload;
         if (payload is null)
         {
@@ -203,6 +240,12 @@ public sealed class PacketDispatcher
 
     private static PacketDispatchResult DispatchAck(Packet<AckPayload> ackPacket)
     {
+        // ACK flow ở tầng dispatcher:
+        // - chỉ kiểm tra ACK có đủ machineId/requestId/ackFor/status hay không
+        // - không check client này có đúng là máy đó không
+        // - không check requestId có nằm trong pending command không
+        //
+        // Những bước còn lại cần clientId TCP nên được làm trong TcpJsonLineServer.
         AckPayload? payload = ackPacket.TypedPayload;
         if (payload is null)
         {

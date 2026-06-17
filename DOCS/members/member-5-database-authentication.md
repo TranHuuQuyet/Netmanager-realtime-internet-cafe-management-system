@@ -71,3 +71,8 @@ Ban own canonical SQLite auth/session runtime, seed data, account-to-`machineId`
 - `Code/ServerApp/Auth/Services/AuthService.cs` da xu ly valid login, wrong password, wrong `machineId`, account-disabled, and machine-active cases theo canonical auth path.
 - `Code/Auth_Test/Program.cs` da co verify cho `admin` / `123` / `PC00`, `client01` / `123` / `PC-01`, wrong password, va wrong `machineId`.
 - Pham vi M5 cho `R2-A01` da san sang, con M6 runtime verification va final `G2` gate review la phan cua tester/gate owner.
+
+## R4-N01 Evidence Note
+
+- `Code/Auth_Test/Program.cs` da verify hai client authenticated doc lap (`client01` / `PC-01`, `client02` / `PC-02`) co session ID rieng va duplicate active login bi reject voi `MACHINE_ALREADY_ACTIVE`.
+- Pham vi M5 cho `R4-N01` da duoc xac nhan o tang auth; networking/LAN routing van la phan cua owner networking va UI.

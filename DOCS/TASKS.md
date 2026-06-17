@@ -218,7 +218,7 @@ Owner: `M2 + M5`
 Task: Route two authenticated local clients distinctly, keep the route LAN-capable, and decide duplicate-login behavior
 Dependency: `G3` pass
 Required evidence: Routing/session test
-Member done: [ ]
+Member done: [x]
 
 `R4-U01`
 Owner: `M3 + M4`

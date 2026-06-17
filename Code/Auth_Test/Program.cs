@@ -16,6 +16,7 @@ await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
 await AssertCommandGuardAsync(runtime);
+await AssertR4DistinctClientsAsync();
 
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
@@ -23,6 +24,7 @@ Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC-01
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
+Console.WriteLine("PASS R4-N01: two authenticated clients stay distinct and duplicate active login is rejected");
 
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
@@ -116,6 +118,58 @@ static async Task AssertCommandGuardAsync(AuthRuntime runtime)
 
     var deniedClosed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-01");
     AssertCommandGuardFailure(deniedClosed, "R3-A01 closed machine", "UNAUTHORIZED_COMMAND");
+}
+
+static async Task AssertR4DistinctClientsAsync()
+{
+    string r4DbPath = PrepareScratchDatabasePath("Netmanager-R4-N01");
+    AuthRuntime r4Runtime = await AuthBootstrapper.CreateAsync(r4DbPath);
+
+    var client01 = await r4Runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+    AssertSuccess(client01, AuthStatus.Success, "R4-N01 client01");
+
+    var client02 = await r4Runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client02", "123", "PC-02", UserRole.Client));
+    AssertSuccess(client02, AuthStatus.Success, "R4-N01 client02");
+
+    if (client01.Session is null || client02.Session is null)
+    {
+        throw new InvalidOperationException("R4-N01 expected active sessions for both clients.");
+    }
+
+    if (string.Equals(client01.Session.Id, client02.Session.Id, StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R4-N01 expected distinct session IDs for client01 and client02.");
+    }
+
+    if (!string.Equals(client01.Session.MachineId, "PC-01", StringComparison.Ordinal)
+        || !string.Equals(client02.Session.MachineId, "PC-02", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R4-N01 expected each client to keep its own machine binding.");
+    }
+
+    var duplicateLogin = await r4Runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+    AssertFailure(
+        duplicateLogin,
+        AuthStatus.MachineAlreadyActive,
+        "MACHINE_ALREADY_ACTIVE",
+        "R4-N01 duplicate active login");
+
+    await r4Runtime.SessionService.CloseSessionAsync(client01.Session.Id);
+    await r4Runtime.SessionService.CloseSessionAsync(client02.Session.Id);
+
+    var client01Reopened = await r4Runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+    AssertSuccess(client01Reopened, AuthStatus.Success, "R4-N01 client01 reopened");
+
+    if (client01Reopened.Session is null)
+    {
+        throw new InvalidOperationException("R4-N01 expected a session after reopening client01.");
+    }
+
+    await r4Runtime.SessionService.CloseSessionAsync(client01Reopened.Session.Id);
 }
 
 static void AssertSuccess(AuthResult result, AuthStatus expectedStatus, string username)

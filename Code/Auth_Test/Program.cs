@@ -2,7 +2,10 @@ using Microsoft.Data.Sqlite;
 using SQLitePCL;
 using ServerApp.Auth.Models;
 using ServerApp.Auth.Services;
+using ServerApp.Billing.Models;
+using ServerApp.Billing.Services;
 using ServerApp.Database;
+using ServerApp.Database.Models;
 
 Batteries_V2.Init();
 
@@ -17,6 +20,7 @@ await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
 await AssertCommandGuardAsync(runtime);
 await AssertR4DistinctClientsAsync();
+await AssertBillingRecoverySnapshotAsync();
 
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
@@ -25,6 +29,7 @@ Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
 Console.WriteLine("PASS R4-N01: two authenticated clients stay distinct and duplicate active login is rejected");
+Console.WriteLine("PASS R4-R01: billing recovery snapshot restores active billing with timer state");
 
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
@@ -170,6 +175,67 @@ static async Task AssertR4DistinctClientsAsync()
     }
 
     await r4Runtime.SessionService.CloseSessionAsync(client01Reopened.Session.Id);
+}
+
+static async Task AssertBillingRecoverySnapshotAsync()
+{
+    string billingDbPath = PrepareScratchDatabasePath("Netmanager-R4-R01-Billing");
+    AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(billingDbPath);
+    BillingRuntime billingRuntime = await BillingBootstrapper.CreateAsync(billingDbPath);
+
+    var login = await authRuntime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+    if (!login.IsSuccess || login.User is null || login.Session is null)
+    {
+        throw new InvalidOperationException("R4-R01 expected a valid authenticated client session.");
+    }
+
+    var opened = await billingRuntime.Billing.OpenSessionAsync(
+        new BillingSessionRequest(
+            login.Session.Id,
+            login.User.Id,
+            login.User.Username,
+            login.Session.MachineId,
+            BillingRentalMode.Timed,
+            DateTimeOffset.UtcNow.AddMinutes(-17),
+            10_000,
+            DateTimeOffset.UtcNow.AddMinutes(13)));
+
+    if (!opened.IsSuccess || opened.Session is null)
+    {
+        throw new InvalidOperationException("R4-R01 expected billing session open to succeed.");
+    }
+
+    var snapshot = await billingRuntime.Billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    if (snapshot.Sessions.Count != 1)
+    {
+        throw new InvalidOperationException(
+            $"R4-R01 expected one active billing session, got {snapshot.Sessions.Count}.");
+    }
+
+    var restored = snapshot.Sessions[0];
+    if (!string.Equals(restored.Session.Session.MachineId, "PC-01", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R4-R01 expected billing snapshot to keep machine binding.");
+    }
+
+    if (restored.ShouldLockNow)
+    {
+        throw new InvalidOperationException("R4-R01 expected the session to still have remaining time.");
+    }
+
+    if (restored.RemainingSeconds is null || restored.RemainingSeconds <= 0)
+    {
+        throw new InvalidOperationException("R4-R01 expected positive remaining seconds for active billing.");
+    }
+
+    if (restored.Session.Calculation.ChargedMinutes < 17)
+    {
+        throw new InvalidOperationException("R4-R01 expected rounded-up charged minutes to be restored.");
+    }
+
+    await billingRuntime.Billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
+    await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
 }
 
 static void AssertSuccess(AuthResult result, AuthStatus expectedStatus, string username)

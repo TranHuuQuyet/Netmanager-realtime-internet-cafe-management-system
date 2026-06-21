@@ -174,7 +174,7 @@ Owner: `M2 + M3`
 Task: Route real `LOCK`/`UNLOCK` commands from selected client action
 Dependency: `G2` pass; `R3-B01`
 Required evidence: Command packet trace
-Member done: [ ]
+Member done: [x]
 
 `R3-U01`
 Owner: `M4`
@@ -195,7 +195,7 @@ Owner: `M3`
 Task: Show ACK/error result in admin UI
 Dependency: `R3-N02`
 Required evidence: Dashboard result evidence
-Member done: [ ]
+Member done: [x]
 
 `R3-A01`
 Owner: `M5`
@@ -226,6 +226,7 @@ Task: Render/maintain distinct local client instances and prepare Admin/Client U
 Dependency: `R4-N01`
 Required evidence: Two-client UI evidence
 Member done: [ ]
+M3 slice: [x] Admin UI preserves selected-machine state and maintains distinct rows/cards; integrated M2/M4 route and M6 evidence remain pending.
 
 `R4-N02`
 Owner: `M2 + M6`
@@ -240,6 +241,7 @@ Task: Implement required 1-1 `CHAT` routing between Admin and the selected clien
 Dependency: `G3` pass; `R4-N01`
 Required evidence: Selected-client chat trace and UI evidence
 Member done: [ ]
+M3 slice: [x] Typed Admin chat boundary and per-machine UI history are ready; M2 routing, M4 client UI and M6 evidence remain pending.
 
 `R4-B01`
 Owner: `M3 + M5 + M1`
@@ -247,6 +249,7 @@ Task: Define required billing/session interface target: Admin selects timed/free
 Dependency: `2026-06-09` scope decision
 Required evidence: Docs/API handoff note for `BillingSessions` and Admin UI ownership
 Member done: [ ]
+M3 slice: [x] Admin control ownership and required typed billing result are documented; M5 implementation and M1 approval remain pending.
 
 `R4-R01`
 Owner: `M2 + M4 + M5`

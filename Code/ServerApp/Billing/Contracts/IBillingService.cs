@@ -24,6 +24,10 @@ public interface IBillingService
         DateTimeOffset asOfUtc,
         CancellationToken cancellationToken = default);
 
+    Task<BillingRecoverySnapshot> GetRecoverySnapshotAsync(
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken = default);
+
     BillingCalculation CalculateAmount(
         DateTimeOffset startedAtUtc,
         DateTimeOffset asOfUtc,

@@ -23,6 +23,15 @@ public sealed record BillingSessionView(
     BillingSessionRecord Session,
     BillingCalculation Calculation);
 
+public sealed record BillingSyncSession(
+    BillingSessionView Session,
+    long? RemainingSeconds,
+    bool ShouldLockNow);
+
+public sealed record BillingRecoverySnapshot(
+    DateTimeOffset RestoredAtUtc,
+    IReadOnlyList<BillingSyncSession> Sessions);
+
 public sealed record BillingResult
 {
     public required bool IsSuccess { get; init; }
@@ -78,5 +87,35 @@ public static class BillingCalculator
             amountVnd,
             startedAtUtc,
             asOfUtc);
+    }
+
+    public static BillingSyncSession BuildSyncSession(
+        BillingSessionRecord session,
+        DateTimeOffset asOfUtc)
+    {
+        BillingCalculation calculation = Calculate(session.StartedAtUtc, asOfUtc, session.RatePerHour);
+
+        long? remainingSeconds = null;
+        bool shouldLockNow = false;
+
+        if (session.ExpiresAtUtc is not null)
+        {
+            TimeSpan remaining = session.ExpiresAtUtc.Value - asOfUtc;
+            remainingSeconds = remaining > TimeSpan.Zero
+                ? (long)Math.Ceiling(remaining.TotalSeconds)
+                : 0;
+            shouldLockNow = remainingSeconds == 0;
+        }
+
+        BillingSessionRecord updatedSession = session with
+        {
+            ChargedMinutes = calculation.ChargedMinutes,
+            AmountVnd = calculation.AmountVnd
+        };
+
+        return new BillingSyncSession(
+            new BillingSessionView(updatedSession, calculation),
+            remainingSeconds,
+            shouldLockNow);
     }
 }

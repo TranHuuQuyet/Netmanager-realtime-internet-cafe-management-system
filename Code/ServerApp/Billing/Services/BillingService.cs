@@ -152,4 +152,19 @@ public sealed class BillingService : IBillingService
             new BillingSessionView(typedSession, calculation),
             "Billing session restored.");
     }
+
+    public async Task<BillingRecoverySnapshot> GetRecoverySnapshotAsync(
+        DateTimeOffset asOfUtc,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<BillingSessionRecord> sessions = await _billingSessions.ListActiveAsync(cancellationToken).ConfigureAwait(false);
+        var syncSessions = new List<BillingSyncSession>(sessions.Count);
+
+        foreach (BillingSessionRecord session in sessions)
+        {
+            syncSessions.Add(BillingCalculator.BuildSyncSession(session, asOfUtc));
+        }
+
+        return new BillingRecoverySnapshot(asOfUtc, syncSessions);
+    }
 }

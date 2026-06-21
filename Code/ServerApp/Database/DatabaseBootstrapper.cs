@@ -20,11 +20,12 @@ public static class DatabaseBootstrapper
         var users = new SqliteUserRepository(store);
         var sessions = new SqliteSessionRepository(store);
         var machines = new SqliteMachineRepository(store);
+        var billingSessions = new SqliteBillingSessionRepository(store);
 
         await SeedUsersAsync(users, cancellationToken).ConfigureAwait(false);
         await SeedMachinesAsync(machines, cancellationToken).ConfigureAwait(false);
 
-        return new DatabaseRuntime(users, sessions, machines);
+        return new DatabaseRuntime(users, sessions, machines, billingSessions);
     }
 
     private static IReadOnlyList<SeedAccount> BuildSeedUsers()
@@ -180,6 +181,27 @@ internal sealed class DatabaseStore
                    EndedAtUtc TEXT NULL,
                    FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
                );
+
+               CREATE TABLE IF NOT EXISTS BillingSessions (
+                   Id TEXT PRIMARY KEY,
+                   AuthSessionId TEXT NOT NULL,
+                   UserId TEXT NOT NULL,
+                   Username TEXT NOT NULL,
+                   MachineId TEXT NOT NULL,
+                   RentalMode INTEGER NOT NULL,
+                   State INTEGER NOT NULL,
+                   RatePerHour INTEGER NOT NULL,
+                   StartedAtUtc TEXT NOT NULL,
+                   ExpiresAtUtc TEXT NULL,
+                   EndedAtUtc TEXT NULL,
+                   ChargedMinutes INTEGER NOT NULL DEFAULT 0,
+                   AmountVnd INTEGER NOT NULL DEFAULT 0,
+                   FOREIGN KEY (AuthSessionId) REFERENCES AuthSessions(Id),
+                   FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
+               );
+
+               CREATE INDEX IF NOT EXISTS IX_BillingSessions_MachineId_State ON BillingSessions (MachineId, State);
+               CREATE INDEX IF NOT EXISTS IX_BillingSessions_AuthSessionId_State ON BillingSessions (AuthSessionId, State);
                """;
     }
 }
@@ -555,6 +577,206 @@ internal sealed class SqliteSessionRepository : ISessionRepository
             DateTimeOffset.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
             reader.IsDBNull(7) ? null : DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
     }
+}
+
+internal sealed class SqliteBillingSessionRepository : IBillingSessionRepository
+{
+    private readonly DatabaseStore _store;
+
+    public SqliteBillingSessionRepository(DatabaseStore store)
+    {
+        _store = store;
+    }
+
+    public async Task AddAsync(BillingSessionRecord session, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO BillingSessions
+                (Id, AuthSessionId, UserId, Username, MachineId, RentalMode, State, RatePerHour, StartedAtUtc, ExpiresAtUtc, EndedAtUtc, ChargedMinutes, AmountVnd)
+            VALUES
+                (@Id, @AuthSessionId, @UserId, @Username, @MachineId, @RentalMode, @State, @RatePerHour, @StartedAtUtc, @ExpiresAtUtc, @EndedAtUtc, @ChargedMinutes, @AmountVnd);
+            """;
+        BindSession(command, session);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<BillingSessionRecord?> GetByIdAsync(string billingSessionId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(billingSessionId))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, AuthSessionId, UserId, Username, MachineId, RentalMode, State, RatePerHour, StartedAtUtc, ExpiresAtUtc, EndedAtUtc, ChargedMinutes, AmountVnd
+            FROM BillingSessions
+            WHERE Id = @Id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@Id", billingSessionId.Trim());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<BillingSessionRecord?> GetActiveByMachineIdAsync(string machineId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(machineId))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, AuthSessionId, UserId, Username, MachineId, RentalMode, State, RatePerHour, StartedAtUtc, ExpiresAtUtc, EndedAtUtc, ChargedMinutes, AmountVnd
+            FROM BillingSessions
+            WHERE MachineId = @MachineId AND State = @State
+            ORDER BY StartedAtUtc DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@MachineId", machineId.Trim());
+        command.Parameters.AddWithValue("@State", (int)BillingSessionState.Active);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await ReadSessionAsync(reader, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<BillingSessionRecord>> ListActiveAsync(CancellationToken cancellationToken = default)
+    {
+        var sessions = new List<BillingSessionRecord>();
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT Id, AuthSessionId, UserId, Username, MachineId, RentalMode, State, RatePerHour, StartedAtUtc, ExpiresAtUtc, EndedAtUtc, ChargedMinutes, AmountVnd
+            FROM BillingSessions
+            WHERE State = @State
+            ORDER BY StartedAtUtc DESC;
+            """;
+        command.Parameters.AddWithValue("@State", (int)BillingSessionState.Active);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            sessions.Add(ReadSession(reader));
+        }
+
+        return sessions;
+    }
+
+    public async Task UpdateAsync(BillingSessionRecord session, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE BillingSessions
+            SET AuthSessionId = @AuthSessionId,
+                UserId = @UserId,
+                Username = @Username,
+                MachineId = @MachineId,
+                RentalMode = @RentalMode,
+                State = @State,
+                RatePerHour = @RatePerHour,
+                StartedAtUtc = @StartedAtUtc,
+                ExpiresAtUtc = @ExpiresAtUtc,
+                EndedAtUtc = @EndedAtUtc,
+                ChargedMinutes = @ChargedMinutes,
+                AmountVnd = @AmountVnd
+            WHERE Id = @Id;
+            """;
+        BindSession(command, session);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task CloseAsync(string billingSessionId, DateTimeOffset endedAtUtc, long chargedMinutes, long amountVnd, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(billingSessionId))
+        {
+            return;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE BillingSessions
+            SET State = @State,
+                EndedAtUtc = @EndedAtUtc,
+                ChargedMinutes = @ChargedMinutes,
+                AmountVnd = @AmountVnd
+            WHERE Id = @Id;
+            """;
+        command.Parameters.AddWithValue("@Id", billingSessionId.Trim());
+        command.Parameters.AddWithValue("@State", (int)BillingSessionState.Closed);
+        command.Parameters.AddWithValue("@EndedAtUtc", endedAtUtc.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("@ChargedMinutes", chargedMinutes);
+        command.Parameters.AddWithValue("@AmountVnd", amountVnd);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void BindSession(SqliteCommand command, BillingSessionRecord session)
+    {
+        command.Parameters.AddWithValue("@Id", session.Id);
+        command.Parameters.AddWithValue("@AuthSessionId", session.AuthSessionId);
+        command.Parameters.AddWithValue("@UserId", session.UserId);
+        command.Parameters.AddWithValue("@Username", session.Username);
+        command.Parameters.AddWithValue("@MachineId", session.MachineId);
+        command.Parameters.AddWithValue("@RentalMode", (int)session.RentalMode);
+        command.Parameters.AddWithValue("@State", (int)session.State);
+        command.Parameters.AddWithValue("@RatePerHour", session.RatePerHour);
+        command.Parameters.AddWithValue("@StartedAtUtc", session.StartedAtUtc.UtcDateTime.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("@ExpiresAtUtc", session.ExpiresAtUtc?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? (object?)DBNull.Value);
+        command.Parameters.AddWithValue("@EndedAtUtc", session.EndedAtUtc?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? (object?)DBNull.Value);
+        command.Parameters.AddWithValue("@ChargedMinutes", session.ChargedMinutes);
+        command.Parameters.AddWithValue("@AmountVnd", session.AmountVnd);
+    }
+
+    private static async Task<BillingSessionRecord?> ReadSessionAsync(SqliteDataReader reader, CancellationToken cancellationToken)
+    {
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return ReadSession(reader);
+    }
+
+    private static BillingSessionRecord ReadSession(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            (BillingRentalMode)reader.GetInt32(5),
+            (BillingSessionState)reader.GetInt32(6),
+            reader.GetInt64(7),
+            DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            reader.GetInt64(11),
+            reader.GetInt64(12));
 }
 
 internal sealed class SqliteMachineRepository : IMachineRepository

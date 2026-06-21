@@ -33,7 +33,7 @@ Ban own client UI va client reaction trong core demo. Connect/login/main/lock fo
 - Form shell chi la artifact den khi duoc bind vao real client service.
 - `G1-02` evidence is ClientApp shell/startup smoke only; real connect/login rendering is `R2-U01` after the M2/M5 route exists.
 - UI result phai dua tren auth/command event that, khong dung dialog placeholder lam evidence.
-- Nop client feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
+- Nop client feature/fix branch vao `testing_branch`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

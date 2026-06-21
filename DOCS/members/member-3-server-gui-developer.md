@@ -28,7 +28,7 @@ Ban own server/admin UI cho core demo. Dashboard hien van la shell cho den khi b
 - UI khong parse packet, khong truy cap SQLite va khong invent result/error.
 - Button/row/card chi duoc coi la feature khi gui action qua real service va render real response.
 - Sample rows hoac placeholder feedback khong duoc nop lam runtime pass.
-- Nop server UI feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
+- Nop server UI feature/fix branch vao `testing_branch`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

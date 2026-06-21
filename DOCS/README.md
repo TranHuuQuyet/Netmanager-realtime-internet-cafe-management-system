@@ -18,8 +18,8 @@ Core delivery deadline: `2026-07-05`
 - Real LAN plus local multi-instance demo is mandatory before `2026-07-05` after the `2026-06-09` scope update.
 - 1-1 chat, billing/session monitor, SQLite billing restore and minimal reconnect/resync are required demo scope, not retained extensions.
 - Important secondary features that were not promoted remain in `Retained Extension Track` and opened only after required core gates pass.
-- `develop` is the integration/testing branch; members merge feature/fix branches into `develop`, not directly into `main`.
-- `main` receives a candidate only after M6 verifies the integrated `develop` build as `Pass` and M1 approves the promotion.
+- `testing_branch` is the integration/testing branch; members merge feature/fix branches into `testing_branch`, not directly into `main`.
+- `main` receives a candidate only after M6 verifies the integrated `testing_branch` build as `Pass` and M1 approves the promotion.
 - Previous 8-week tasks are retained as audit history, not active completion evidence.
 - A docs draft, UI shell or code skeleton does not count as delivered runtime behavior.
 

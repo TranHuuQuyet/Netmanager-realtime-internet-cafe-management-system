@@ -37,7 +37,7 @@ Ban khong own:
 - Auth duoc goi qua interface, khong embed SQL vao network layer.
 - GUI khong parse packet truc tiep trong form khi da co service boundary.
 - R1 scope stops at shared/server network foundation and local JSON-line evidence; ClientApp UI login integration starts in R2.
-- Nop thay doi networking/contract qua feature/fix branch vao `develop`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
+- Nop thay doi networking/contract qua feature/fix branch vao `testing_branch`; khong merge truc tiep vao `main`, va cho M6 `Pass` truoc release promotion.
 
 ## Core Assignments
 

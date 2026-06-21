@@ -24,9 +24,9 @@ Rules:
 - Previous 8-week checkboxes are historical evidence only; they no longer express active delivery completion.
 - A checked item in `DOCS/TASKS.md` records submitted member work; it is not a runtime or gate pass.
 - Delivery pass is counted only from verified results in `DOCS/TEST_MATRIX.md` and `DOCS/DEMO_CHECKLIST.md`, with M1 approval where a gate requires it.
-- `develop` is the integration/testing branch; `main` is the accepted release branch.
-- Members submit feature or fix branches to `develop`; no member feature branch merges directly into `main`.
-- A change may enter `main` only after M6 records a `Pass` for the integrated `develop` candidate and M1 approves the promotion.
+- `testing_branch` is the integration/testing branch; `main` is the accepted release branch.
+- Members submit feature or fix branches to `testing_branch`; no member feature branch merges directly into `main`.
+- A change may enter `main` only after M6 records a `Pass` for the integrated `testing_branch` candidate and M1 approves the promotion.
 - If code and docs differ, runtime is not approved until the owning contract/docs and tests are aligned.
 - If a core gate is red, retained extension work cannot begin unless M1 records an exception that does not delay required recovery.
 
@@ -125,11 +125,11 @@ These features do not enter development before `G5 Release` unless M1 formally c
 
 - Packet/schema changes require M2 proposal, M1 approval and M5 review when auth/session is affected.
 - Auth/schema/seed changes require M5 proposal and M1 approval before M2 or UI owners consume them.
-- Each member branches from the latest `develop`, implements one scoped feature/fix, and opens the PR back into `develop`.
-- Merge candidates into `develop` must build and carry the relevant owner evidence; integration into `develop` means ready for M6 testing, not accepted release.
-- M6 tests the integrated candidate on `develop` and records the tested commit/build identity and result in `DOCS/TEST_MATRIX.md` or `DOCS/DEMO_CHECKLIST.md`.
-- Only a `develop` candidate with the required M6 `Pass` result may be promoted to `main`; M1 approves and performs or authorizes that merge.
-- A failed or blocked candidate stays out of `main` and returns to the owning feature/fix flow through `develop`.
+- Each member branches from the latest `testing_branch`, implements one scoped feature/fix, and opens the PR back into `testing_branch`.
+- Merge candidates into `testing_branch` must build and carry the relevant owner evidence; integration into `testing_branch` means ready for M6 testing, not accepted release.
+- M6 tests the integrated candidate on `testing_branch` and records the tested commit/build identity and result in `DOCS/TEST_MATRIX.md` or `DOCS/DEMO_CHECKLIST.md`.
+- Only a `testing_branch` candidate with the required M6 `Pass` result may be promoted to `main`; M1 approves and performs or authorizes that merge.
+- A failed or blocked candidate stays out of `main` and returns to the owning feature/fix flow through `testing_branch`.
 - Uncommitted local forms, docs or database files are artifacts, not delivered integration.
 
 ### Handoff Evidence

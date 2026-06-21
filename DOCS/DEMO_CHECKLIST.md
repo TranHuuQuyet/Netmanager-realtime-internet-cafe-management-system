@@ -56,7 +56,7 @@ At final reporting, each extension is marked `Verified Pass Before Release`, `Op
 ## Fallback And Guardrails
 
 - Physical LAN and local multi-instance regression are both required after the `2026-06-09` scope decision.
-- The release candidate reaches `main` only after M6 verifies its integrated `develop` build as `Pass` and M1 approves promotion.
+- The release candidate reaches `main` only after M6 verifies its integrated `testing_branch` build as `Pass` and M1 approves promotion.
 - If a required LAN/chat/billing path cannot pass, it is a core blocker unless M1 records an explicit demo exception.
 - Local multi-instance never replaces a failing physical LAN path, and physical LAN never replaces a failing local regression path.
 - No extension may enter the demo script if it introduces an open High/Critical blocker.

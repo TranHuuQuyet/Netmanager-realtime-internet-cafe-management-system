@@ -9,6 +9,9 @@ namespace ServerApp;
 
 static class Program
 {
+    private const int NetworkPort = 5000;
+    private static readonly IPAddress NetworkBindAddress = IPAddress.Any;
+
     [STAThread]
     static void Main()
     {
@@ -51,8 +54,8 @@ static class Program
     private static TcpJsonLineServer? TryStartNetworkServer(AuthRuntime authRuntime)
     {
         var server = new TcpJsonLineServer(
-            IPAddress.Loopback,
-            5000,
+            NetworkBindAddress,
+            NetworkPort,
             new PacketDispatcher(authRuntime.Auth, authRuntime.SessionRepository, authRuntime.Machines),
             authRuntime.SessionService);
 
@@ -65,7 +68,7 @@ static class Program
         {
             server.Dispose();
             MessageBox.Show(
-                $"Khong the mo cong TCP 127.0.0.1:5000.\n\n{ex.Message}",
+                $"Khong the mo cong TCP {NetworkBindAddress}:{NetworkPort}.\n\n{ex.Message}",
                 "NetManager Network",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);

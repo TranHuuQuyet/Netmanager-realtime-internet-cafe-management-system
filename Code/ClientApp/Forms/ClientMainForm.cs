@@ -10,18 +10,34 @@ namespace ClientApp.Forms;
 
 public sealed class ClientMainForm : Form
 {
+    // Kết nối TCP được chuyển từ ConnectForm sang và được giữ trong suốt phiên sử dụng.
     private readonly TcpClientConnection _connection;
+
+    // Thời điểm đăng nhập luôn được chuẩn hóa về UTC để tính thời lượng không phụ
+    // thuộc múi giờ của máy trạm.
     private readonly DateTime _loginTimeUtc;
     private readonly string _machineId;
     private readonly string _sessionId;
+
+    // Chuỗi host:port dùng để hiển thị cùng trạng thái kết nối hiện tại.
     private readonly string _serverEndpoint;
+
+    // Timer WinForms chạy trên UI thread mỗi giây để cập nhật thời gian sử dụng.
     private readonly System.Windows.Forms.Timer _sessionTimer = new();
+
+    // Handler lắng nghe packet điều khiển runtime và chuyển chúng thành sự kiện LOCK/UNLOCK.
     private readonly ClientRuntimeCommandHandler _commandHandler;
+
+    // Form khóa chỉ tồn tại khi server đã khóa máy; null khi máy đang mở.
     private LockScreenForm? _lockScreen;
     private bool _isLockedByServer;
+
+    // Hai TextBox được tạo bằng code trong BuildInfoLayout nên được gán sau constructor.
     private TextBox _usedTimeTextBox = null!;
     private TextBox _serverTextBox = null!;
 
+    // Nhận thông tin phiên đã xác thực từ ConnectForm, dựng giao diện và đăng ký toàn
+    // bộ sự kiện kết nối/lệnh cần thiết cho thời gian chạy của máy trạm.
     public ClientMainForm(
         string username,
         string machineId,
@@ -31,12 +47,15 @@ public sealed class ClientMainForm : Form
         DateTime loginTimeUtc,
         TcpClientConnection connection)
     {
+        // Fail-fast nếu ConnectForm không chuyển kết nối hợp lệ; các giá trị định danh
+        // được trim trước khi dùng làm source của packet.
         _connection = connection ?? throw new ArgumentNullException(nameof(connection));
         _loginTimeUtc = DateTime.SpecifyKind(loginTimeUtc, DateTimeKind.Utc);
         _machineId = machineId.Trim();
         _sessionId = sessionId.Trim();
         _serverEndpoint = $"{host}:{port}";
 
+        // Cấu hình cửa sổ cố định để màn hình phiên làm việc có kích thước nhất quán.
         Text = "Máy trạm";
         ClientSize = new Size(420, 380);
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -44,6 +63,7 @@ public sealed class ClientMainForm : Form
         StartPosition = FormStartPosition.CenterParent;
         Padding = new Padding(16);
 
+        // Layout gốc chia form thành tiêu đề máy, thông tin phiên và dải nút thao tác.
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -54,6 +74,7 @@ public sealed class ClientMainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
 
+        // Các layout con được tạo bằng helper để constructor chỉ điều phối cấu trúc tổng thể.
         root.Controls.Add(new Label
         {
             Dock = DockStyle.Fill,
@@ -65,19 +86,23 @@ public sealed class ClientMainForm : Form
         root.Controls.Add(BuildActionStrip(), 0, 2);
         Controls.Add(root);
 
+        // Tooltip lưu lại thông tin đăng nhập đầy đủ mà không chiếm diện tích form.
         ToolTip tooltip = new();
         tooltip.SetToolTip(this, $"Đã đăng nhập {username}/{machineId} tại {host}:{port}.");
 
+        // Cập nhật thời gian ngay khi mở form, sau đó tăng mỗi giây bằng Timer UI.
         _sessionTimer.Interval = 1000;
         _sessionTimer.Tick += (_, _) => UpdateUsedTime();
         _sessionTimer.Start();
         UpdateUsedTime();
 
+        // Đăng ký nhận lệnh runtime. Mỗi sự kiện được hủy đăng ký trong OnFormClosed.
         _commandHandler = new ClientRuntimeCommandHandler(_connection, _machineId);
         _commandHandler.LockRequested += ApplyLockCommand;
         _commandHandler.UnlockRequested += ApplyUnlockCommand;
         _commandHandler.InvalidPacketIgnored += CommandHandler_InvalidPacketIgnored;
 
+        // Theo dõi vòng đời kết nối để cập nhật giao diện và gửi lại trạng thái sau reconnect.
         _connection.Connected += Connection_Connected;
         _connection.Disconnected += Connection_Disconnected;
         _connection.ReconnectFailed += Connection_ReconnectFailed;
@@ -85,12 +110,15 @@ public sealed class ClientMainForm : Form
             ? "connected"
             : "disconnected - reconnecting");
 
+        // Nếu socket vẫn nối từ bước đăng nhập, báo ngay trạng thái phiên đang hoạt động.
         if (_connection.IsConnected)
         {
             _ = SendResumeStatusAsync();
         }
     }
 
+    // Chuyển MachineId thành tiêu đề thân thiện. PC-01 được hiển thị theo tên mặc
+    // định; ID khác giữ nguyên sau khi loại khoảng trắng.
     private static string MachineCaption(string machineId)
     {
         if (string.Equals(machineId, "PC-01", StringComparison.OrdinalIgnoreCase))
@@ -101,6 +129,8 @@ public sealed class ClientMainForm : Form
         return string.IsNullOrWhiteSpace(machineId) ? "Máy 1" : machineId.Trim();
     }
 
+    // Tạo bảng hai cột chứa thông tin tài khoản/phiên và giữ tham chiếu tới các ô
+    // cần cập nhật động là thời gian sử dụng và trạng thái máy chủ.
     private Control BuildInfoLayout(string username, string sessionId, string host, int port)
     {
         var infoLayout = new TableLayoutPanel
@@ -113,6 +143,7 @@ public sealed class ClientMainForm : Form
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142F));
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
+        // Năm dòng chia đều chiều cao của vùng thông tin.
         for (var row = 0; row < 5; row++)
         {
             infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
@@ -127,6 +158,7 @@ public sealed class ClientMainForm : Form
         return infoLayout;
     }
 
+    // Thêm một cặp Label/TextBox chỉ đọc vào đúng hàng và trả về TextBox vừa tạo.
     private static TextBox AddInfoRow(TableLayoutPanel layout, int row, string label, string value)
     {
         layout.Controls.Add(new Label
@@ -136,6 +168,7 @@ public sealed class ClientMainForm : Form
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, row);
+        // TextBox chỉ dùng hiển thị, không nhận Tab focus và không cho người dùng sửa.
         var textBox = new TextBox
         {
             Dock = DockStyle.Fill,
@@ -149,6 +182,7 @@ public sealed class ClientMainForm : Form
         return textBox;
     }
 
+    // Tạo dải nút phía dưới. RightToLeft khiến nút đầu tiên được thêm nằm sát mép phải.
     private Control BuildActionStrip()
     {
         var panel = new FlowLayoutPanel
@@ -164,6 +198,7 @@ public sealed class ClientMainForm : Form
         return panel;
     }
 
+    // Factory dùng chung để ba nút có cùng kích thước, margin và cách gắn handler.
     private static Button BuildButton(string text, EventHandler clickHandler)
     {
         var button = new Button
@@ -177,25 +212,31 @@ public sealed class ClientMainForm : Form
         return button;
     }
 
+    // Chức năng đổi mật khẩu chưa nối tới API xác thực nên hiện chỉ thông báo trạng thái.
     private void ChangePassword_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(this, "Chức năng đổi mật khẩu đang chờ tích hợp hệ thống xác thực.", "Mật khẩu", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
+    // Đăng xuất bằng cách đóng form chính; OnFormClosed sẽ giải phóng kết nối và handler.
     private void Logout_Click(object? sender, EventArgs e)
     {
         Close();
     }
 
+    // Khu vực giao tiếp đang là placeholder cho route CHAT phía client.
     private void Communication_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(this, "Giao tiếp với máy chủ sẽ được bật sau khi route CHAT sẵn sàng.", "Giao tiếp", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
+    // Tính thời gian đã dùng từ mốc UTC đăng nhập và hiển thị theo HH:mm:ss. TotalHours
+    // được ép int để số giờ vẫn tăng qua 24 thay vì quay lại 00 như TimeSpan.Hours.
     private void UpdateUsedTime()
     {
         TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc;
 
+        // Bảo vệ trường hợp đồng hồ máy bị lệch khiến loginTime nằm trong tương lai.
         if (elapsed < TimeSpan.Zero)
         {
             elapsed = TimeSpan.Zero;
@@ -204,40 +245,52 @@ public sealed class ClientMainForm : Form
         _usedTimeTextBox.Text = $"{(int)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
     }
 
+    // Khi kết nối hoặc reconnect thành công, cập nhật UI rồi gửi lại trạng thái Online
+    // để server phục hồi thông tin phiên của client.
     private async void Connection_Connected()
     {
         UpdateServerConnectionStatus("connected");
         await SendResumeStatusAsync();
     }
 
+    // Mất kết nối chưa đóng phiên vì TcpClientConnection sẽ tự thử reconnect.
     private void Connection_Disconnected()
     {
         UpdateServerConnectionStatus("disconnected - reconnecting");
     }
 
+    // Một lượt reconnect thất bại được phản ánh trên UI; exception không hiển thị trực tiếp.
     private void Connection_ReconnectFailed(Exception _)
     {
         UpdateServerConnectionStatus("waiting for server");
     }
 
+    // Packet điều khiển sai được bỏ qua an toàn và chỉ cập nhật trạng thái chẩn đoán.
     private void CommandHandler_InvalidPacketIgnored()
     {
         UpdateServerConnectionStatus("connected - ignored invalid packet");
     }
 
+    // Áp dụng lệnh LOCK từ server, hiển thị LockScreenForm và gửi ACK tương ứng với
+    // RequestId của packet để server đối chiếu kết quả.
     private void ApplyLockCommand(Packet<LockPayload> packet)
     {
+        // Sự kiện packet có thể phát từ luồng đọc socket; mọi thao tác control phải
+        // được chuyển về UI thread.
         if (InvokeRequired)
         {
             BeginInvoke(() => ApplyLockCommand(packet));
             return;
         }
 
+        // Bỏ qua packet đến muộn sau khi form đã kết thúc vòng đời.
         if (IsDisposed)
         {
             return;
         }
 
+        // LOCK lặp không tạo thêm form. Kích hoạt cửa sổ hiện có và vẫn ACK thành công
+        // để server biết trạng thái khóa đã được bảo đảm.
         if (_lockScreen is { IsDisposed: false })
         {
             SetClientSurfaceLocked(true);
@@ -247,6 +300,7 @@ public sealed class ClientMainForm : Form
             return;
         }
 
+        // Lệnh LOCK đầu tiên khóa các control form chính rồi mở form chặn thao tác.
         SetClientSurfaceLocked(true);
         _lockScreen = new LockScreenForm();
         _lockScreen.FormClosed += LockScreen_FormClosed;
@@ -255,19 +309,24 @@ public sealed class ClientMainForm : Form
         _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Lock applied.");
     }
 
+    // Áp dụng lệnh UNLOCK, đóng màn hình khóa bằng đường được server cho phép và gửi ACK.
     private void ApplyUnlockCommand(Packet<UnlockPayload> packet)
     {
+        // Đồng bộ về UI thread vì handler mạng không chạy trên message loop của form.
         if (InvokeRequired)
         {
             BeginInvoke(() => ApplyUnlockCommand(packet));
             return;
         }
 
+        // Không truy cập control nếu form chính đã bị Dispose.
         if (IsDisposed)
         {
             return;
         }
 
+        // Nếu màn hình khóa còn sống, UnlockFromServer đặt cờ cho phép đóng. Nếu không,
+        // chỉ dọn tham chiếu để trạng thái nội bộ vẫn nhất quán.
         if (_lockScreen is { IsDisposed: false })
         {
             _lockScreen.UnlockFromServer();
@@ -277,11 +336,13 @@ public sealed class ClientMainForm : Form
             _lockScreen = null;
         }
 
+        // Mở lại bề mặt client kể cả khi form khóa không tồn tại, giúp UNLOCK có tính idempotent.
         SetClientSurfaceLocked(false);
         UpdateServerConnectionStatus("connected - unlocked by server");
         _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Unlock applied.");
     }
 
+    // Dọn tham chiếu khi màn hình khóa đóng và hủy handler để tránh giữ object cũ.
     private void LockScreen_FormClosed(object? sender, FormClosedEventArgs e)
     {
         if (sender is LockScreenForm lockScreen)
@@ -289,24 +350,29 @@ public sealed class ClientMainForm : Form
             lockScreen.FormClosed -= LockScreen_FormClosed;
         }
 
+        // Form khóa đã biến mất nên luôn khôi phục khả năng tương tác của form chính.
         _lockScreen = null;
         SetClientSurfaceLocked(false);
     }
 
+    // Ghi nhận trạng thái khóa và bật/tắt toàn bộ control cấp một của form chính.
     private void SetClientSurfaceLocked(bool locked)
     {
         _isLockedByServer = locked;
 
+        // Vô hiệu hóa container gốc sẽ làm toàn bộ control con không nhận thao tác.
         foreach (Control control in Controls)
         {
             control.Enabled = !locked;
         }
     }
 
+    // Gửi packet STATUS Online sau đăng nhập/reconnect để server gắn lại máy với phiên hiện tại.
     private async Task SendResumeStatusAsync()
     {
         try
         {
+            // RequestId mới xác định riêng lần cập nhật; LastSeen dùng UTC để đồng bộ máy chủ.
             var statusPacket = PacketFactory.CreateStatus(
                 source: _machineId,
                 target: NetworkProtocol.ServerSource,
@@ -320,18 +386,23 @@ public sealed class ClientMainForm : Form
                 },
                 requestId: Guid.NewGuid().ToString("N"));
 
+            // Packet typed được serialize thành một dòng JSON trước khi chuyển qua TCP.
             await _connection.SendAsync(JsonHelper.SerializeToJson(statusPacket));
         }
         catch (Exception)
         {
+            // Không đóng form khi status tạm thời chưa gửi được; auto reconnect có thể
+            // kích hoạt lần gửi lại sau đó.
             UpdateServerConnectionStatus("connected - status pending");
         }
     }
 
+    // Gửi ACK cho lệnh LOCK/UNLOCK, giữ nguyên RequestId của lệnh gốc để server ghép cặp.
     private async Task SendCommandAckAsync(PacketType commandType, string? requestId, string status, string message)
     {
         try
         {
+            // AckFor mô tả loại lệnh, còn MachineId xác định client đã thực thi lệnh.
             var ackPacket = PacketFactory.CreateAck(
                 source: _machineId,
                 target: NetworkProtocol.ServerSource,
@@ -348,10 +419,14 @@ public sealed class ClientMainForm : Form
         }
         catch (Exception)
         {
+            // ACK lỗi chỉ làm thay đổi trạng thái hiển thị; lệnh đã áp dụng cục bộ không
+            // bị hoàn tác vì mất phản hồi mạng.
             UpdateServerConnectionStatus("connected - command ACK pending");
         }
     }
 
+    // Hiển thị endpoint cùng trạng thái kết nối; helper tự marshal về UI thread để
+    // mọi callback networking có thể gọi trực tiếp.
     private void UpdateServerConnectionStatus(string status)
     {
         if (InvokeRequired)
@@ -360,12 +435,15 @@ public sealed class ClientMainForm : Form
             return;
         }
 
+        // Callback có thể được xếp hàng trước lúc đóng form, nên kiểm tra lại Dispose.
         if (!IsDisposed)
         {
             _serverTextBox.Text = $"{_serverEndpoint} ({status})";
         }
     }
 
+    // Rút gọn SessionId còn tối đa 12 ký tự cho vừa giao diện; ID đầy đủ vẫn được giữ
+    // trong field _sessionId để gửi packet.
     private static string ShortSessionId(string sessionId)
     {
         if (string.IsNullOrWhiteSpace(sessionId))
@@ -376,22 +454,29 @@ public sealed class ClientMainForm : Form
         return sessionId.Length <= 12 ? sessionId : sessionId[..12];
     }
 
+    // Chuyển mốc UTC sang giờ địa phương chỉ tại bước hiển thị cho người dùng.
     private static string FormatLoginTime(DateTime loginTimeUtc)
     {
         return loginTimeUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
     }
 
+    // Giải phóng toàn bộ subscription, handler, form khóa và timer khi phiên kết thúc.
+    // Thứ tự dọn dẹp ngăn callback mạng tiếp tục truy cập control đã Dispose.
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        // Ngừng nhận lệnh trước rồi Dispose command handler.
         _commandHandler.LockRequested -= ApplyLockCommand;
         _commandHandler.UnlockRequested -= ApplyUnlockCommand;
         _commandHandler.InvalidPacketIgnored -= CommandHandler_InvalidPacketIgnored;
         _commandHandler.Dispose();
 
+        // Hủy các callback trạng thái của kết nối; TcpClientConnection do ConnectForm
+        // sở hữu sẽ được Dispose khi form đăng nhập đóng.
         _connection.Connected -= Connection_Connected;
         _connection.Disconnected -= Connection_Disconnected;
         _connection.ReconnectFailed -= Connection_ReconnectFailed;
 
+        // Cho phép đóng màn hình khóa theo đường server để handler FormClosing không chặn.
         if (_lockScreen is { IsDisposed: false })
         {
             _lockScreen.FormClosed -= LockScreen_FormClosed;
@@ -399,11 +484,13 @@ public sealed class ClientMainForm : Form
             _lockScreen = null;
         }
 
+        // Khôi phục control trước khi form chính hoàn tất đóng để trạng thái không bị kẹt.
         if (_isLockedByServer)
         {
             SetClientSurfaceLocked(false);
         }
 
+        // Timer phải được dừng và Dispose để không còn Tick sau khi form đóng.
         _sessionTimer.Stop();
         _sessionTimer.Dispose();
         base.OnFormClosed(e);

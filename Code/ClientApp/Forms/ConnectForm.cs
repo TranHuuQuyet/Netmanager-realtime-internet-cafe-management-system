@@ -12,26 +12,38 @@ namespace ClientApp.Forms;
 
 public partial class ConnectForm : Form
 {
+    // Cấu hình khởi chạy chứa host/port server và MachineId mặc định từ Program.
     private readonly ClientLaunchOptions _launchOptions;
+
+    // Kết nối chỉ được gán vào field sau khi đăng nhập thành công. Trước thời điểm đó,
+    // kết nối tạm được giữ trong biến local để dễ Dispose khi có lỗi.
     private TcpClientConnection? _connection;
 
+    // Dựng control từ Designer và điền sẵn mã máy theo tùy chọn khởi chạy.
     public ConnectForm(ClientLaunchOptions launchOptions)
     {
+        // Form không thể hoạt động nếu thiếu endpoint/mã máy đầu vào.
         _launchOptions = launchOptions ?? throw new ArgumentNullException(nameof(launchOptions));
 
         InitializeComponent();
         txtMachineId.Text = _launchOptions.MachineId;
     }
 
+    // Kiểm tra dữ liệu đầu vào, mở TCP, gửi LOGIN và chỉ chuyển sang ClientMainForm
+    // khi server trả về kết quả xác thực thành công.
     private async void BtnLogin_Click(object? sender, EventArgs e)
     {
+        // Đặt lại vùng thông báo về màu lỗi mặc định và xóa nội dung của lần thử trước.
         lblMessage.ForeColor = Color.FromArgb(170, 45, 45);
         lblMessage.Text = string.Empty;
 
+        // Username/MachineId được trim; password giữ nguyên vì khoảng trắng có thể là
+        // một phần hợp lệ của mật khẩu.
         string username = txtUsername.Text.Trim();
         string password = txtPassword.Text;
         string machineId = txtMachineId.Text.Trim();
 
+        // Dừng tại trường sai đầu tiên và đưa focus về đúng control để người dùng sửa.
         if (string.IsNullOrWhiteSpace(username))
         {
             ShowValidationMessage("Vui lòng nhập tên tài khoản.", txtUsername);
@@ -50,16 +62,21 @@ public partial class ConnectForm : Form
             return;
         }
 
+        // Chuyển sang trạng thái đang xử lý và khóa nút để tránh nhiều request LOGIN
+        // chạy song song trên các kết nối khác nhau.
         lblMessage.ForeColor = SystemColors.ControlText;
         lblMessage.Text = $"Đang kết nối {_launchOptions.ServerHost}:{_launchOptions.ServerPort}...";
         btnLogin.Enabled = false;
         btnExit.Enabled = false;
 
+        // pendingConnection chỉ trở thành _connection khi xác thực thành công. Cờ
+        // loginSucceeded quyết định có mở lại nút ở finally hay không.
         TcpClientConnection? pendingConnection = new();
         bool loginSucceeded = false;
 
         try
         {
+            // Toàn bộ connect/send/wait response có giới hạn 10 giây để UI không chờ vô hạn.
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             ClientLoginAuthResult authResult = await SendLoginAsync(
                 pendingConnection,
@@ -68,44 +85,56 @@ public partial class ConnectForm : Form
                 machineId,
                 timeout.Token);
 
+            // Lỗi nghiệp vụ được server trả về dưới dạng result, không phải exception.
             if (!authResult.IsSuccess)
             {
                 ShowErrorMessage(CreateLoginFailureMessage(authResult));
                 return;
             }
 
+            // Thay kết nối cũ nếu có, chuyển quyền sở hữu kết nối tạm sang field và bật
+            // tự reconnect cho giai đoạn chạy ClientMainForm.
             _connection?.Dispose();
             _connection = pendingConnection;
             _connection.EnableAutoReconnect();
             pendingConnection = null;
             loginSucceeded = true;
 
+            // Mở form phiên làm việc bằng thông tin server đã xác nhận.
             ShowClientMainForm(authResult);
         }
+        // Timeout hoặc cancellation đều được diễn giải thành server không phản hồi.
         catch (OperationCanceledException)
         {
             ShowErrorMessage("Không nhận được phản hồi từ máy chủ. Vui lòng thử lại.");
         }
+        // Lỗi ở bước tạo/kết nối socket thường do server chưa chạy hoặc sai endpoint.
         catch (SocketException)
         {
             ShowErrorMessage("Không thể kết nối TCP. Hãy mở ServerApp trước và kiểm tra host/port.");
         }
+        // Socket đã mở nhưng luồng dữ liệu bị ngắt trong quá trình đăng nhập.
         catch (IOException)
         {
             ShowErrorMessage("Kết nối TCP bị ngắt khi đăng nhập.");
         }
+        // Packet nhận được nhưng cấu trúc/nội dung không đúng contract LOGIN.
         catch (InvalidDataException ex)
         {
             ShowErrorMessage($"Phản hồi máy chủ không hợp lệ: {ex.Message}");
         }
+        // Trạng thái/protocol hợp lệ về cú pháp nhưng không phù hợp với luồng LOGIN.
         catch (InvalidOperationException ex)
         {
             ShowErrorMessage(ex.Message);
         }
         finally
         {
+            // Sau thành công pendingConnection đã được đặt null, nên chỉ kết nối thất
+            // bại mới bị Dispose tại đây.
             pendingConnection?.Dispose();
 
+            // Nếu chưa chuyển sang form chính và form đăng nhập vẫn sống, mở lại nút.
             if (!loginSucceeded && !IsDisposed)
             {
                 btnLogin.Enabled = true;
@@ -114,17 +143,21 @@ public partial class ConnectForm : Form
         }
     }
 
+    // Đóng form đăng nhập; OnFormClosed chịu trách nhiệm dừng và Dispose kết nối nếu có.
     private void BtnExit_Click(object? sender, EventArgs e)
     {
         Close();
     }
 
+    // Hiển thị lỗi nhập liệu và chuyển focus tới trường cần sửa.
     private void ShowValidationMessage(string message, Control focusTarget)
     {
         lblMessage.Text = message;
         focusTarget.Focus();
     }
 
+    // Thực hiện một request/response LOGIN có correlation bằng RequestId. Handler tạm
+    // chỉ nhận hai loại packet phản hồi LOGIN và được gỡ ngay khi request kết thúc.
     private async Task<ClientLoginAuthResult> SendLoginAsync(
         TcpClientConnection connection,
         string username,
@@ -132,15 +165,20 @@ public partial class ConnectForm : Form
         string machineId,
         CancellationToken cancellationToken)
     {
+        // RequestId duy nhất ghép phản hồi đúng với lần đăng nhập này. TCS chuyển callback
+        // MessageReceived thành Task có thể await trong luồng xử lý hiện tại.
         string requestId = Guid.NewGuid().ToString("N");
         var responseSource = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        // Local handler deserialize từng JSON line và chỉ hoàn tất TCS khi RequestId khớp.
         void HandleMessage(string message)
         {
             try
             {
                 object response = JsonHelper.DeserializePacket(message);
 
+                // LOGIN thành công có payload phiên; LOGIN thất bại dùng EmptyPayload
+                // kèm Error. Packet không liên quan được bỏ qua để handler khác xử lý.
                 if (response is Packet<LoginResultPayload> successPacket
                     && string.Equals(successPacket.RequestId, requestId, StringComparison.Ordinal))
                 {
@@ -154,14 +192,18 @@ public partial class ConnectForm : Form
             }
             catch (Exception ex)
             {
+                // Lỗi deserialize/protocol được chuyển sang Task chờ phía dưới.
                 responseSource.TrySetException(ex);
             }
         }
 
+        // Đăng ký trước khi gửi để không bỏ lỡ phản hồi rất nhanh từ server.
         connection.MessageReceived += HandleMessage;
 
         try
         {
+            // Packet LOGIN mang role Client, thông tin xác thực và cùng RequestId đã
+            // dùng để lọc phản hồi.
             var loginPacket = PacketFactory.CreateLogin(
                 source: machineId,
                 target: NetworkProtocol.ServerSource,
@@ -174,11 +216,13 @@ public partial class ConnectForm : Form
                 },
                 requestId: requestId);
 
+            // Kết nối trước, gửi JSON line sau, rồi chờ TCS hoặc cancellation timeout.
             await connection.ConnectAsync(_launchOptions.ServerHost, _launchOptions.ServerPort, cancellationToken);
             await connection.SendAsync(JsonHelper.SerializeToJson(loginPacket), cancellationToken);
 
             object response = await responseSource.Task.WaitAsync(cancellationToken);
 
+            // Chuyển packet wire-level thành model kết quả đơn giản cho tầng UI.
             return response switch
             {
                 Packet<LoginResultPayload> successPacket when successPacket.Success == true
@@ -191,10 +235,14 @@ public partial class ConnectForm : Form
         }
         finally
         {
+            // Luôn gỡ local handler để các lần LOGIN sau không tích lũy subscriber và
+            // packet runtime không bị handler đăng nhập cũ xử lý.
             connection.MessageReceived -= HandleMessage;
         }
     }
 
+    // Ánh xạ mã lỗi ổn định từ server sang thông báo thân thiện. Khi không nhận diện
+    // mã lỗi, ưu tiên chi tiết server rồi mới dùng thông báo mặc định.
     private static string CreateLoginFailureMessage(ClientLoginAuthResult authResult)
     {
         return authResult.ErrorCode switch
@@ -211,16 +259,20 @@ public partial class ConnectForm : Form
         };
     }
 
+    // Chuẩn hóa cách hiển thị lỗi nghiệp vụ và lỗi kỹ thuật trên cùng label.
     private void ShowErrorMessage(string message)
     {
         lblMessage.ForeColor = Color.FromArgb(170, 45, 45);
         lblMessage.Text = message;
     }
 
+    // Ẩn form kết nối, chạy ClientMainForm theo modal và chỉ đóng ConnectForm sau khi
+    // phiên client kết thúc. Kết nối TCP được truyền tiếp, không tạo socket mới.
     private void ShowClientMainForm(ClientLoginAuthResult authResult)
     {
         Hide();
 
+        // using bảo đảm ClientMainForm được Dispose sau ShowDialog.
         using var mainForm = new ClientMainForm(
             authResult.Username,
             authResult.MachineId,
@@ -234,8 +286,12 @@ public partial class ConnectForm : Form
         Close();
     }
 
+    // Model nội bộ gom dữ liệu của cả phản hồi thành công và thất bại, giúp code UI
+    // không phụ thuộc trực tiếp vào nhiều kiểu Packet khác nhau.
     private sealed class ClientLoginAuthResult
     {
+        // Constructor private buộc caller tạo model qua FromSuccess/FromFailure để
+        // mọi invariant của kết quả được kiểm tra tập trung.
         private ClientLoginAuthResult(
             bool isSuccess,
             string? sessionId,
@@ -254,6 +310,7 @@ public partial class ConnectForm : Form
             ErrorMessage = errorMessage;
         }
 
+        // Các property chỉ đọc vì kết quả xác thực không thay đổi sau khi được tạo.
         public bool IsSuccess { get; }
 
         public string? SessionId { get; }
@@ -268,11 +325,14 @@ public partial class ConnectForm : Form
 
         public string? ErrorMessage { get; }
 
+        // Tạo kết quả thành công từ payload server và kiểm tra SessionId bắt buộc.
         public static ClientLoginAuthResult FromSuccess(
             Packet<LoginResultPayload> packet,
             string requestedUsername,
             string requestedMachineId)
         {
+            // Success packet thiếu payload/session không đủ dữ liệu mở phiên nên được
+            // xem là lỗi protocol thay vì đăng nhập thành công một phần.
             LoginResultPayload payload = packet.TypedPayload
                 ?? throw new InvalidDataException("LOGIN success response is missing payload.");
 
@@ -291,6 +351,8 @@ public partial class ConnectForm : Form
                 errorMessage: null);
         }
 
+        // Tạo kết quả thất bại từ Error metadata; các trường phiên để rỗng vì chưa
+        // có session hợp lệ.
         public static ClientLoginAuthResult FromFailure(Packet<EmptyPayload> packet)
         {
             return new ClientLoginAuthResult(
@@ -303,6 +365,8 @@ public partial class ConnectForm : Form
                 errorMessage: packet.Error?.Details ?? packet.Message);
         }
 
+        // Tin giá trị đã chuẩn hóa từ server khi có; fallback về dữ liệu request nếu
+        // server không gửi lại username hoặc MachineId.
         private static string UseServerValueOrFallback(string? serverValue, string fallback)
         {
             return string.IsNullOrWhiteSpace(serverValue)
@@ -311,6 +375,7 @@ public partial class ConnectForm : Form
         }
     }
 
+    // Dừng auto reconnect và giải phóng socket khi form kết nối kết thúc vòng đời.
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _connection?.DisableAutoReconnect();

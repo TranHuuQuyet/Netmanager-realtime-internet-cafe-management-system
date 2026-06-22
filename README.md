@@ -42,10 +42,10 @@ Extension status is tracked in [DOCS/TASKS.md](DOCS/TASKS.md) and [DOCS/TEST_MAT
 
 ## Branch And Promotion Rule
 
-- Members create feature/fix branches from `develop` and open merge requests or pull requests back into `develop`.
-- `develop` is the shared integration branch on which M6 tests candidate behavior and records evidence.
-- `main` is reserved for accepted code: only a `develop` candidate with an M6 `Pass` record and M1 approval is merged into `main`.
-- Failed or blocked candidates are corrected through the feature/fix to `develop` flow and do not enter `main`.
+- Members create feature/fix branches from `testing_branch` and open merge requests or pull requests back into `testing_branch`.
+- `testing_branch` is the shared integration branch on which M6 tests candidate behavior and records evidence.
+- `main` is reserved for accepted code: only a `testing_branch` candidate with an M6 `Pass` record and M1 approval is merged into `main`.
+- Failed or blocked candidates are corrected through the feature/fix to `testing_branch` flow and do not enter `main`.
 
 ## Solution Shape
 

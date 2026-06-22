@@ -2,7 +2,7 @@
 
 Prepared by: M6 (Tester)
 
-This report is the prepared verification template for Sprint R2. It records the checks required before the integrated develop candidate can be marked as passing G2 Auth & Status.
+This report is the prepared verification template for Sprint R2. It records the checks required before the integrated testing_branch candidate can be marked as passing G2 Auth & Status.
 
 Sprint: R2 (2026-06-01 to 2026-06-07)
 

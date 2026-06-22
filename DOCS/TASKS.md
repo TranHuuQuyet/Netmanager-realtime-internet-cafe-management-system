@@ -11,8 +11,8 @@ Roadmap 8 tuan cu da bi supersede boi recovery roadmap vi build va runtime gate 
 - Trong cac bang task `R1-R6`, `[x]` nghia la owner da nop phan viec/evidence duoc yeu cau; `[ ]` nghia la chua nop, dang bi block hoac chua mo.
 - Checkbox la checklist nop viec cua member, khong phai ket qua runtime verification hay gate approval.
 - Runtime/release pass duoc xac nhan trong `DOCS/TEST_MATRIX.md` va `DOCS/DEMO_CHECKLIST.md`; M6 verify evidence va M1 approve gate khi can.
-- Moi feature/fix cua member duoc tao tu `develop` va PR/merge vao `develop` de integration va test; khong merge truc tiep vao `main`.
-- Chi candidate tren `develop` co `Pass` do M6 ghi nhan va duoc M1 approve moi duoc promote/merge vao `main`.
+- Moi feature/fix cua member duoc tao tu `testing_branch` va PR/merge vao `testing_branch` de integration va test; khong merge truc tiep vao `main`.
+- Chi candidate tren `testing_branch` co `Pass` do M6 ghi nhan va duoc M1 approve moi duoc promote/merge vao `main`.
 
 Cac status chu sau van dung cho baseline, evidence submission va retained extension tracking:
 
@@ -60,7 +60,7 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 Owner: `M1`
 Task: Approve recovery scope, deadline, core/extension lanes va merge gates
 Dependency: Recoveary report
-Required evidence: Decision entry + team notice + `develop` -> tester `Pass` -> `main` promotion rule
+Required evidence: Decision entry + team notice + `testing_branch` -> tester `Pass` -> `main` promotion rule
 Member done: [x]
 
 `R1-C01`
@@ -174,7 +174,7 @@ Owner: `M2 + M3`
 Task: Route real `LOCK`/`UNLOCK` commands from selected client action
 Dependency: `G2` pass; `R3-B01`
 Required evidence: Command packet trace
-Member done: [ ]
+Member done: [x]
 
 `R3-U01`
 Owner: `M4`
@@ -195,7 +195,7 @@ Owner: `M3`
 Task: Show ACK/error result in admin UI
 Dependency: `R3-N02`
 Required evidence: Dashboard result evidence
-Member done: [ ]
+Member done: [x]
 
 `R3-A01`
 Owner: `M5`
@@ -226,6 +226,7 @@ Task: Render/maintain distinct local client instances and prepare Admin/Client U
 Dependency: `R4-N01`
 Required evidence: Two-client UI evidence
 Member done: [ ]
+M3 slice: [x] Admin UI preserves selected-machine state and maintains distinct rows/cards; integrated M2/M4 route and M6 evidence remain pending.
 
 `R4-N02`
 Owner: `M2 + M6`
@@ -240,6 +241,7 @@ Task: Implement required 1-1 `CHAT` routing between Admin and the selected clien
 Dependency: `G3` pass; `R4-N01`
 Required evidence: Selected-client chat trace and UI evidence
 Member done: [ ]
+M3 slice: [x] Typed Admin chat boundary and per-machine UI history are ready; M2 routing, M4 client UI and M6 evidence remain pending.
 
 `R4-B01`
 Owner: `M3 + M5 + M1`
@@ -247,6 +249,7 @@ Task: Define required billing/session interface target: Admin selects timed/free
 Dependency: `2026-06-09` scope decision
 Required evidence: Docs/API handoff note for `BillingSessions` and Admin UI ownership
 Member done: [ ]
+M3 slice: [x] Admin control ownership and required typed billing result are documented; M5 implementation and M1 approval remain pending.
 
 `R4-R01`
 Owner: `M2 + M4 + M5`
@@ -375,4 +378,4 @@ Member done: [ ]
 
 Core delivery is complete only when `G0` through `G5` in `DOCS/TEST_MATRIX.md` are `Pass`, final local and physical LAN rehearsals pass, required chat/billing/restart restore pass, and no unaccepted High/Critical blocker remains. Retained extensions remain part of NetManager regardless of whether they are finished by core release.
 
-Branch promotion does not replace gate counting: work merged into `develop` is only an integration candidate. It enters `main` only after the applicable M6 `Pass` evidence is recorded and M1 approves promotion.
+Branch promotion does not replace gate counting: work merged into `testing_branch` is only an integration candidate. It enters `main` only after the applicable M6 `Pass` evidence is recorded and M1 approves promotion.

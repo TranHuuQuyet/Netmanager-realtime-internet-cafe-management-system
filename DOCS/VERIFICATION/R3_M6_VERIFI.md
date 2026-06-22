@@ -2,7 +2,7 @@
 
 Prepared by: M6 (Tester)
 
-This report records Sprint R3 verification before the integrated develop candidate is marked as passing G3 Core Control.
+This report records Sprint R3 verification before the integrated testing_branch candidate is marked as passing G3 Core Control.
 
 Sprint: R3 (2026-06-08 to 2026-06-14)
 

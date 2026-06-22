@@ -95,7 +95,7 @@ Each decision should include:
 
 - Owner: Member 1 + Member 6
 - Affected docs/code: branch workflow, all feature work, `DOCS/LEADER_FLOW.md`, `DOCS/TASKS.md`, `DOCS/TEST_MATRIX.md`, member playbooks
-- Decision: every member feature/fix branch is merged into `develop` for integration and M6 verification; only a tested `develop` candidate recorded as `Pass` and approved by M1 may be merged into `main`
+- Decision: every member feature/fix branch is merged into `testing_branch` for integration and M6 verification; only a tested `testing_branch` candidate recorded as `Pass` and approved by M1 may be merged into `main`
 - Reason: keep unverified feature work out of the accepted release branch and make tester evidence mandatory before release promotion
 
 ### 2026-06-01 - Close Canonical Auth Seed Verification

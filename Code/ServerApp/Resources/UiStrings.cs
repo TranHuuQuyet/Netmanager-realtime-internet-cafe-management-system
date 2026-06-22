@@ -68,6 +68,10 @@ internal static class UiStrings
     public static string ChatWithMachineTemplate => Get(nameof(ChatWithMachineTemplate), "Chat với máy {0}");
     public static string ChatHistoryTemplate => Get(nameof(ChatHistoryTemplate), "[{0}] Sẵn sàng nhận tin nhắn từ máy chủ.");
     public static string ServerPrefix => Get(nameof(ServerPrefix), "Máy chủ");
+    public static string MainChatSendingTemplate => Get(nameof(MainChatSendingTemplate), "Đang gửi CHAT tới {0}.");
+    public static string MainChatResultTemplate => Get(nameof(MainChatResultTemplate), "CHAT tới {0}: {1}. {2}");
+    public static string MainChatErrorTemplate => Get(nameof(MainChatErrorTemplate), "CHAT tới {0}: {1}. {2}");
+    public static string MainChatReceivedTemplate => Get(nameof(MainChatReceivedTemplate), "Đã nhận CHAT từ {0}.");
     public static string MainSelectedMachineStatusTemplate => Get(nameof(MainSelectedMachineStatusTemplate), "Đang chọn máy {0}.");
     public static string MainRuntimeStatusUpdatedTemplate => Get(nameof(MainRuntimeStatusUpdatedTemplate), "Đã nhận cập nhật trạng thái runtime cho {0}: {1}.");
     public static string MainNoMachineSelectedStatus => Get(nameof(MainNoMachineSelectedStatus), "Vui lòng chọn một máy trước.");

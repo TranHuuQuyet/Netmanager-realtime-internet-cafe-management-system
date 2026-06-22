@@ -13,6 +13,9 @@ public partial class MainForm : Form
 
     private readonly IMachineRepository? _machines;
     private readonly IAdminCommandService _adminCommands;
+    private readonly IAdminChatService _adminChat;
+    private readonly Dictionary<string, List<AdminChatMessage>> _chatHistoryByMachine =
+        new(StringComparer.OrdinalIgnoreCase);
     private bool _isSelectingMachine;
     private bool _isRuntimeMachineDataActive;
     private string? _selectedMachineName;
@@ -28,11 +31,21 @@ public partial class MainForm : Form
     }
 
     public MainForm(IMachineRepository? machines, IAdminCommandService? adminCommands)
+        : this(machines, adminCommands, null)
+    {
+    }
+
+    public MainForm(
+        IMachineRepository? machines,
+        IAdminCommandService? adminCommands,
+        IAdminChatService? adminChat)
     {
         _machines = machines;
         _adminCommands = adminCommands ?? new UnavailableAdminCommandService();
+        _adminChat = adminChat ?? new UnavailableAdminChatService();
         InitializeComponent();
         ConfigureR1ShellState();
+        _adminChat.MessageReceived += AdminChat_MessageReceived;
     }
 
     public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer)
@@ -68,6 +81,8 @@ public partial class MainForm : Form
         btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
         btnUnlockMachine.Width = 120;
         btnUnlockMachine.Enabled = true;
+
+        SetChatActionEnabled(false);
     }
 
     private void LoadSampleMachineData()
@@ -157,7 +172,14 @@ public partial class MainForm : Form
         EnsureRuntimeMachineDataActive();
         UpsertMachineRow(normalizedMachineId, normalizedStatus);
         UpsertMachineCard(normalizedMachineId, normalizedStatus);
-        SelectMachine(normalizedMachineId);
+
+        // A status event from another client must not steal the operator's current
+        // selection. Select automatically only when the runtime list has no active
+        // selection yet (for example, the first client that connects).
+        if (string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            SelectMachine(normalizedMachineId);
+        }
 
         lblServerStatus.Text = string.Format(
             UiStrings.MainRuntimeStatusUpdatedTemplate,
@@ -288,12 +310,16 @@ public partial class MainForm : Form
         {
             _selectedMachineName = machineName;
             lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
-            txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, machineName);
+            RenderSelectedChatHistory();
+            SetChatActionEnabled(true);
             lblServerStatus.Text = string.Format(UiStrings.MainSelectedMachineStatusTemplate, machineName);
 
             foreach (DataGridViewRow row in dgvMachines.Rows)
             {
-                bool isSelected = row.Cells["MachineNameColumn"].Value?.ToString() == machineName;
+                bool isSelected = string.Equals(
+                    row.Cells["MachineNameColumn"].Value?.ToString(),
+                    machineName,
+                    StringComparison.OrdinalIgnoreCase);
                 row.Selected = isSelected;
 
                 if (isSelected)
@@ -310,19 +336,84 @@ public partial class MainForm : Form
         }
     }
 
-    private void BtnSendChat_Click(object? sender, EventArgs e)
+    private async void BtnSendChat_Click(object? sender, EventArgs e)
     {
         string message = txtChatMessage.Text.Trim();
 
-        if (message.Length == 0)
+        if (message.Length == 0 || string.IsNullOrWhiteSpace(_selectedMachineName))
         {
+            if (string.IsNullOrWhiteSpace(_selectedMachineName))
+            {
+                lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            }
+
             return;
         }
 
-        txtChatHistory.AppendText($"{Environment.NewLine}{UiStrings.ServerPrefix}: {message}");
-        txtChatMessage.Clear();
-        txtChatMessage.Focus();
+        string targetMachineId = _selectedMachineName;
+        var request = new AdminChatRequest(targetMachineId, message);
+
+        lblServerStatus.Text = string.Format(UiStrings.MainChatSendingTemplate, targetMachineId);
+        SetChatActionEnabled(false);
+
+        try
+        {
+            AdminChatResult result = await _adminChat.SendAsync(request);
+            lblServerStatus.Text = FormatChatResult(result);
+
+            if (!result.IsError)
+            {
+                AppendChatMessage(new AdminChatMessage(
+                    targetMachineId,
+                    UiStrings.ServerPrefix,
+                    message,
+                    DateTimeOffset.Now));
+
+                txtChatMessage.Clear();
+                RenderSelectedChatHistory();
+            }
+        }
+        catch (Exception ex)
+        {
+            AdminChatResult error = AdminChatResult.ControlledError(
+                request,
+                "CHAT_SERVICE_ERROR",
+                ex.Message);
+            lblServerStatus.Text = FormatChatResult(error);
+        }
+        finally
+        {
+            SetChatActionEnabled(!string.IsNullOrWhiteSpace(_selectedMachineName));
+            txtChatMessage.Focus();
+        }
     }
+
+    public void ApplyIncomingChatMessage(AdminChatMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyIncomingChatMessage(message));
+            return;
+        }
+
+        string machineId = NormalizeMachineId(message.MachineId);
+        AdminChatMessage normalizedMessage = message with { MachineId = machineId };
+        AppendChatMessage(normalizedMessage);
+
+        if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+        {
+            RenderSelectedChatHistory();
+        }
+
+        lblServerStatus.Text = string.Format(
+            UiStrings.MainChatReceivedTemplate,
+            machineId);
+    }
+
+    private void AdminChat_MessageReceived(AdminChatMessage message)
+        => ApplyIncomingChatMessage(message);
 
     private async void MachineAction_Click(object? sender, EventArgs e)
     {
@@ -421,7 +512,10 @@ public partial class MainForm : Form
                 continue;
             }
 
-            bool isSelected = machineName == selectedMachineName;
+            bool isSelected = string.Equals(
+                machineName,
+                selectedMachineName,
+                StringComparison.OrdinalIgnoreCase);
             card.BackColor = isSelected ? Color.FromArgb(232, 244, 255) : Color.White;
             card.BorderStyle = isSelected ? BorderStyle.Fixed3D : BorderStyle.FixedSingle;
 
@@ -445,7 +539,9 @@ public partial class MainForm : Form
         _isRuntimeMachineDataActive = true;
         lblMachineTitle.Text = UiStrings.MainMachineTitle;
         _selectedMachineName = null;
+        _chatHistoryByMachine.Clear();
         SetMachineActionButtonsEnabled(true);
+        SetChatActionEnabled(false);
         btnLockMachine.Text = UiStrings.MainLockMachine;
         btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
 
@@ -535,10 +631,70 @@ public partial class MainForm : Form
             result.Message);
     }
 
+    private static string FormatChatResult(AdminChatResult result)
+    {
+        string template = result.IsError
+            ? UiStrings.MainChatErrorTemplate
+            : UiStrings.MainChatResultTemplate;
+        string status = result.IsError && !string.IsNullOrWhiteSpace(result.ErrorCode)
+            ? result.ErrorCode
+            : result.Status;
+
+        return string.Format(template, result.MachineId, status, result.Message);
+    }
+
+    private void AppendChatMessage(AdminChatMessage message)
+    {
+        if (!_chatHistoryByMachine.TryGetValue(message.MachineId, out List<AdminChatMessage>? history))
+        {
+            history = [];
+            _chatHistoryByMachine[message.MachineId] = history;
+        }
+
+        history.Add(message);
+    }
+
+    private void RenderSelectedChatHistory()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            txtChatHistory.Clear();
+            return;
+        }
+
+        if (!_chatHistoryByMachine.TryGetValue(_selectedMachineName, out List<AdminChatMessage>? history)
+            || history.Count == 0)
+        {
+            txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, _selectedMachineName);
+            return;
+        }
+
+        txtChatHistory.Lines = history
+            .Select(FormatChatMessage)
+            .ToArray();
+        txtChatHistory.SelectionStart = txtChatHistory.TextLength;
+        txtChatHistory.ScrollToCaret();
+    }
+
+    private static string FormatChatMessage(AdminChatMessage message)
+        => $"[{message.Timestamp:HH:mm:ss}] {message.Sender}: {message.Message}";
+
     private void SetMachineActionButtonsEnabled(bool enabled)
     {
         btnLockMachine.Enabled = enabled;
         btnUnlockMachine.Enabled = enabled;
+    }
+
+    private void SetChatActionEnabled(bool enabled)
+    {
+        txtChatMessage.Enabled = enabled;
+        btnSendChat.Enabled = enabled;
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        _adminChat.MessageReceived -= AdminChat_MessageReceived;
+        base.OnFormClosed(e);
     }
 
     private static string NormalizeMachineId(string machineId)

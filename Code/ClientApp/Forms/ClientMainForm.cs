@@ -56,8 +56,8 @@ public sealed class ClientMainForm : Form
         _serverEndpoint = $"{host}:{port}";
 
         // Cấu hình cửa sổ cố định để màn hình phiên làm việc có kích thước nhất quán.
-        Text = "Máy trạm";
-        ClientSize = new Size(420, 380);
+        Text = $"Client - {_machineId}";
+        ClientSize = new Size(420, 410);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
@@ -78,7 +78,7 @@ public sealed class ClientMainForm : Form
         root.Controls.Add(new Label
         {
             Dock = DockStyle.Fill,
-            Text = MachineCaption(machineId),
+            Text = MachineCaption(_machineId),
             Font = new Font("Segoe UI", 18F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleCenter
         }, 0, 0);
@@ -117,16 +117,14 @@ public sealed class ClientMainForm : Form
         }
     }
 
-    // Chuyển MachineId thành tiêu đề thân thiện. PC-01 được hiển thị theo tên mặc
-    // định; ID khác giữ nguyên sau khi loại khoảng trắng.
+    // Giu MachineId that trong tieu de de hai instance local/LAN khong bi nham voi nhau.
     private static string MachineCaption(string machineId)
     {
-        if (string.Equals(machineId, "PC-01", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Máy 1";
-        }
+        string normalizedMachineId = string.IsNullOrWhiteSpace(machineId)
+            ? "UNKNOWN"
+            : machineId.Trim();
 
-        return string.IsNullOrWhiteSpace(machineId) ? "Máy 1" : machineId.Trim();
+        return $"Client {normalizedMachineId}";
     }
 
     // Tạo bảng hai cột chứa thông tin tài khoản/phiên và giữ tham chiếu tới các ô
@@ -137,24 +135,25 @@ public sealed class ClientMainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 5,
+            RowCount = 6,
             Margin = new Padding(0, 8, 0, 8)
         };
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142F));
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
-        // Năm dòng chia đều chiều cao của vùng thông tin.
-        for (var row = 0; row < 5; row++)
+        // Cac dong chia deu chieu cao cua vung thong tin.
+        for (var row = 0; row < 6; row++)
         {
-            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 6F));
         }
 
-        AddInfoRow(infoLayout, 0, "Tài khoản", username);
-        AddInfoRow(infoLayout, 1, "Mã phiên", ShortSessionId(sessionId));
-        _usedTimeTextBox = AddInfoRow(infoLayout, 2, "Thời gian sử dụng", "00:00:00");
-        AddInfoRow(infoLayout, 3, "Máy chủ", $"{host}:{port}");
-        AddInfoRow(infoLayout, 4, "Giờ đăng nhập", FormatLoginTime(_loginTimeUtc));
-        _serverTextBox = infoLayout.GetControlFromPosition(1, 3) as TextBox ?? _serverTextBox;
+        AddInfoRow(infoLayout, 0, "Machine ID", _machineId);
+        AddInfoRow(infoLayout, 1, "Account", username);
+        AddInfoRow(infoLayout, 2, "Session", ShortSessionId(sessionId));
+        _usedTimeTextBox = AddInfoRow(infoLayout, 3, "Used time", "00:00:00");
+        AddInfoRow(infoLayout, 4, "Server", $"{host}:{port}");
+        AddInfoRow(infoLayout, 5, "Login time", FormatLoginTime(_loginTimeUtc));
+        _serverTextBox = infoLayout.GetControlFromPosition(1, 4) as TextBox ?? _serverTextBox;
         return infoLayout;
     }
 

@@ -3,7 +3,6 @@ using SQLitePCL;
 using ServerApp.Auth.Models;
 using ServerApp.Auth.Services;
 using ServerApp.Billing.Models;
-using ServerApp.Billing.Services;
 using ServerApp.Database;
 using ServerApp.Database.Models;
 
@@ -181,7 +180,7 @@ static async Task AssertBillingRecoverySnapshotAsync()
 {
     string billingDbPath = PrepareScratchDatabasePath("Netmanager-R4-R01-Billing");
     AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(billingDbPath);
-    BillingRuntime billingRuntime = await BillingBootstrapper.CreateAsync(billingDbPath);
+    var billing = authRuntime.Billing;
 
     var login = await authRuntime.Auth.AuthenticateAsync(
         new AuthRequest("client01", "123", "PC-01", UserRole.Client));
@@ -190,7 +189,7 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected a valid authenticated client session.");
     }
 
-    var opened = await billingRuntime.Billing.OpenSessionAsync(
+    var opened = await billing.OpenSessionAsync(
         new BillingSessionRequest(
             login.Session.Id,
             login.User.Id,
@@ -206,7 +205,18 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected billing session open to succeed.");
     }
 
-    var snapshot = await billingRuntime.Billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    var active = await billing.GetActiveSessionAsync(login.Session.MachineId, DateTimeOffset.UtcNow);
+    if (active is null || active.Session is null)
+    {
+        throw new InvalidOperationException("R4-R01 expected active billing lookup to succeed.");
+    }
+
+    if (active.Session.Calculation.ChargedMinutes < 17)
+    {
+        throw new InvalidOperationException("R4-R01 expected active billing lookup to restore charged minutes.");
+    }
+
+    var snapshot = await billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
     if (snapshot.Sessions.Count != 1)
     {
         throw new InvalidOperationException(
@@ -234,7 +244,17 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected rounded-up charged minutes to be restored.");
     }
 
-    await billingRuntime.Billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
+    var calculation = billing.CalculateAmount(
+        DateTimeOffset.UtcNow.AddSeconds(-61),
+        DateTimeOffset.UtcNow,
+        10_000);
+
+    if (calculation.ChargedMinutes != 2)
+    {
+        throw new InvalidOperationException("R4-R01 expected 61 seconds to round up to 2 charged minutes.");
+    }
+
+    await billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
     await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
 }
 

@@ -1,4 +1,6 @@
 using ServerApp.Auth.Contracts;
+using ServerApp.Billing.Contracts;
+using ServerApp.Billing.Services;
 using ServerApp.Database;
 using ServerApp.Database.Contracts;
 
@@ -10,7 +12,8 @@ public sealed record AuthRuntime(
     ISessionRepository SessionRepository,
     IMachineRepository Machines,
     ISessionService SessionService,
-    IAuthService Auth);
+    IAuthService Auth,
+    IBillingService Billing);
 
 public static class AuthBootstrapper {
     private const string CanonicalDatabasePath = "internet_cafe.db";
@@ -21,8 +24,9 @@ public static class AuthBootstrapper {
 
         ISessionService sessionService = new SessionService(database.Sessions, database.Machines);
         IAuthService auth = new AuthService(database.Users, database.Machines, sessionService);
+        IBillingService billing = new BillingService(database.BillingSessions);
 
-        return new AuthRuntime(database.Users, database.Sessions, database.Machines, sessionService, auth);
+        return new AuthRuntime(database.Users, database.Sessions, database.Machines, sessionService, auth, billing);
     }
 
     // Helper cho UI form khi chi can IAuthService, khong can dereference AuthRuntime.

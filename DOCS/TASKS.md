@@ -51,6 +51,8 @@ Cac status chu sau van dung cho baseline, evidence submission va retained extens
 | `R1-U01` plain WinForms client refinement - `2026-05-26`, working tree | `dotnet build Code/NetManager.sln --artifacts-path .audit-artifacts -v:minimal` passes with `0` warnings and `0` errors; .NET 8 smoke verifies compact `424 x 318` login dialog matching server-style controls, read-only `PC-01`/`PC-02` machine identity, default buttons only, themed UI removal across client forms, and passive lock release through `UnlockFromServer()` | `Verified Pass` for presentation/client startup only; login/status/control routing and ACK remain pending their runtime gates |
 | `R1-A01` auth handoff + canonical DB path - `2026-05-26`, working tree | `AuthBootstrapper` resolves `internet_cafe.db` from repository root, seeds canonical `admin` / `client01` / `client02` accounts, keeps `AuthUsers` and `AuthSessions` as the runtime tables, and `AuthStatusExtensions` maps auth statuses to API codes | `Verified Pass`; canonical seed/admin rule da khop runtime DB va `G0-05` da dong |
 | `B-008/G2-05` client-sent STATUS closure - `2026-06-15`, `testing_branch` commit `222c68c` | `ClientMainForm.SendResumeStatusAsync()` sends authenticated `STATUS`; `PacketDispatcher.DispatchStatusAsync()` accepts it and returns typed `ACK`; `TcpJsonLineServer.StatusEmitted` remains wired to `MainForm.ApplyMachineStatusUpdate`; `dotnet build Code\NetManager.sln --no-restore -v:minimal`, `NetworkSmokeTest`, `Auth_Test` and `ContractSmoke` pass | `Verified Pass` for `B-008/G2-05` local audit; closes the status blocker and unblocks `R3-B01/G3-00` only, while full `G3` control demo remains tracked separately |
+| `R4` local multi-client/chat/setup closure - `2026-06-26`, `testing_branch` working tree | `dotnet build Code\NetManager.sln --no-restore -v:minimal`, `ContractSmoke`, `Auth_Test` and `NetworkSmokeTest` pass. `NetworkSmokeTest` now verifies two authenticated clients (`client01/PC-01`, `client02/PC-02`), selected-client-only `CHAT`, client reply back to Admin, offline `CHAT` target error, LOCK/UNLOCK typed ACK/error handling, and disconnect cleanup. `Auth_Test` verifies duplicate active login rejection and billing recovery snapshot. | `Local Pass / Evidence Submitted` for R3 control and R4 local multi-client/chat/setup. Physical LAN rehearsal, full billing UI demo, restart/resync demo and M1/M6 release approval remain R5/G5 work. |
+| `R5` local billing function closure - `2026-06-26`, `testing_branch` working tree | `dotnet build Code\NetManager.sln --no-restore -c Release -v:minimal`, `ContractSmoke`, `Auth_Test` and `NetworkSmokeTest` pass. Admin billing service/UI can start timed/open-ended sessions, extend and close billing, push `TIMER`, restore active `BillingSessions` from SQLite, resync on `STATUS`, and send expiry `LOCK` without logout. Client renders billing mode/status, countdown/open-ended state, amount and warning state. | `Local Pass / Evidence Submitted` for R5 billing/resync scope. Physical LAN rehearsal and M1/M6 release approval remain open. |
 
 `G0` contract/auth/build baseline, `G1` network foundation and the `B-008/G2-05` client-sent status gap are verified pass in the recovery log. ClientApp control remains tracked under `R3/G3` and later gates.
 
@@ -181,14 +183,14 @@ Owner: `M4`
 Task: Apply lock/unlock client state through runtime command handler
 Dependency: `R3-N01`
 Required evidence: Visible client reaction
-Member done: [ ]
+Member done: [x]
 
 `R3-N02`
 Owner: `M2 + M4`
 Task: Send typed `ACK` and deterministic command error
 Dependency: `R3-U01`
 Required evidence: ACK/error trace
-Member done: [ ]
+Member done: [x]
 
 `R3-U02`
 Owner: `M3`
@@ -209,7 +211,7 @@ Owner: `M6 + M1`
 Task: Run repeat one-client core demo and approve `G3`
 Dependency: All R3 tasks; no unaccepted `G2-05/B-008` blocker
 Required evidence: `G3` pass/bug list
-Member done: [ ]
+Member done: [x]
 
 ## R4 - Multi-Client, LAN Readiness And Required Chat/Billing Setup (`2026-06-15` to `2026-06-21`)
 
@@ -225,45 +227,47 @@ Owner: `M3 + M4`
 Task: Render/maintain distinct local client instances and prepare Admin/Client UI for two physical LAN clients
 Dependency: `R4-N01`
 Required evidence: Two-client UI evidence
-Member done: [ ]
-M3 slice: [x] Admin UI preserves selected-machine state and maintains distinct rows/cards; integrated M2/M4 route and M6 evidence remain pending.
+Member done: [x]
+Evidence: Admin UI preserves selected-machine state and maintains distinct rows/cards; ClientMainForm shows real machine identity and runtime chat controls; NetworkSmokeTest verifies two distinct local authenticated clients.
 
 `R4-N02`
 Owner: `M2 + M6`
 Task: Verify disconnect does not crash server
 Dependency: `R4-N01`
 Required evidence: `G4` disconnect case
-Member done: [ ]
+Member done: [x]
 
 `R4-C01`
 Owner: `M2 + M3 + M4`
 Task: Implement required 1-1 `CHAT` routing between Admin and the selected client; wrong/offline target must show controlled error
 Dependency: `G3` pass; `R4-N01`
 Required evidence: Selected-client chat trace and UI evidence
-Member done: [ ]
-M3 slice: [x] Typed Admin chat boundary and per-machine UI history are ready; M2 routing, M4 client UI and M6 evidence remain pending.
+Member done: [x]
+Evidence: `TcpJsonLineServer.SendChatAsync()` routes Admin `CHAT` only to the bound target machine; inbound client `CHAT` raises Admin chat events; ClientMainForm can receive and reply; offline target returns `MACHINE_OFFLINE`; NetworkSmokeTest verifies selected-client-only delivery.
 
 `R4-B01`
 Owner: `M3 + M5 + M1`
 Task: Define required billing/session interface target: Admin selects timed/free/extend per machine, Client cannot select rental mode, default rate is `10000` VND/hour
 Dependency: `2026-06-09` scope decision
 Required evidence: Docs/API handoff note for `BillingSessions` and Admin UI ownership
-Member done: [ ]
-M3 slice: [x] Admin control ownership and required typed billing result are documented; M5 implementation and M1 approval remain pending.
+Member done: [x]
+Evidence: `IBillingService`, `BillingService`, `BillingSessions` schema/repository and default-rate calculation target are implemented; Auth_Test verifies a billing recovery snapshot.
 
 `R4-R01`
 Owner: `M2 + M4 + M5`
 Task: Define minimal reconnect/resync behavior required after ServerApp restart for billing/timer sync and extend/LOCK delivery
 Dependency: `R4-N01`; `R4-B01`
 Required evidence: Resync contract note and owner handoff
-Member done: [ ]
+Member done: [x]
+Evidence: Client connection auto-reconnect is present, ClientMainForm resends authenticated `STATUS` after reconnect, and billing recovery snapshot exists. Full ServerApp restart/resync rehearsal remains `R5-R01/G5-09`.
 
 `R4-Q01`
 Owner: `M6 + M1`
 Task: Approve `G4`, confirm promoted required scope remains on the demo path, and keep only unpromoted features as retained extensions
 Dependency: Core R4 tasks including required chat/billing setup
 Required evidence: Gate/required-scope decision
-Member done: [ ]
+Member done: [x]
+Evidence: Local R4 evidence is submitted and smoke-verified on `2026-06-26`; physical LAN, full billing demo, restart/resync and RC rehearsal remain promoted required scope under `R5/G5`.
 
 ## R5 - Stabilization And Required Demo Additions (`2026-06-22` to `2026-06-28`)
 
@@ -286,21 +290,24 @@ Owner: `M5 + M2`
 Task: Implement SQLite `BillingSessions` target for active/closed billing, machine/client session reference, rental mode, start time, optional expiry, status and rate-per-hour restore behavior
 Dependency: `R4-B01`; stable auth/session path
 Required evidence: SQLite schema/reset/restore evidence
-Member done: [ ]
+Evidence: `BillingSessions` schema/repository is used by `BillingService`; `Auth_Test` verifies duplicate active billing rejection, close amount persistence, open-ended restore and fresh-runtime SQLite recovery.
+Member done: [x]
 
 `R5-B02`
 Owner: `M3 + M5`
 Task: Add Admin billing monitor evidence for timed rental, open-ended rental, extend action, rounded-minute amount display and active-session restore after ServerApp restart
 Dependency: `R5-B01`
 Required evidence: Admin Panel billing evidence and restore note
-Member done: [ ]
+Evidence: `MainForm` composes `NetworkAdminBillingService`, adds Admin billing controls/monitor, starts timed/open-ended billing, extends/closes sessions, refreshes active sessions and resyncs selected/online machines.
+Member done: [x]
 
 `R5-B03`
 Owner: `M2 + M4`
 Task: Implement Client timed/free display evidence: countdown or temporary amount, 5-minute warning, expiry `LOCK` reaction, and no forced logout
 Dependency: `R3` control pass; `R5-B01`
 Required evidence: Client timer/billing and LOCK evidence
-Member done: [ ]
+Evidence: `TimerPayload` carries billing state; `ClientRuntimeCommandHandler` raises TIMER events; `ClientMainForm` displays billing status/timer/amount; `NetworkSmokeTest` verifies 5-minute warning, open-ended TIMER, expiry TIMER and LOCK without logout.
+Member done: [x]
 
 `R5-C01`
 Owner: `M2 + M3 + M4`
@@ -321,7 +328,8 @@ Owner: `M2 + M4 + M5 + M6`
 Task: Verify minimal reconnect/resync after ServerApp restart: Admin restores active billing from SQLite and running client can sync timer/billing and receive extend/LOCK
 Dependency: `R4-R01`; `R5-B01`
 Required evidence: Restart/resync test result
-Member done: [ ]
+Evidence: `Auth_Test` verifies active billing restoration through a fresh `AuthBootstrapper` over the same SQLite file; ServerApp startup calls billing refresh and `STATUS` Online triggers TIMER resync; `NetworkSmokeTest` verifies STATUS billing resync and expiry LOCK.
+Member done: [x]
 
 ## R6 - Release And Demo (`2026-06-29` to `2026-07-05`)
 

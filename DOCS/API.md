@@ -221,13 +221,20 @@ Direct message is `E1`; broadcast scope is `E5`.
 ```json
 {
   "machineId": "PC-01",
+  "rentalMode": "Timed",
   "remainingSeconds": 1800,
   "startedAt": "2026-05-25T09:30:00Z",
-  "expiresAt": "2026-05-25T10:00:00Z"
+  "expiresAt": "2026-05-25T10:00:00Z",
+  "ratePerHour": 10000,
+  "chargedMinutes": 1,
+  "amountVnd": 167,
+  "isWarning": false,
+  "shouldLockNow": false,
+  "status": "Active"
 }
 ```
 
-`TIMER` is required for billing display/resync. Timed rental warns at 5 minutes remaining, sends `LOCK` at expiry and does not force logout.
+`TIMER` is required for billing display/resync. Open-ended rentals send `remainingSeconds: null` and `expiresAt: null`. Timed rental warns at 5 minutes remaining, sends `LOCK` at expiry and does not force logout.
 
 ### `CHAT`
 
@@ -243,7 +250,7 @@ Chat remains direct 1-1 text only: no history, group, file/image, delivery queue
 
 ### Billing session target
 
-Future implementation must persist billing sessions in SQLite with enough data to restore active rentals after ServerApp restart:
+Billing sessions persist in SQLite with enough data to restore active rentals after ServerApp restart:
 
 - machine/client session reference;
 - rental mode (`timed`, `open-ended`, `extend`);
@@ -251,6 +258,8 @@ Future implementation must persist billing sessions in SQLite with enough data t
 - status (`Active`, `Closed` or equivalent approved values);
 - rate per hour, defaulting to `10000` VND/hour;
 - active/closed restore behavior.
+
+Admin owns start/extend/close. Client displays received billing state only. Closing billing does not log out, lock or unlock the client; timed expiry sends `LOCK` while preserving the auth session.
 
 Billing amount uses rounded-up minutes:
 

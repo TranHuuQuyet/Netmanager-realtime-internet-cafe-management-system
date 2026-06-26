@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.Networking;
@@ -22,6 +23,10 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
     public event Action<Packet<LockPayload>>? LockRequested;
 
     public event Action<Packet<UnlockPayload>>? UnlockRequested;
+
+    public event Action<Packet<ChatPayload>>? ChatReceived;
+
+    public event Action<Packet<TimerPayload>>? TimerReceived;
 
     public event Action? InvalidPacketIgnored;
 
@@ -63,6 +68,20 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
                     }
 
                     break;
+                case Packet<ChatPayload> chatPacket:
+                    if (IsChatForThisMachine(chatPacket.TypedPayload, chatPacket.Target))
+                    {
+                        ChatReceived?.Invoke(chatPacket);
+                    }
+
+                    break;
+                case Packet<TimerPayload> timerPacket:
+                    if (IsCommandForThisMachine(timerPacket.TypedPayload.MachineId, timerPacket.Target))
+                    {
+                        TimerReceived?.Invoke(timerPacket);
+                    }
+
+                    break;
             }
         }
         catch (Exception ex) when (ex is InvalidDataException or FormatException or JsonException)
@@ -82,6 +101,16 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
         => string.IsNullOrWhiteSpace(payloadMachineId)
             ? packetTarget?.Trim() ?? string.Empty
             : payloadMachineId.Trim();
+
+    private bool IsChatForThisMachine(ChatPayload payload, string? packetTarget)
+    {
+        string receiver = string.IsNullOrWhiteSpace(payload.Receiver)
+            ? packetTarget?.Trim() ?? string.Empty
+            : payload.Receiver.Trim();
+
+        return string.Equals(receiver, _machineId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(packetTarget?.Trim(), _machineId, StringComparison.OrdinalIgnoreCase);
+    }
 
     private async Task SendCommandAckAsync(Packet commandPacket, string machineId, string status, string message)
     {

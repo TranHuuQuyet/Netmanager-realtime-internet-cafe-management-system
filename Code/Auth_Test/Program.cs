@@ -205,6 +205,33 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected billing session open to succeed.");
     }
 
+    var duplicate = await billing.OpenSessionAsync(
+        new BillingSessionRequest(
+            login.Session.Id,
+            login.User.Id,
+            login.User.Username,
+            login.Session.MachineId,
+            BillingRentalMode.OpenEnded,
+            DateTimeOffset.UtcNow));
+
+    if (!duplicate.IsFailure || duplicate.ErrorCode != "BILLING_SESSION_ALREADY_ACTIVE")
+    {
+        throw new InvalidOperationException("R5-B01 expected duplicate active billing to be rejected.");
+    }
+
+    var extended = await billing.ExtendSessionAsync(
+        opened.Session.Session.Id,
+        TimeSpan.FromMinutes(5),
+        DateTimeOffset.UtcNow);
+
+    if (!extended.IsSuccess
+        || extended.Session is null
+        || extended.Session.Session.RentalMode != BillingRentalMode.Extend
+        || extended.Session.Session.ExpiresAtUtc <= opened.Session.Session.ExpiresAtUtc)
+    {
+        throw new InvalidOperationException("R5-B02 expected timed billing extension to update expiry and mode.");
+    }
+
     var active = await billing.GetActiveSessionAsync(login.Session.MachineId, DateTimeOffset.UtcNow);
     if (active is null || active.Session is null)
     {
@@ -244,6 +271,14 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected rounded-up charged minutes to be restored.");
     }
 
+    AuthRuntime restartedRuntime = await AuthBootstrapper.CreateAsync(billingDbPath);
+    var restartedSnapshot = await restartedRuntime.Billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    if (restartedSnapshot.Sessions.Count != 1
+        || !string.Equals(restartedSnapshot.Sessions[0].Session.Session.MachineId, "PC-01", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R5-R01 expected fresh runtime to restore active billing from SQLite.");
+    }
+
     var calculation = billing.CalculateAmount(
         DateTimeOffset.UtcNow.AddSeconds(-61),
         DateTimeOffset.UtcNow,
@@ -254,7 +289,42 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected 61 seconds to round up to 2 charged minutes.");
     }
 
-    await billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
+    var closed = await billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
+    if (!closed.IsSuccess
+        || closed.Session is null
+        || closed.Session.Session.State != BillingSessionState.Closed
+        || closed.Session.Session.AmountVnd <= 0)
+    {
+        throw new InvalidOperationException("R5-B01 expected close to persist charged minutes and amount.");
+    }
+
+    var openEnded = await billing.OpenSessionAsync(
+        new BillingSessionRequest(
+            login.Session.Id,
+            login.User.Id,
+            login.User.Username,
+            login.Session.MachineId,
+            BillingRentalMode.OpenEnded,
+            DateTimeOffset.UtcNow.AddMinutes(-3),
+            10_000,
+            null));
+
+    if (!openEnded.IsSuccess || openEnded.Session is null)
+    {
+        throw new InvalidOperationException("R5-B01 expected open-ended billing session to open after close.");
+    }
+
+    var openEndedSnapshot = await billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    var openEndedSync = openEndedSnapshot.Sessions.SingleOrDefault(session =>
+        session.Session.Session.RentalMode == BillingRentalMode.OpenEnded);
+    if (openEndedSync is null
+        || openEndedSync.RemainingSeconds is not null
+        || openEndedSync.ShouldLockNow)
+    {
+        throw new InvalidOperationException("R5-R01 expected open-ended billing restore without remaining seconds or lock.");
+    }
+
+    await billing.CloseSessionAsync(openEnded.Session.Session.Id, DateTimeOffset.UtcNow);
     await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
 }
 

@@ -9,15 +9,42 @@ public class TimerPayload
     [Required]
     public string MachineId { get; set; } = string.Empty;
 
+    [JsonPropertyName("rentalMode")]
+    [Required]
+    public string RentalMode { get; set; } = string.Empty;
+
     [JsonPropertyName("remainingSeconds")]
-    [Range(0, int.MaxValue)]
-    public int RemainingSeconds { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [Range(0, long.MaxValue)]
+    public long? RemainingSeconds { get; set; }
 
     [JsonPropertyName("startedAt")]
     [Required]
-    public DateTime StartedAt { get; set; }
+    public DateTimeOffset StartedAt { get; set; }
 
     [JsonPropertyName("expiresAt")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public DateTimeOffset? ExpiresAt { get; set; }
+
+    [JsonPropertyName("ratePerHour")]
+    [Range(0, long.MaxValue)]
+    public long RatePerHour { get; set; }
+
+    [JsonPropertyName("chargedMinutes")]
+    [Range(0, long.MaxValue)]
+    public long ChargedMinutes { get; set; }
+
+    [JsonPropertyName("amountVnd")]
+    [Range(0, long.MaxValue)]
+    public long AmountVnd { get; set; }
+
+    [JsonPropertyName("isWarning")]
+    public bool IsWarning { get; set; }
+
+    [JsonPropertyName("shouldLockNow")]
+    public bool ShouldLockNow { get; set; }
+
+    [JsonPropertyName("status")]
     [Required]
-    public DateTime ExpiresAt { get; set; }
+    public string Status { get; set; } = "Active";
 }

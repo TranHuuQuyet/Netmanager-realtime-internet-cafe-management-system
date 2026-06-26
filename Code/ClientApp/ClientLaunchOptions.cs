@@ -3,7 +3,7 @@ namespace ClientApp;
 public sealed record ClientLaunchOptions(string MachineId, string ServerHost, int ServerPort)
 {
     public const string DefaultMachineId = "PC-01";
-    public const string DefaultServerHost = "10.33.126.145";
+    public const string DefaultServerHost = "127.0.0.1";
     public const int DefaultServerPort = 5000;
 
     public static ClientLaunchOptions Default { get; } =

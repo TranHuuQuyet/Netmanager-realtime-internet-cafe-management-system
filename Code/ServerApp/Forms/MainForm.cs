@@ -22,6 +22,8 @@ public partial class MainForm : Form
     // dùng implementation "Unavailable" để trả lỗi có kiểm soát thay vì NullReference.
     private readonly IAdminCommandService _adminCommands;
     private readonly IAdminChatService _adminChat;
+    private readonly IAdminBillingService? _adminBilling;
+    private readonly System.Windows.Forms.Timer _billingRefreshTimer = new();
 
     // Lưu lịch sử chat riêng theo từng MachineId. So sánh không phân biệt hoa/thường
     // để PC01 và pc01 không tạo thành hai cuộc hội thoại khác nhau.
@@ -38,6 +40,12 @@ public partial class MainForm : Form
 
     // Máy đang được admin thao tác; đồng thời là đích nhận lệnh và tin nhắn chat.
     private string? _selectedMachineName;
+    private ComboBox _billingModeComboBox = null!;
+    private NumericUpDown _billingMinutesInput = null!;
+    private Button _btnStartBilling = null!;
+    private Button _btnExtendBilling = null!;
+    private Button _btnCloseBilling = null!;
+    private TextBox _txtBillingMonitor = null!;
 
     // Các constructor rút gọn đều chuyển về constructor đầy đủ để việc khởi tạo
     // dependency và đăng ký sự kiện chỉ nằm tại một nơi.
@@ -60,20 +68,39 @@ public partial class MainForm : Form
         IMachineRepository? machines,
         IAdminCommandService? adminCommands,
         IAdminChatService? adminChat)
+        : this(machines, adminCommands, adminChat, null)
+    {
+    }
+
+    public MainForm(
+        IMachineRepository? machines,
+        IAdminCommandService? adminCommands,
+        IAdminChatService? adminChat,
+        IAdminBillingService? adminBilling)
     {
         // Lưu dependency và thay dependency thiếu bằng service trả lỗi có kiểm soát.
         _machines = machines;
         _adminCommands = adminCommands ?? new UnavailableAdminCommandService();
         _adminChat = adminChat ?? new UnavailableAdminChatService();
+        _adminBilling = adminBilling;
 
         // Dựng control trước khi cấu hình trạng thái ban đầu vì các hàm sau cần truy
         // cập label, button và textbox do Designer tạo.
         InitializeComponent();
+        ConfigureResizableLayout();
+        ConfigureBillingPanel();
         ConfigureR1ShellState();
 
         // Nhận tin nhắn đẩy từ client trong suốt vòng đời form. Sự kiện được hủy ở
         // OnFormClosed để service không giữ tham chiếu tới form đã đóng.
         _adminChat.MessageReceived += AdminChat_MessageReceived;
+        if (_adminBilling is not null)
+        {
+            _adminBilling.BillingUpdated += AdminBilling_BillingUpdated;
+            _billingRefreshTimer.Interval = 5000;
+            _billingRefreshTimer.Tick += BillingRefreshTimer_Tick;
+            _billingRefreshTimer.Start();
+        }
     }
 
     /// <summary>
@@ -81,12 +108,153 @@ public partial class MainForm : Form
     /// lệnh để phần còn lại của form chỉ phụ thuộc vào IAdminCommandService.
     /// </summary>
     public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer)
+        : this(machines, networkServer, null)
+    {
+    }
+
+    public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer, IAdminBillingService? adminBilling)
         : this(
             machines,
             networkServer is null
                 ? null
-                : new NetworkAdminCommandService(networkServer))
+                : new NetworkAdminCommandService(networkServer),
+            networkServer is null
+                ? null
+                : new NetworkAdminChatService(networkServer),
+            adminBilling)
     {
+    }
+
+    private void ConfigureResizableLayout()
+    {
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
+        SizeGripStyle = SizeGripStyle.Show;
+        MinimumSize = new Size(960, 640);
+        ClientSize = new Size(Math.Max(ClientSize.Width, 1100), Math.Max(ClientSize.Height, 760));
+
+        machineActions.AutoScroll = true;
+        customerButtons.AutoScroll = true;
+
+        machineLayout.RowStyles.Clear();
+        machineLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
+        machineLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        machineLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
+        machineLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+
+        machineSplit.FixedPanel = FixedPanel.None;
+        machineSplit.IsSplitterFixed = false;
+        machineSplit.Panel1MinSize = 320;
+        machineSplit.Panel2MinSize = 320;
+        if (machineSplit.Width > machineSplit.Panel1MinSize + machineSplit.Panel2MinSize + machineSplit.SplitterWidth)
+        {
+            machineSplit.SplitterDistance = Math.Min(
+                Math.Max(560, machineSplit.Panel1MinSize),
+                machineSplit.Width - machineSplit.Panel2MinSize - machineSplit.SplitterWidth);
+        }
+
+        customerLayout.RowStyles.Clear();
+        customerLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 190F));
+        customerLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        customerLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
+    }
+
+    private void ConfigureBillingPanel()
+    {
+        var rightPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2
+        };
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 48F));
+        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 52F));
+
+        var billingGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Billing",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Padding = new Padding(8)
+        };
+
+        var billingLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2
+        };
+        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+        billingLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+
+        var controls = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            WrapContents = true,
+            AutoScroll = true
+        };
+
+        _billingModeComboBox = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 132,
+            Margin = new Padding(3, 2, 6, 2)
+        };
+        _billingModeComboBox.Items.AddRange(["Timed", "Open-ended"]);
+        _billingModeComboBox.SelectedIndex = 0;
+
+        _billingMinutesInput = new NumericUpDown
+        {
+            Minimum = 1,
+            Maximum = 1440,
+            Value = 10,
+            Width = 76,
+            Margin = new Padding(3, 2, 6, 2)
+        };
+
+        _btnStartBilling = BuildBillingButton("Start", BillingStart_Click);
+        _btnExtendBilling = BuildBillingButton("Extend", BillingExtend_Click);
+        _btnCloseBilling = BuildBillingButton("Close", BillingClose_Click);
+
+        controls.Controls.Add(_billingModeComboBox);
+        controls.Controls.Add(_billingMinutesInput);
+        controls.Controls.Add(_btnStartBilling);
+        controls.Controls.Add(_btnExtendBilling);
+        controls.Controls.Add(_btnCloseBilling);
+
+        _txtBillingMonitor = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            TabStop = false,
+            ScrollBars = ScrollBars.Vertical,
+            Text = "No billing session selected."
+        };
+
+        billingLayout.Controls.Add(controls, 0, 0);
+        billingLayout.Controls.Add(_txtBillingMonitor, 0, 1);
+        billingGroup.Controls.Add(billingLayout);
+
+        machineSplit.Panel2.Controls.Remove(chatGroup);
+        rightPanel.Controls.Add(billingGroup, 0, 0);
+        rightPanel.Controls.Add(chatGroup, 0, 1);
+        machineSplit.Panel2.Controls.Add(rightPanel);
+        SetBillingActionEnabled(false);
+    }
+
+    private static Button BuildBillingButton(string text, EventHandler clickHandler)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Width = 84,
+            Height = 28,
+            Margin = new Padding(3, 2, 4, 2),
+            UseVisualStyleBackColor = true
+        };
+        button.Click += clickHandler;
+        return button;
     }
 
     /// <summary>
@@ -259,6 +427,11 @@ public partial class MainForm : Form
             UiStrings.MainRuntimeStatusUpdatedTemplate,
             normalizedMachineId,
             normalizedStatus);
+
+        if (string.Equals(normalizedStatus, "ONLINE", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = SyncBillingForMachineAsync(normalizedMachineId);
+        }
     }
 
     /// <summary>
@@ -428,7 +601,9 @@ public partial class MainForm : Form
             lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
             RenderSelectedChatHistory();
             SetChatActionEnabled(true);
+            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
             lblServerStatus.Text = string.Format(UiStrings.MainSelectedMachineStatusTemplate, machineName);
+            _ = SyncBillingForMachineAsync(machineName);
 
             // DataGridView không biết lựa chọn từ card, vì vậy duyệt các dòng để chọn
             // đúng dòng có MachineName tương ứng (không phân biệt hoa/thường).
@@ -559,6 +734,151 @@ public partial class MainForm : Form
     // ApplyIncomingChatMessage để cả callback và caller khác dùng chung một luồng.
     private void AdminChat_MessageReceived(AdminChatMessage message)
         => ApplyIncomingChatMessage(message);
+
+    private async void BillingStart_Click(object? sender, EventArgs e)
+    {
+        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            return;
+        }
+
+        SetBillingActionEnabled(false);
+        try
+        {
+            AdminBillingResult result = _billingModeComboBox.SelectedIndex == 1
+                ? await _adminBilling.StartOpenEndedAsync(_selectedMachineName)
+                : await _adminBilling.StartTimedAsync(_selectedMachineName, (int)_billingMinutesInput.Value);
+            ApplyBillingUpdate(result);
+        }
+        finally
+        {
+            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
+        }
+    }
+
+    private async void BillingExtend_Click(object? sender, EventArgs e)
+    {
+        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            return;
+        }
+
+        SetBillingActionEnabled(false);
+        try
+        {
+            AdminBillingResult result = await _adminBilling.ExtendAsync(
+                _selectedMachineName,
+                (int)_billingMinutesInput.Value);
+            ApplyBillingUpdate(result);
+        }
+        finally
+        {
+            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
+        }
+    }
+
+    private async void BillingClose_Click(object? sender, EventArgs e)
+    {
+        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            return;
+        }
+
+        SetBillingActionEnabled(false);
+        try
+        {
+            AdminBillingResult result = await _adminBilling.CloseAsync(_selectedMachineName);
+            ApplyBillingUpdate(result);
+        }
+        finally
+        {
+            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
+        }
+    }
+
+    private async void BillingRefreshTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_adminBilling is not null)
+        {
+            await _adminBilling.RefreshActiveSessionsAsync();
+        }
+    }
+
+    private void AdminBilling_BillingUpdated(AdminBillingResult result)
+        => ApplyBillingUpdate(result);
+
+    public async Task SyncBillingForMachineAsync(string machineId)
+    {
+        if (_adminBilling is null)
+        {
+            return;
+        }
+
+        AdminBillingResult? result = await _adminBilling.SyncMachineAsync(machineId);
+        if (result is not null)
+        {
+            ApplyBillingUpdate(result);
+        }
+        else if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+        {
+            _txtBillingMonitor.Text = "No active billing session.";
+        }
+    }
+
+    public async Task RefreshBillingSessionsAsync()
+    {
+        if (_adminBilling is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<AdminBillingResult> results = await _adminBilling.RefreshActiveSessionsAsync();
+        AdminBillingResult? selectedResult = results.FirstOrDefault(result =>
+            string.Equals(result.MachineId, _selectedMachineName, StringComparison.OrdinalIgnoreCase));
+        if (selectedResult is not null)
+        {
+            ApplyBillingUpdate(selectedResult);
+        }
+    }
+
+    private void ApplyBillingUpdate(AdminBillingResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyBillingUpdate(result));
+            return;
+        }
+
+        lblServerStatus.Text = result.IsError
+            ? $"Billing {result.MachineId}: {result.ErrorCode ?? "Error"} - {result.Message}"
+            : $"Billing {result.MachineId}: {result.Message}";
+
+        if (!string.Equals(result.MachineId, _selectedMachineName, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _txtBillingMonitor.Text = result.Timer is null
+            ? result.Message
+            : FormatBillingMonitor(result.Timer);
+    }
+
+    private static string FormatBillingMonitor(Shared.DTOs.CommandPayloads.TimerPayload timer)
+    {
+        string remaining = timer.RemainingSeconds is null
+            ? "open-ended"
+            : $"{TimeSpan.FromSeconds(timer.RemainingSeconds.Value):hh\\:mm\\:ss}";
+        string warning = timer.IsWarning ? " / warning <=5m" : string.Empty;
+        return
+            $"{timer.Status} {timer.RentalMode}{warning}{Environment.NewLine}" +
+            $"Time: {remaining} / charged {timer.ChargedMinutes} min{Environment.NewLine}" +
+            $"Amount: {timer.AmountVnd:N0} VND";
+    }
 
     /// <summary>
     /// Ánh xạ nút thao tác máy sang CommandType và điều phối việc gửi lệnh. Nút tắt
@@ -726,6 +1046,7 @@ public partial class MainForm : Form
         _selectedMachineName = null;
         _chatHistoryByMachine.Clear();
         SetMachineActionButtonsEnabled(true);
+        SetBillingActionEnabled(_adminBilling is not null);
         SetChatActionEnabled(false);
         btnLockMachine.Text = UiStrings.MainLockMachine;
         btnUnlockMachine.Text = UiStrings.MainUnlockMachine;
@@ -916,6 +1237,16 @@ public partial class MainForm : Form
         btnSendChat.Enabled = enabled;
     }
 
+    private void SetBillingActionEnabled(bool enabled)
+    {
+        bool canUseBilling = enabled && _adminBilling is not null;
+        _billingModeComboBox.Enabled = canUseBilling;
+        _billingMinutesInput.Enabled = canUseBilling;
+        _btnStartBilling.Enabled = canUseBilling;
+        _btnExtendBilling.Enabled = canUseBilling;
+        _btnCloseBilling.Enabled = canUseBilling;
+    }
+
     /// <summary>
     /// Hủy đăng ký sự kiện trước khi đóng form để service chat không giữ tham chiếu
     /// đến form và không gọi cập nhật control đã Dispose.
@@ -923,6 +1254,14 @@ public partial class MainForm : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         _adminChat.MessageReceived -= AdminChat_MessageReceived;
+        if (_adminBilling is not null)
+        {
+            _adminBilling.BillingUpdated -= AdminBilling_BillingUpdated;
+        }
+
+        _billingRefreshTimer.Stop();
+        _billingRefreshTimer.Tick -= BillingRefreshTimer_Tick;
+        _billingRefreshTimer.Dispose();
         base.OnFormClosed(e);
     }
 
@@ -975,6 +1314,47 @@ public partial class MainForm : Form
                     commandResult.ErrorCode ?? "COMMAND_SEND_FAILED",
                     commandResult.Message,
                     commandResult.RequestId);
+        }
+    }
+
+    private sealed class NetworkAdminChatService : IAdminChatService
+    {
+        private readonly TcpJsonLineServer _networkServer;
+
+        public NetworkAdminChatService(TcpJsonLineServer networkServer)
+        {
+            _networkServer = networkServer ?? throw new ArgumentNullException(nameof(networkServer));
+            _networkServer.ChatReceived += NetworkServer_ChatReceived;
+        }
+
+        public event Action<AdminChatMessage>? MessageReceived;
+
+        public async Task<AdminChatResult> SendAsync(
+            AdminChatRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            MachineChatSendResult result = await _networkServer.SendChatAsync(
+                request.MachineId,
+                UiStrings.ServerPrefix,
+                request.Message,
+                cancellationToken).ConfigureAwait(false);
+
+            return result.Sent
+                ? AdminChatResult.Sent(request, result.Message, result.RequestId)
+                : AdminChatResult.ControlledError(
+                    request,
+                    result.ErrorCode ?? "CHAT_SEND_FAILED",
+                    result.Message,
+                    result.RequestId);
+        }
+
+        private void NetworkServer_ChatReceived(string machineId, Shared.DTOs.Bidrectional.ChatPayload payload)
+        {
+            MessageReceived?.Invoke(new AdminChatMessage(
+                machineId,
+                string.IsNullOrWhiteSpace(payload.Sender) ? machineId : payload.Sender.Trim(),
+                payload.Message.Trim(),
+                DateTimeOffset.Now));
         }
     }
 

@@ -25,16 +25,28 @@ static class Program
         {
             AuthRuntime authRuntime = authRuntimeTask.GetAwaiter().GetResult();
             using TcpJsonLineServer? networkServer = TryStartNetworkServer(authRuntime);
-            using var mainForm = new MainForm(authRuntime.Machines, networkServer);
+            var billingService = new NetworkAdminBillingService(
+                authRuntime.Billing,
+                authRuntime.SessionRepository,
+                networkServer);
+            using var mainForm = new MainForm(authRuntime.Machines, networkServer, billingService);
 
             if (networkServer is not null)
             {
                 networkServer.StatusEmitted += status =>
+                {
                     mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
+                    if (string.Equals(status.Status, "Online", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _ = mainForm.SyncBillingForMachineAsync(status.MachineId);
+                    }
+                };
                 // Network emits typed command results; presentation owns the UI-facing shape.
                 networkServer.CommandResultEmitted += result =>
                     mainForm.ApplyCommandResultUpdate(AdminCommandResultMapper.FromNetworkAck(result));
             }
+
+            _ = mainForm.RefreshBillingSessionsAsync();
 
             Application.Run(mainForm);
         }

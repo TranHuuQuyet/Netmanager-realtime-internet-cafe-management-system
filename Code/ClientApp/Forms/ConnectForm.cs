@@ -27,6 +27,11 @@ public partial class ConnectForm : Form
 
         InitializeComponent();
         txtMachineId.Text = _launchOptions.MachineId;
+        txtMachineId.ReadOnly = true;
+        txtMachineId.TabStop = false;
+        txtMachineId.BackColor = SystemColors.Control;
+        Text = $"Client login - {_launchOptions.MachineId}";
+        lblTitle.Text = $"CLIENT LOGIN - {_launchOptions.MachineId}";
     }
 
     // Kiểm tra dữ liệu đầu vào, mở TCP, gửi LOGIN và chỉ chuyển sang ClientMainForm

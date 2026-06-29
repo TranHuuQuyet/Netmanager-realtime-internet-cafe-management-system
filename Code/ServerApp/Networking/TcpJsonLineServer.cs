@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.Enums;
@@ -91,6 +92,10 @@ public sealed class TcpJsonLineServer : IDisposable
     public event Action<NetworkTraceEntry>? TraceEmitted;
 
     public event Action<StatusPayload>? StatusEmitted;
+
+    public event Action<string, ChatPayload>? ChatReceived;
+
+    public event Action<string, TimerPayload>? TimerSent;
 
     // Event đưa kết quả command cuối cùng sang tầng UI.
     //
@@ -291,6 +296,153 @@ public sealed class TcpJsonLineServer : IDisposable
         }
     }
 
+    public async Task<MachineChatSendResult> SendChatAsync(
+        string machineId,
+        string sender,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        string targetMachineId = machineId?.Trim() ?? string.Empty;
+        string chatMessage = message?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(targetMachineId))
+        {
+            const string errorCode = "INVALID_MACHINE_ID";
+            const string errorMessage = "Machine ID is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineChatSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        if (string.IsNullOrWhiteSpace(chatMessage))
+        {
+            const string errorCode = "INVALID_CHAT_MESSAGE";
+            const string errorMessage = "CHAT message is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineChatSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string clientId = string.Empty;
+        foreach (KeyValuePair<string, string> binding in _machineBindings)
+        {
+            if (string.Equals(binding.Value, targetMachineId, StringComparison.OrdinalIgnoreCase))
+            {
+                clientId = binding.Key;
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId)
+            || !_connections.TryGetValue(clientId, out ClientConnection? connection))
+        {
+            const string errorCode = "MACHINE_OFFLINE";
+            const string errorMessage = "Machine is offline or not connected.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineChatSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        AuthResult authorization = await _sessions.AuthorizeCommandTargetAsync(targetMachineId, cancellationToken).ConfigureAwait(false);
+        if (!authorization.IsSuccess)
+        {
+            const string errorCode = "UNAUTHORIZED_CHAT";
+            string errorMessage = authorization.Message;
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineChatSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string requestId = Guid.NewGuid().ToString("N");
+        Packet<ChatPayload> packet = PacketFactory.CreateChat(
+            source: NetworkProtocol.ServerSource,
+            target: targetMachineId,
+            payload: new ChatPayload
+            {
+                Sender = string.IsNullOrWhiteSpace(sender) ? "Admin" : sender.Trim(),
+                Receiver = targetMachineId,
+                Message = chatMessage
+            },
+            requestId: requestId);
+
+        string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
+        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_CHAT", clientId, outboundLine));
+
+        try
+        {
+            await connection.SendAsync(outboundLine, cancellationToken).ConfigureAwait(false);
+            return new MachineChatSendResult(true, "Sent", "CHAT sent to client.", RequestId: requestId);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            const string errorCode = "CHAT_SEND_FAILED";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
+            return new MachineChatSendResult(false, "Error", ex.Message, errorCode, requestId);
+        }
+    }
+
+    public async Task<MachineTimerSendResult> SendTimerAsync(
+        string machineId,
+        TimerPayload payload,
+        CancellationToken cancellationToken = default)
+    {
+        string targetMachineId = machineId?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(targetMachineId))
+        {
+            const string errorCode = "INVALID_MACHINE_ID";
+            const string errorMessage = "Machine ID is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("TIMER_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineTimerSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        if (payload is null)
+        {
+            const string errorCode = "INVALID_TIMER_PAYLOAD";
+            const string errorMessage = "TIMER payload is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("TIMER_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineTimerSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string clientId = string.Empty;
+        foreach (KeyValuePair<string, string> binding in _machineBindings)
+        {
+            if (string.Equals(binding.Value, targetMachineId, StringComparison.OrdinalIgnoreCase))
+            {
+                clientId = binding.Key;
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId)
+            || !_connections.TryGetValue(clientId, out ClientConnection? connection))
+        {
+            const string errorCode = "MACHINE_OFFLINE";
+            const string errorMessage = "Machine is offline or not connected.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("TIMER_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineTimerSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string requestId = Guid.NewGuid().ToString("N");
+        payload.MachineId = targetMachineId;
+        Packet<TimerPayload> packet = PacketFactory.CreateTimer(
+            source: NetworkProtocol.ServerSource,
+            target: targetMachineId,
+            payload: payload,
+            requestId: requestId);
+
+        string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
+        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_TIMER", clientId, outboundLine));
+
+        try
+        {
+            await connection.SendAsync(outboundLine, cancellationToken).ConfigureAwait(false);
+            NotifyTimerSent(clientId, targetMachineId, payload);
+            return new MachineTimerSendResult(true, "Sent", "TIMER sent to client.", RequestId: requestId);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            const string errorCode = "TIMER_SEND_FAILED";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("TIMER_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
+            return new MachineTimerSendResult(false, "Error", ex.Message, errorCode, requestId);
+        }
+    }
+
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
         // Vòng lặp nhận client TCP mới.
@@ -402,6 +554,12 @@ public sealed class TcpJsonLineServer : IDisposable
             if (result.CommandAckPacket is not null)
             {
                 HandleCommandAck(connection.ClientId, result.CommandAckPacket);
+                return;
+            }
+
+            if (result.ChatPacket is not null)
+            {
+                HandleChatPacket(connection.ClientId, result.ChatPacket);
                 return;
             }
 
@@ -538,6 +696,28 @@ public sealed class TcpJsonLineServer : IDisposable
         NotifyCommandResultEmitted(clientId, result);
     }
 
+    private void HandleChatPacket(string clientId, Packet<ChatPayload> chatPacket)
+    {
+        ChatPayload payload = chatPacket.TypedPayload;
+        string senderMachineId = payload.Sender.Trim();
+
+        if (!IsMachineBoundToClient(clientId, senderMachineId))
+        {
+            TraceEmitted?.Invoke(new NetworkTraceEntry(
+                "CHAT_ERROR",
+                clientId,
+                "UNAUTHORIZED_CHAT: CHAT sender does not match authenticated connection."));
+            return;
+        }
+
+        TraceEmitted?.Invoke(new NetworkTraceEntry(
+            "CHAT",
+            clientId,
+            NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(chatPacket))));
+
+        NotifyChatReceived(clientId, senderMachineId, payload);
+    }
+
     private void EmitCommandAckError(
         string clientId,
         string machineId,
@@ -641,6 +821,30 @@ public sealed class TcpJsonLineServer : IDisposable
         catch (Exception ex)
         {
             TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_RESULT_HANDLER_ERROR", clientId, ex.Message));
+        }
+    }
+
+    private void NotifyChatReceived(string clientId, string machineId, ChatPayload payload)
+    {
+        try
+        {
+            ChatReceived?.Invoke(machineId, payload);
+        }
+        catch (Exception ex)
+        {
+            TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_HANDLER_ERROR", clientId, ex.Message));
+        }
+    }
+
+    private void NotifyTimerSent(string clientId, string machineId, TimerPayload payload)
+    {
+        try
+        {
+            TimerSent?.Invoke(machineId, payload);
+        }
+        catch (Exception ex)
+        {
+            TraceEmitted?.Invoke(new NetworkTraceEntry("TIMER_HANDLER_ERROR", clientId, ex.Message));
         }
     }
 

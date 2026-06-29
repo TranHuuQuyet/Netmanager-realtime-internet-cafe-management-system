@@ -1,4 +1,5 @@
 using ClientApp.Networking;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.Enums;
@@ -31,10 +32,18 @@ public sealed class ClientMainForm : Form
     // Form khóa chỉ tồn tại khi server đã khóa máy; null khi máy đang mở.
     private LockScreenForm? _lockScreen;
     private bool _isLockedByServer;
+    private TimeSpan _totalLockedTime = TimeSpan.Zero;
+    private DateTime? _lockStartedUtc;
 
     // Hai TextBox được tạo bằng code trong BuildInfoLayout nên được gán sau constructor.
     private TextBox _usedTimeTextBox = null!;
     private TextBox _serverTextBox = null!;
+    private TextBox _billingModeTextBox = null!;
+    private TextBox _billingTimeTextBox = null!;
+    private TextBox _billingAmountTextBox = null!;
+    private TextBox _chatHistoryTextBox = null!;
+    private TextBox _chatMessageTextBox = null!;
+    private Button _sendChatButton = null!;
 
     // Nhận thông tin phiên đã xác thực từ ConnectForm, dựng giao diện và đăng ký toàn
     // bộ sự kiện kết nối/lệnh cần thiết cho thời gian chạy của máy trạm.
@@ -56,8 +65,8 @@ public sealed class ClientMainForm : Form
         _serverEndpoint = $"{host}:{port}";
 
         // Cấu hình cửa sổ cố định để màn hình phiên làm việc có kích thước nhất quán.
-        Text = "Máy trạm";
-        ClientSize = new Size(420, 380);
+        Text = $"Client - {_machineId}";
+        ClientSize = new Size(560, 700);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
@@ -68,9 +77,10 @@ public sealed class ClientMainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 3
+            RowCount = 4
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 318F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
 
@@ -78,12 +88,13 @@ public sealed class ClientMainForm : Form
         root.Controls.Add(new Label
         {
             Dock = DockStyle.Fill,
-            Text = MachineCaption(machineId),
+            Text = MachineCaption(_machineId),
             Font = new Font("Segoe UI", 18F, FontStyle.Bold),
             TextAlign = ContentAlignment.MiddleCenter
         }, 0, 0);
         root.Controls.Add(BuildInfoLayout(username, sessionId, host, port), 0, 1);
-        root.Controls.Add(BuildActionStrip(), 0, 2);
+        root.Controls.Add(BuildChatLayout(), 0, 2);
+        root.Controls.Add(BuildActionStrip(), 0, 3);
         Controls.Add(root);
 
         // Tooltip lưu lại thông tin đăng nhập đầy đủ mà không chiếm diện tích form.
@@ -100,6 +111,8 @@ public sealed class ClientMainForm : Form
         _commandHandler = new ClientRuntimeCommandHandler(_connection, _machineId);
         _commandHandler.LockRequested += ApplyLockCommand;
         _commandHandler.UnlockRequested += ApplyUnlockCommand;
+        _commandHandler.ChatReceived += ApplyChatPacket;
+        _commandHandler.TimerReceived += ApplyTimerPacket;
         _commandHandler.InvalidPacketIgnored += CommandHandler_InvalidPacketIgnored;
 
         // Theo dõi vòng đời kết nối để cập nhật giao diện và gửi lại trạng thái sau reconnect.
@@ -117,16 +130,14 @@ public sealed class ClientMainForm : Form
         }
     }
 
-    // Chuyển MachineId thành tiêu đề thân thiện. PC-01 được hiển thị theo tên mặc
-    // định; ID khác giữ nguyên sau khi loại khoảng trắng.
+    // Giu MachineId that trong tieu de de hai instance local/LAN khong bi nham voi nhau.
     private static string MachineCaption(string machineId)
     {
-        if (string.Equals(machineId, "PC-01", StringComparison.OrdinalIgnoreCase))
-        {
-            return "Máy 1";
-        }
+        string normalizedMachineId = string.IsNullOrWhiteSpace(machineId)
+            ? "UNKNOWN"
+            : machineId.Trim();
 
-        return string.IsNullOrWhiteSpace(machineId) ? "Máy 1" : machineId.Trim();
+        return $"Client {normalizedMachineId}";
     }
 
     // Tạo bảng hai cột chứa thông tin tài khoản/phiên và giữ tham chiếu tới các ô
@@ -137,24 +148,28 @@ public sealed class ClientMainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 5,
+            RowCount = 9,
             Margin = new Padding(0, 8, 0, 8)
         };
-        infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 142F));
+        infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 128F));
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
-        // Năm dòng chia đều chiều cao của vùng thông tin.
-        for (var row = 0; row < 5; row++)
+        // Cac dong chia deu chieu cao cua vung thong tin.
+        for (var row = 0; row < 9; row++)
         {
-            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 20F));
+            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 9F));
         }
 
-        AddInfoRow(infoLayout, 0, "Tài khoản", username);
-        AddInfoRow(infoLayout, 1, "Mã phiên", ShortSessionId(sessionId));
-        _usedTimeTextBox = AddInfoRow(infoLayout, 2, "Thời gian sử dụng", "00:00:00");
-        AddInfoRow(infoLayout, 3, "Máy chủ", $"{host}:{port}");
-        AddInfoRow(infoLayout, 4, "Giờ đăng nhập", FormatLoginTime(_loginTimeUtc));
-        _serverTextBox = infoLayout.GetControlFromPosition(1, 3) as TextBox ?? _serverTextBox;
+        AddInfoRow(infoLayout, 0, "Machine ID", _machineId);
+        AddInfoRow(infoLayout, 1, "Account", username);
+        AddInfoRow(infoLayout, 2, "Session", ShortSessionId(sessionId));
+        _usedTimeTextBox = AddInfoRow(infoLayout, 3, "Used time", "00:00:00");
+        AddInfoRow(infoLayout, 4, "Server", $"{host}:{port}");
+        AddInfoRow(infoLayout, 5, "Login time", FormatLoginTime(_loginTimeUtc));
+        _billingModeTextBox = AddInfoRow(infoLayout, 6, "Billing", "No active billing");
+        _billingTimeTextBox = AddInfoRow(infoLayout, 7, "Timer", "N/A");
+        _billingAmountTextBox = AddInfoRow(infoLayout, 8, "Amount", "0 VND");
+        _serverTextBox = infoLayout.GetControlFromPosition(1, 4) as TextBox ?? _serverTextBox;
         return infoLayout;
     }
 
@@ -224,17 +239,136 @@ public sealed class ClientMainForm : Form
         Close();
     }
 
-    // Khu vực giao tiếp đang là placeholder cho route CHAT phía client.
     private void Communication_Click(object? sender, EventArgs e)
     {
-        MessageBox.Show(this, "Giao tiếp với máy chủ sẽ được bật sau khi route CHAT sẵn sàng.", "Giao tiếp", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        _chatMessageTextBox.Focus();
+    }
+
+    private Control BuildChatLayout()
+    {
+        var chatLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = new Padding(0, 4, 0, 4)
+        };
+        chatLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+        chatLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        chatLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+
+        chatLayout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "Chat voi Server",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, 0);
+
+        _chatHistoryTextBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical,
+            TabStop = false,
+            Text = "Chua co tin nhan."
+        };
+        chatLayout.Controls.Add(_chatHistoryTextBox, 0, 1);
+
+        var inputLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1
+        };
+        inputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        inputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82F));
+
+        _chatMessageTextBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 7, 8, 0)
+        };
+        _chatMessageTextBox.KeyDown += ChatMessageTextBox_KeyDown;
+        inputLayout.Controls.Add(_chatMessageTextBox, 0, 0);
+
+        _sendChatButton = new Button
+        {
+            Dock = DockStyle.Fill,
+            Text = "Gui",
+            Margin = new Padding(0, 4, 0, 0),
+            UseVisualStyleBackColor = true
+        };
+        _sendChatButton.Click += SendChatButton_Click;
+        inputLayout.Controls.Add(_sendChatButton, 1, 0);
+
+        chatLayout.Controls.Add(inputLayout, 0, 2);
+        return chatLayout;
+    }
+
+    private void ChatMessageTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Enter && !e.Shift)
+        {
+            e.SuppressKeyPress = true;
+            _ = SendClientChatAsync();
+        }
+    }
+
+    private void SendChatButton_Click(object? sender, EventArgs e)
+    {
+        _ = SendClientChatAsync();
+    }
+
+    private async Task SendClientChatAsync()
+    {
+        string message = _chatMessageTextBox.Text.Trim();
+        if (message.Length == 0)
+        {
+            return;
+        }
+
+        _sendChatButton.Enabled = false;
+        try
+        {
+            var chatPacket = PacketFactory.CreateChat(
+                source: _machineId,
+                target: NetworkProtocol.ServerSource,
+                payload: new ChatPayload
+                {
+                    Sender = _machineId,
+                    Receiver = NetworkProtocol.ServerSource,
+                    Message = message
+                },
+                requestId: Guid.NewGuid().ToString("N"));
+
+            await _connection.SendAsync(JsonHelper.SerializeToJson(chatPacket));
+            AppendClientChatLine(_machineId, message);
+            _chatMessageTextBox.Clear();
+        }
+        catch (Exception)
+        {
+            UpdateServerConnectionStatus("connected - chat pending");
+        }
+        finally
+        {
+            if (!IsDisposed)
+            {
+                _sendChatButton.Enabled = true;
+                _chatMessageTextBox.Focus();
+            }
+        }
     }
 
     // Tính thời gian đã dùng từ mốc UTC đăng nhập và hiển thị theo HH:mm:ss. TotalHours
     // được ép int để số giờ vẫn tăng qua 24 thay vì quay lại 00 như TimeSpan.Hours.
     private void UpdateUsedTime()
     {
-        TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc;
+        TimeSpan currentLockedTime = _lockStartedUtc is null
+            ? TimeSpan.Zero
+            : DateTime.UtcNow - _lockStartedUtc.Value;
+        TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc - _totalLockedTime - currentLockedTime;
 
         // Bảo vệ trường hợp đồng hồ máy bị lệch khiến loginTime nằm trong tương lai.
         if (elapsed < TimeSpan.Zero)
@@ -269,6 +403,71 @@ public sealed class ClientMainForm : Form
     private void CommandHandler_InvalidPacketIgnored()
     {
         UpdateServerConnectionStatus("connected - ignored invalid packet");
+    }
+
+    private void ApplyChatPacket(Packet<ChatPayload> packet)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyChatPacket(packet));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        ChatPayload payload = packet.TypedPayload;
+        AppendClientChatLine(
+            string.IsNullOrWhiteSpace(payload.Sender) ? "Server" : payload.Sender.Trim(),
+            payload.Message.Trim());
+        UpdateServerConnectionStatus("connected - chat received");
+    }
+
+    private void ApplyTimerPacket(Packet<TimerPayload> packet)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyTimerPacket(packet));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        TimerPayload payload = packet.TypedPayload;
+        string status = string.IsNullOrWhiteSpace(payload.Status) ? "Active" : payload.Status.Trim();
+        string mode = string.IsNullOrWhiteSpace(payload.RentalMode) ? "Billing" : payload.RentalMode.Trim();
+        string warning = payload.IsWarning ? " - warn <=5m" : string.Empty;
+        _billingModeTextBox.Text = $"{status} {mode}{warning}";
+
+        _billingTimeTextBox.Text = payload.RemainingSeconds is null
+            ? $"Open-ended since {payload.StartedAt.ToLocalTime():HH:mm:ss}"
+            : payload.ShouldLockNow
+                ? "Expired"
+                : $"{TimeSpan.FromSeconds(payload.RemainingSeconds.Value):hh\\:mm\\:ss}";
+        _billingAmountTextBox.Text = $"{payload.AmountVnd:N0} VND ({payload.ChargedMinutes} min)";
+        UpdateServerConnectionStatus(payload.ShouldLockNow
+            ? "connected - billing expired"
+            : "connected - billing synced");
+    }
+
+    private void AppendClientChatLine(string sender, string message)
+    {
+        if (_chatHistoryTextBox.Text == "Chua co tin nhan.")
+        {
+            _chatHistoryTextBox.Clear();
+        }
+
+        string line = $"[{DateTime.Now:HH:mm:ss}] {sender}: {message}";
+        _chatHistoryTextBox.AppendText(_chatHistoryTextBox.TextLength == 0
+            ? line
+            : Environment.NewLine + line);
+        _chatHistoryTextBox.SelectionStart = _chatHistoryTextBox.TextLength;
+        _chatHistoryTextBox.ScrollToCaret();
     }
 
     // Áp dụng lệnh LOCK từ server, hiển thị LockScreenForm và gửi ACK tương ứng với
@@ -358,7 +557,23 @@ public sealed class ClientMainForm : Form
     // Ghi nhận trạng thái khóa và bật/tắt toàn bộ control cấp một của form chính.
     private void SetClientSurfaceLocked(bool locked)
     {
+        DateTime now = DateTime.UtcNow;
+        if (locked && !_isLockedByServer)
+        {
+            _lockStartedUtc = now;
+        }
+        else if (!locked && _isLockedByServer)
+        {
+            if (_lockStartedUtc is not null)
+            {
+                _totalLockedTime += now - _lockStartedUtc.Value;
+            }
+
+            _lockStartedUtc = null;
+        }
+
         _isLockedByServer = locked;
+        UpdateUsedTime();
 
         // Vô hiệu hóa container gốc sẽ làm toàn bộ control con không nhận thao tác.
         foreach (Control control in Controls)
@@ -467,6 +682,8 @@ public sealed class ClientMainForm : Form
         // Ngừng nhận lệnh trước rồi Dispose command handler.
         _commandHandler.LockRequested -= ApplyLockCommand;
         _commandHandler.UnlockRequested -= ApplyUnlockCommand;
+        _commandHandler.ChatReceived -= ApplyChatPacket;
+        _commandHandler.TimerReceived -= ApplyTimerPacket;
         _commandHandler.InvalidPacketIgnored -= CommandHandler_InvalidPacketIgnored;
         _commandHandler.Dispose();
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
 using Shared.Packets;
@@ -10,6 +11,7 @@ Run("G0-03 LOGIN request deserializes as request payload", LoginRequestDeseriali
 Run("G0-03 LOGIN request keeps response envelope fields unset", LoginRequestKeepsResponseFieldsUnset);
 Run("G0-03 LOGIN success deserializes as result payload", LoginSuccessDeserializesAsResult);
 Run("G0-04 LOGIN failure uses top-level error envelope", LoginFailureUsesErrorEnvelope);
+Run("G5-06 TIMER supports open-ended billing sync", TimerSupportsOpenEndedBillingSync);
 
 Console.WriteLine("Contract smoke checks passed.");
 
@@ -137,6 +139,41 @@ static void LoginFailureUsesErrorEnvelope()
     Assert(typedPacket.Success == false, "LOGIN failure response must set success false.");
     Assert(typedPacket.Error?.Code == "INVALID_CREDENTIALS", "LOGIN failure must use top-level error.code.");
     Assert(typedPacket.Payload is EmptyPayload, "LOGIN failure payload must be empty.");
+}
+
+static void TimerSupportsOpenEndedBillingSync()
+{
+    var startedAt = DateTimeOffset.Parse("2026-06-26T01:02:03Z");
+    string json = JsonHelper.SerializeToJson(PacketFactory.CreateTimer(
+        "server",
+        "PC-01",
+        new TimerPayload
+        {
+            MachineId = "PC-01",
+            RentalMode = "OpenEnded",
+            RemainingSeconds = null,
+            StartedAt = startedAt,
+            ExpiresAt = null,
+            RatePerHour = 10_000,
+            ChargedMinutes = 2,
+            AmountVnd = 334,
+            IsWarning = false,
+            ShouldLockNow = false,
+            Status = "Active"
+        },
+        "timer-0001"));
+
+    using JsonDocument doc = JsonDocument.Parse(json);
+    JsonElement payload = doc.RootElement.GetProperty("payload");
+    Assert(payload.GetProperty("expiresAt").ValueKind == JsonValueKind.Null, "Open-ended TIMER expiresAt must be null.");
+    Assert(payload.GetProperty("remainingSeconds").ValueKind == JsonValueKind.Null, "Open-ended TIMER remainingSeconds must be null.");
+    Assert(payload.GetProperty("amountVnd").GetInt64() == 334, "TIMER must carry rounded billing amount.");
+
+    object packet = JsonHelper.DeserializePacket(json);
+    var timerPacket = packet as Packet<TimerPayload>
+        ?? throw new InvalidOperationException("TIMER must deserialize as Packet<TimerPayload>.");
+    Assert(timerPacket.TypedPayload.ExpiresAt is null, "Deserialized TIMER must preserve null expiresAt.");
+    Assert(timerPacket.TypedPayload.RentalMode == "OpenEnded", "Deserialized TIMER must preserve rental mode.");
 }
 
 static void Assert(bool condition, string message)

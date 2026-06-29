@@ -32,6 +32,8 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G1-01/G1-03/G1-04/G1-05` ServerApp network smoke (`R1-N01/R1-N02`, `2026-06-02`, working tree) | `Pass` on implementation working tree | `dotnet run --project Code/NetworkSmokeTest/NetworkSmoke.csproj --no-restore` starts `TcpJsonLineServer`, verifies authenticated `LOGIN` success/failure, traces controlled dispatch errors for malformed JSON, an unknown type and unopened `STATUS`, disconnects only the offending socket, then verifies a fresh valid login after each rejection | Pass(M6 2026-06-02) |
 | `G2` R2 audit (`2026-06-08`, dirty working tree) | `Partial` historical result | Build passes with `0` warnings/errors; `Auth_Test`, `NetworkSmokeTest`, `CurrentAdminLoginSmoke`, `CurrentClientLoginSmoke` and `CurrentDashboardSmoke` verify real auth/login and server-generated Online/Offline UI bridge. Strict client-sent `STATUS` was missing and inbound `STATUS` was unsupported at this audit point. | Superseded for `G2-05/B-008` by the `2026-06-15` status route verification below. |
 | `B-008/G2-05` status route closure (`2026-06-15`, `testing_branch` commit `222c68c`) | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --no-restore -v:minimal` passes with `0` warnings/errors; `dotnet run --project Code\NetworkSmokeTest\NetworkSmoke.csproj --no-restore` passes authenticated client-originated `STATUS` and receives typed `ACK` with `ackFor=STATUS` / `status=Accepted`; `TcpJsonLineServer.StatusEmitted` remains wired to `MainForm.ApplyMachineStatusUpdate`. | Pass(local audit - 2026-06-15); closes `B-008` and unblocks `G3-00` precondition only, not full `G3` control approval. |
+| `R3/R4` local control and multi-client chat closure (`2026-06-26`, `testing_branch` working tree) | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --no-restore -v:minimal`, `ContractSmoke`, `Auth_Test` and `NetworkSmokeTest` pass. `NetworkSmokeTest` verifies LOCK/UNLOCK command packets, typed ACK and deterministic ACK errors, command disconnect handling, two distinct authenticated clients, selected `PC-02` command routing, selected-client-only `CHAT`, client reply back to Admin, offline `CHAT` target error and disconnect cleanup. `Auth_Test` verifies duplicate active login rejection and billing recovery snapshot. | `Local Pass / Evidence Submitted` for `G3` and `G4`. Physical LAN, full billing UI, restart/resync and RC rehearsal remain `G5` work. |
+| `R5` local billing function closure (`2026-06-26`, `testing_branch` working tree) | `Pass` on implementation working tree | `dotnet build Code\NetManager.sln --no-restore -c Release -v:minimal`, `ContractSmoke`, `Auth_Test` and `NetworkSmokeTest` pass. `ContractSmoke` verifies open-ended nullable TIMER JSON; `Auth_Test` verifies duplicate billing rejection, rounded-minute formula, close persistence and fresh-runtime SQLite restore; `NetworkSmokeTest` verifies timed warning TIMER, open-ended TIMER, extend/close TIMER, expiry LOCK and STATUS resync. | `Local Pass / Evidence Submitted` for `G5-06` through `G5-09`. Physical LAN rehearsal and release approval remain open. |
 
 ## G0 - Build And Contract (`R1`)
 
@@ -69,20 +71,20 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | ID      | Test                                                           | Mode  | Owner                | Initial status |
 | ------- | -------------------------------------------------------------- | ----- | -------------------- | -------------- |
 | `G3-00` | `G2-05/B-008` status policy is fixed or explicitly accepted before control readiness is claimed | Local | M1 + M2 + M4 + M6 | `Pass(local audit - 2026-06-15; B-008 fixed by client-sent STATUS route)` |
-| `G3-01` | Admin locks authenticated target client                        | Local | M2 + M3 + M4         | `Blocked`      |
-| `G3-02` | Client returns visible ACK after lock                          | Local | M2 + M3 + M4         | `Blocked`      |
-| `G3-03` | Admin unlocks target client and client exits lock state        | Local | M2 + M3 + M4         | `Blocked`      |
-| `G3-04` | Invalid/unauthorized command displays controlled error         | Local | M2 + M5              | `Blocked`      |
-| `G3-05` | One-client login/status/lock/ACK/unlock flow passes repeatedly | Local | M6 + all core owners | `Blocked`      |
+| `G3-01` | Admin locks authenticated target client                        | Local | M2 + M3 + M4         | `Pass(local audit - 2026-06-26; NetworkSmokeTest)`      |
+| `G3-02` | Client returns visible ACK after lock                          | Local | M2 + M3 + M4         | `Pass(local audit - 2026-06-26; NetworkSmokeTest)`      |
+| `G3-03` | Admin unlocks target client and client exits lock state        | Local | M2 + M3 + M4         | `Pass(local audit - 2026-06-26; NetworkSmokeTest)`      |
+| `G3-04` | Invalid/unauthorized command displays controlled error         | Local | M2 + M5              | `Pass(local audit - 2026-06-26; INVALID_MACHINE_ID, MACHINE_OFFLINE and ACK error cases)`      |
+| `G3-05` | One-client login/status/lock/ACK/unlock flow passes repeatedly | Local | M6 + all core owners | `Pass(local audit - 2026-06-26; repeat smoke path)`      |
 
 ## G4 - Multi-Client Stability (`R4`)
 
 | ID      | Test                                                  | Mode                 | Owner             | Initial status |
 | ------- | ----------------------------------------------------- | -------------------- | ----------------- | -------------- |
-| `G4-01` | `client01` and `client02` connect and remain distinct | Local multi-instance | M2 + M3 + M4 + M5 | `Blocked`      |
-| `G4-02` | Command routes only to selected machine               | Local multi-instance | M2 + M3 + M4      | `Blocked`      |
-| `G4-03` | Duplicate active login behavior is deterministic      | Local multi-instance | M2 + M5           | `Blocked`      |
-| `G4-04` | Client disconnect does not crash server               | Local multi-instance | M2 + M6           | `Blocked`      |
+| `G4-01` | `client01` and `client02` connect and remain distinct | Local multi-instance | M2 + M3 + M4 + M5 | `Pass(local audit - 2026-06-26; NetworkSmokeTest + Auth_Test)`      |
+| `G4-02` | Command routes only to selected machine               | Local multi-instance | M2 + M3 + M4      | `Pass(local audit - 2026-06-26; PC-02 command route and selected-client CHAT route)`      |
+| `G4-03` | Duplicate active login behavior is deterministic      | Local multi-instance | M2 + M5           | `Pass(local audit - 2026-06-26; duplicate active login rejected)`      |
+| `G4-04` | Client disconnect does not crash server               | Local multi-instance | M2 + M6           | `Pass(local audit - 2026-06-26; disconnect cleanup and post-error login remain available)`      |
 
 ## G5 - Release Readiness (`R5-R6`)
 
@@ -93,10 +95,10 @@ Prior legacy matrix baseline: `0/33` tests were marked `Pass` at audit. The tabl
 | `G5-03` | Local multi-instance rehearsal passes twice on RC              | Local | M1 + M6              | `Blocked`      |
 | `G5-04` | Two physical LAN clients connect/login and remain distinct while local fallback still passes | Real LAN + Local | M2 + M3 + M4 + M5 + M6 | `Blocked` |
 | `G5-05` | Admin and selected client exchange 1-1 chat; non-selected client does not receive it | Local + LAN | M2 + M3 + M4 + M6 | `Blocked` |
-| `G5-06` | Admin starts timed rental package `5-10` minutes; Admin/Client show countdown, warn at 5 minutes, and expiry sends `LOCK` without logout | Local + LAN | M2 + M3 + M4 + M5 + M6 | `Blocked` |
-| `G5-07` | Open-ended rental amount uses rounded-minute formula; `61` seconds charges `2` minutes at `10000` VND/hour | Local | M3 + M5 + M6 | `Blocked` |
-| `G5-08` | ServerApp restart restores active `BillingSessions` from SQLite and Admin Panel continues calculating time/amount | Local | M3 + M5 + M6 | `Blocked` |
-| `G5-09` | Minimal reconnect/resync lets a running client sync billing/timer and receive extend/LOCK after ServerApp restart | Local + LAN | M2 + M4 + M5 + M6 | `Blocked` |
+| `G5-06` | Admin starts timed rental package `5-10` minutes; Admin/Client show countdown, warn at 5 minutes, and expiry sends `LOCK` without logout | Local + LAN | M2 + M3 + M4 + M5 + M6 | `Local Pass / Evidence Submitted (2026-06-26; NetworkSmokeTest timed warning + expiry LOCK)` |
+| `G5-07` | Open-ended rental amount uses rounded-minute formula; `61` seconds charges `2` minutes at `10000` VND/hour | Local | M3 + M5 + M6 | `Local Pass / Evidence Submitted (2026-06-26; Auth_Test + ContractSmoke + NetworkSmokeTest)` |
+| `G5-08` | ServerApp restart restores active `BillingSessions` from SQLite and Admin Panel continues calculating time/amount | Local | M3 + M5 + M6 | `Local Pass / Evidence Submitted (2026-06-26; fresh AuthBootstrapper SQLite restore + Admin refresh)` |
+| `G5-09` | Minimal reconnect/resync lets a running client sync billing/timer and receive extend/LOCK after ServerApp restart | Local + LAN | M2 + M4 + M5 + M6 | `Local Pass / Evidence Submitted (2026-06-26; STATUS billing resync + extend/LOCK smoke)` |
 | `G5-10` | No unaccepted High/Critical demo blocker remains               | Both  | M1 + M6              | `Blocked`      |
 | `G5-11` | Release docs match approved build, required promoted scope and retained extension state | Both | M6 | `Blocked` |
 

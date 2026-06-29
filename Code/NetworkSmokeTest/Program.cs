@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows.Forms;
 using Microsoft.Data.Sqlite;
 using Shared.Enums;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
@@ -12,7 +13,9 @@ using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 using ServerApp.Auth.Services;
 using ServerApp.Database.Contracts;
+using ServerApp.Database.Models;
 using ServerApp.Networking;
+using ServerApp.Presentation;
 
 Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");
 // The smoke runs WinForms handlers without a message loop, so keep continuations on thread-pool context.
@@ -26,6 +29,7 @@ try
     AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(databasePath);
     List<NetworkTraceEntry> traces = [];
     List<MachineCommandAckResult> commandResults = [];
+    List<(string MachineId, ChatPayload Payload)> chatMessages = [];
 
     using var server = new TcpJsonLineServer(
         IPAddress.Loopback,
@@ -54,6 +58,15 @@ try
         Console.WriteLine(
             $"COMMAND RESULT {result.Command} {result.MachineId}: {result.Status} {result.ErrorCode ?? string.Empty} {result.RequestId}");
     };
+    server.ChatReceived += (machineId, payload) =>
+    {
+        lock (chatMessages)
+        {
+            chatMessages.Add((machineId, payload));
+        }
+
+        Console.WriteLine($"CHAT IN {machineId}: {payload.Message}");
+    };
 
     server.Start();
     int port = server.LocalEndpoint.Port;
@@ -61,6 +74,8 @@ try
 
     await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
     await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
+    await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages);
+    await AssertBillingTimerRoutingAsync(port, authRuntime, server);
     await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
@@ -246,6 +261,429 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
     }
 
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, sessionId);
+}
+
+static async Task AssertTwoClientChatRoutingAsync(
+    int port,
+    AuthRuntime authRuntime,
+    TcpJsonLineServer server,
+    List<(string MachineId, ChatPayload Payload)> chatMessages)
+{
+    string pc01SessionId;
+    string pc02SessionId;
+
+    using var pc01Client = new TcpClient();
+    using var pc02Client = new TcpClient();
+    await pc01Client.ConnectAsync(IPAddress.Loopback, port);
+    await pc02Client.ConnectAsync(IPAddress.Loopback, port);
+
+    await using NetworkStream pc01Stream = pc01Client.GetStream();
+    await using NetworkStream pc02Stream = pc02Client.GetStream();
+    using var pc01Reader = new StreamReader(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    using var pc02Reader = new StreamReader(pc02Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    await using var pc01Writer = new StreamWriter(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+    await using var pc02Writer = new StreamWriter(pc02Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+
+    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC-01", "123");
+    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC-02", "123");
+    pc01SessionId = AssertClientLoginSuccess(pc01Login, await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, pc01Login), "client01", "PC-01");
+    pc02SessionId = AssertClientLoginSuccess(pc02Login, await SendLoginOnOpenStreamAsync(pc02Reader, pc02Writer, pc02Login), "client02", "PC-02");
+
+    MachineCommandSendResult pc02Command = await server.SendMachineCommandWithResultAsync(
+        "PC-02",
+        lockMachine: true,
+        issuedBy: "NetworkSmoke",
+        reason: "Selected-client routing check").ConfigureAwait(false);
+
+    if (!pc02Command.Sent)
+    {
+        throw new InvalidOperationException($"PC-02 command route failed: {pc02Command.ErrorCode} {pc02Command.Message}");
+    }
+
+    Packet pc02LockCommand = await AssertCommandReceivedAsync(pc02Reader, PacketType.LOCK, "PC-02").ConfigureAwait(false);
+    await SendCommandAckAsync(
+        pc02Stream,
+        pc02LockCommand,
+        "PC-02",
+        "Success",
+        "PC-02 lock applied.").ConfigureAwait(false);
+
+    MachineChatSendResult sendResult = await server.SendChatAsync(
+        "PC-01",
+        "Server",
+        "Hello selected client.").ConfigureAwait(false);
+
+    if (!sendResult.Sent)
+    {
+        throw new InvalidOperationException($"CHAT send failed: {sendResult.ErrorCode} {sendResult.Message}");
+    }
+
+    Packet<ChatPayload> pc01Chat = await ReadChatPacketAsync(pc01Reader, "PC-01 admin CHAT").ConfigureAwait(false);
+    if (pc01Chat.TypedPayload.Message != "Hello selected client."
+        || pc01Chat.Target != "PC-01")
+    {
+        throw new InvalidOperationException("Selected client did not receive the expected admin CHAT.");
+    }
+
+    await AssertNoLineWithinAsync(pc02Reader, TimeSpan.FromMilliseconds(300), "non-selected client CHAT").ConfigureAwait(false);
+
+    Packet<ChatPayload> reply = PacketFactory.CreateChat(
+        source: "PC-01",
+        target: NetworkProtocol.ServerSource,
+        payload: new ChatPayload
+        {
+            Sender = "PC-01",
+            Receiver = NetworkProtocol.ServerSource,
+            Message = "Client reply."
+        },
+        requestId: $"chat-{Guid.NewGuid():N}");
+    string replyLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(reply));
+    Console.WriteLine($"CLIENT OUT: {replyLine}");
+    await pc01Writer.WriteLineAsync(replyLine).ConfigureAwait(false);
+    await WaitForChatMessageAsync(chatMessages, "PC-01", "Client reply.").ConfigureAwait(false);
+
+    MachineChatSendResult offlineResult = await server.SendChatAsync(
+        "PC-99",
+        "Server",
+        "Offline target").ConfigureAwait(false);
+
+    if (offlineResult.Sent || offlineResult.ErrorCode != "MACHINE_OFFLINE")
+    {
+        throw new InvalidOperationException("Offline CHAT target did not return MACHINE_OFFLINE.");
+    }
+
+    TryShutdown(pc01Client);
+    TryShutdown(pc02Client);
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc01SessionId).ConfigureAwait(false);
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc02SessionId).ConfigureAwait(false);
+    Console.WriteLine("PASS: selected-client CHAT route delivers only to target and accepts client reply");
+}
+
+static async Task AssertBillingTimerRoutingAsync(
+    int port,
+    AuthRuntime authRuntime,
+    TcpJsonLineServer server)
+{
+    var billingService = new NetworkAdminBillingService(
+        authRuntime.Billing,
+        authRuntime.SessionRepository,
+        server);
+    server.StatusEmitted += status =>
+    {
+        if (string.Equals(status.Status, "Online", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = billingService.SyncMachineAsync(status.MachineId);
+        }
+    };
+
+    using var pc01Client = new TcpClient();
+    using var pc02Client = new TcpClient();
+    await pc01Client.ConnectAsync(IPAddress.Loopback, port);
+    await pc02Client.ConnectAsync(IPAddress.Loopback, port);
+
+    await using NetworkStream pc01Stream = pc01Client.GetStream();
+    await using NetworkStream pc02Stream = pc02Client.GetStream();
+    using var pc01Reader = new StreamReader(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    using var pc02Reader = new StreamReader(pc02Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    await using var pc01Writer = new StreamWriter(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+    await using var pc02Writer = new StreamWriter(pc02Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+
+    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC-01", "123");
+    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC-02", "123");
+    string pc01SessionId = AssertClientLoginSuccess(
+        pc01Login,
+        await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, pc01Login),
+        "client01",
+        "PC-01");
+    string pc02SessionId = AssertClientLoginSuccess(
+        pc02Login,
+        await SendLoginOnOpenStreamAsync(pc02Reader, pc02Writer, pc02Login),
+        "client02",
+        "PC-02");
+
+    AdminBillingResult timed = await billingService.StartTimedAsync("PC-01", 4);
+    if (!timed.IsSuccess)
+    {
+        throw new InvalidOperationException($"Timed billing failed: {timed.ErrorCode} {timed.Message}");
+    }
+
+    Packet<TimerPayload> timedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 timed billing TIMER");
+    if (timedTimer.TypedPayload.RemainingSeconds is null
+        || timedTimer.TypedPayload.RemainingSeconds > 300
+        || !timedTimer.TypedPayload.IsWarning)
+    {
+        throw new InvalidOperationException("Timed billing TIMER did not carry 5-minute warning state.");
+    }
+
+    AdminBillingResult openEnded = await billingService.StartOpenEndedAsync("PC-02");
+    if (!openEnded.IsSuccess)
+    {
+        throw new InvalidOperationException($"Open-ended billing failed: {openEnded.ErrorCode} {openEnded.Message}");
+    }
+
+    Packet<TimerPayload> openEndedTimer = await ReadTimerPacketAsync(pc02Reader, "PC-02 open-ended TIMER");
+    if (openEndedTimer.TypedPayload.ExpiresAt is not null
+        || openEndedTimer.TypedPayload.RemainingSeconds is not null
+        || openEndedTimer.TypedPayload.AmountVnd < 0)
+    {
+        throw new InvalidOperationException("Open-ended TIMER did not carry nullable expiry/remaining billing state.");
+    }
+
+    AdminBillingResult extended = await billingService.ExtendAsync("PC-01", 2);
+    if (!extended.IsSuccess)
+    {
+        throw new InvalidOperationException($"Billing extend failed: {extended.ErrorCode} {extended.Message}");
+    }
+
+    Packet<TimerPayload> extendedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 extended TIMER");
+    if (!string.Equals(extendedTimer.TypedPayload.RentalMode, BillingRentalMode.Extend.ToString(), StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("Extended TIMER did not mark rentalMode Extend.");
+    }
+
+    AdminBillingResult closed = await billingService.CloseAsync("PC-01");
+    if (!closed.IsSuccess)
+    {
+        throw new InvalidOperationException($"Billing close failed: {closed.ErrorCode} {closed.Message}");
+    }
+
+    Packet<TimerPayload> closedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 closed TIMER");
+    if (!string.Equals(closedTimer.TypedPayload.Status, "Closed", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("Closed billing TIMER did not mark status Closed.");
+    }
+
+    SessionRecord pc01Session = await authRuntime.SessionRepository.GetActiveByMachineIdAsync("PC-01")
+        ?? throw new InvalidOperationException("Expected active PC-01 auth session for expired billing check.");
+    AdminBillingResult expiredOpen = await OpenExpiredBillingAsync(authRuntime, pc01Session);
+    if (!expiredOpen.IsSuccess)
+    {
+        throw new InvalidOperationException($"Expired billing setup failed: {expiredOpen.ErrorCode} {expiredOpen.Message}");
+    }
+
+    await billingService.RefreshActiveSessionsAsync();
+    Packet<TimerPayload> expiredTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 expired TIMER");
+    if (!expiredTimer.TypedPayload.ShouldLockNow || expiredTimer.TypedPayload.RemainingSeconds != 0)
+    {
+        throw new InvalidOperationException("Expired billing TIMER did not request lock.");
+    }
+
+    Packet lockCommand = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, "PC-01");
+    await SendCommandAckAsync(pc01Stream, lockCommand, "PC-01", "Success", "Billing expiry lock applied.");
+
+    Packet<TimerPayload> pc02RefreshTimer = await ReadTimerPacketAsync(pc02Reader, "PC-02 refresh TIMER");
+    if (pc02RefreshTimer.TypedPayload.ExpiresAt is not null)
+    {
+        throw new InvalidOperationException("Refresh TIMER did not preserve PC-02 open-ended session.");
+    }
+
+    await SendStatusAsync(pc02Writer, "PC-02", pc02SessionId);
+    object firstStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC-02 STATUS response");
+    object secondStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC-02 STATUS billing response");
+    if (firstStatusResponse is not Packet<AckPayload> && secondStatusResponse is not Packet<AckPayload>)
+    {
+        throw new InvalidOperationException("STATUS did not return ACK while resyncing billing.");
+    }
+
+    Packet<TimerPayload> resyncTimer =
+        firstStatusResponse as Packet<TimerPayload>
+        ?? secondStatusResponse as Packet<TimerPayload>
+        ?? throw new InvalidOperationException("STATUS did not trigger billing TIMER resync.");
+    if (resyncTimer.TypedPayload.ExpiresAt is not null
+        || !string.Equals(resyncTimer.TypedPayload.RentalMode, BillingRentalMode.OpenEnded.ToString(), StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("STATUS-triggered billing resync did not preserve open-ended session.");
+    }
+
+    await billingService.CloseAsync("PC-01");
+    await billingService.CloseAsync("PC-02");
+    TryShutdown(pc01Client);
+    TryShutdown(pc02Client);
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc01SessionId);
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc02SessionId);
+    Console.WriteLine("PASS: billing TIMER route supports timed warning, open-ended, extend/close, expiry LOCK and STATUS resync");
+}
+
+static async Task<AdminBillingResult> OpenExpiredBillingAsync(AuthRuntime authRuntime, SessionRecord session)
+{
+    var opened = await authRuntime.Billing.OpenSessionAsync(
+        new ServerApp.Billing.Models.BillingSessionRequest(
+            session.Id,
+            session.UserId,
+            session.Username,
+            session.MachineId ?? string.Empty,
+            BillingRentalMode.Timed,
+            DateTimeOffset.UtcNow.AddMinutes(-10),
+            10_000,
+            DateTimeOffset.UtcNow.AddMinutes(-1)));
+
+    if (opened.IsFailure || opened.Session is null)
+    {
+        return AdminBillingResult.ControlledError(
+            session.MachineId ?? string.Empty,
+            opened.ErrorCode ?? "BILLING_OPEN_FAILED",
+            opened.Message);
+    }
+
+    return AdminBillingResult.Success(
+        session.MachineId ?? string.Empty,
+        opened.Message,
+        new TimerPayload
+        {
+            MachineId = session.MachineId ?? string.Empty,
+            RentalMode = BillingRentalMode.Timed.ToString(),
+            StartedAt = opened.Session.Session.StartedAtUtc,
+            ExpiresAt = opened.Session.Session.ExpiresAtUtc,
+            RatePerHour = opened.Session.Session.RatePerHour,
+            ChargedMinutes = opened.Session.Calculation.ChargedMinutes,
+            AmountVnd = opened.Session.Calculation.AmountVnd,
+            Status = opened.Session.Session.State.ToString()
+        });
+}
+
+static Packet<LoginPayload> CreateClientLoginPacket(string username, string machineId, string password)
+{
+    return PacketFactory.CreateLogin(
+        source: machineId,
+        target: NetworkProtocol.ServerSource,
+        payload: new LoginPayload
+        {
+            Username = username,
+            Password = password,
+            Role = "Client",
+            MachineId = machineId
+        },
+        requestId: $"roundtrip-{Guid.NewGuid():N}");
+}
+
+static string AssertClientLoginSuccess(
+    Packet<LoginPayload> loginPacket,
+    object response,
+    string username,
+    string machineId)
+{
+    var resultPacket = response as Packet<LoginResultPayload>
+        ?? throw new InvalidOperationException($"Client expected LOGIN success packet for {machineId}.");
+
+    if (resultPacket.Success != true
+        || resultPacket.TypedPayload.Username != username
+        || resultPacket.TypedPayload.MachineId != machineId
+        || string.IsNullOrWhiteSpace(resultPacket.TypedPayload.SessionId))
+    {
+        throw new InvalidOperationException($"LOGIN success payload did not match {username}/{machineId}.");
+    }
+
+    AssertMatchingRequestId(loginPacket, resultPacket);
+    return resultPacket.TypedPayload.SessionId;
+}
+
+static async Task<Packet<ChatPayload>> ReadChatPacketAsync(StreamReader reader, string description)
+{
+    string inboundLine = await ReadRequiredLineAsync(reader, description).ConfigureAwait(false);
+    Console.WriteLine($"CLIENT IN : {inboundLine}");
+
+    return JsonHelper.DeserializePacket(inboundLine) as Packet<ChatPayload>
+        ?? throw new InvalidOperationException($"Client expected CHAT packet for {description}.");
+}
+
+static Task<Packet<TimerPayload>> ReadTimerPacketAsync(StreamReader reader, string description)
+    => ReadPacketAsync<TimerPayload>(reader, description);
+
+static async Task<Packet<TPayload>> ReadPacketAsync<TPayload>(StreamReader reader, string description)
+    where TPayload : class
+{
+    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+
+    while (DateTime.UtcNow < deadline)
+    {
+        string inboundLine = await ReadRequiredLineAsync(reader, description).ConfigureAwait(false);
+        Console.WriteLine($"CLIENT IN : {inboundLine}");
+        object packet = JsonHelper.DeserializePacket(inboundLine);
+        if (packet is Packet<TPayload> typedPacket)
+        {
+            return typedPacket;
+        }
+    }
+
+    throw new InvalidOperationException($"Client expected {typeof(TPayload).Name} packet for {description}.");
+}
+
+static async Task<object> ReadAnyPacketAsync(StreamReader reader, string description)
+{
+    string inboundLine = await ReadRequiredLineAsync(reader, description).ConfigureAwait(false);
+    Console.WriteLine($"CLIENT IN : {inboundLine}");
+    return JsonHelper.DeserializePacket(inboundLine);
+}
+
+static async Task SendStatusAsync(StreamWriter writer, string machineId, string sessionId)
+{
+    var statusPacket = PacketFactory.CreateStatus(
+        source: machineId,
+        target: NetworkProtocol.ServerSource,
+        payload: new StatusPayload
+        {
+            MachineId = machineId,
+            SessionId = sessionId,
+            MachineName = machineId,
+            Status = "Online",
+            IpAddress = IPAddress.Loopback.ToString(),
+            LastSeen = DateTime.UtcNow
+        },
+        requestId: $"status-{Guid.NewGuid():N}");
+
+    string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(statusPacket));
+    Console.WriteLine($"CLIENT OUT: {outboundLine}");
+    await writer.WriteLineAsync(outboundLine).ConfigureAwait(false);
+}
+
+static async Task AssertNoLineWithinAsync(StreamReader reader, TimeSpan timeout, string description)
+{
+    Task<string?> readTask = reader.ReadLineAsync();
+    Task delayTask = Task.Delay(timeout);
+    Task completed = await Task.WhenAny(readTask, delayTask).ConfigureAwait(false);
+
+    if (completed == readTask)
+    {
+        string? line = await readTask.ConfigureAwait(false);
+        throw new InvalidOperationException($"{description} unexpectedly received line: {line}");
+    }
+}
+
+static async Task WaitForChatMessageAsync(
+    List<(string MachineId, ChatPayload Payload)> chatMessages,
+    string machineId,
+    string expectedMessage)
+{
+    DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+
+    while (DateTime.UtcNow < deadline)
+    {
+        lock (chatMessages)
+        {
+            if (chatMessages.Any(item =>
+                    string.Equals(item.MachineId, machineId, StringComparison.OrdinalIgnoreCase)
+                    && item.Payload.Message == expectedMessage))
+            {
+                return;
+            }
+        }
+
+        await Task.Delay(25).ConfigureAwait(false);
+    }
+
+    throw new InvalidOperationException($"CHAT reply from {machineId} was not emitted.");
 }
 
 static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository sessions)

@@ -1,4 +1,5 @@
 using System.IO;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
 using Shared.Enums;
@@ -34,6 +35,7 @@ public sealed record PacketDispatchResult(
     string? CommandErrorMessage = null,
     CommandType? CommandErrorCommand = null,
     string? CommandErrorRequestId = null,
+    Packet<ChatPayload>? ChatPacket = null,
     string? TraceDirection = null,
     string? TraceMessage = null);
 
@@ -79,6 +81,7 @@ public sealed class PacketDispatcher
             Packet<LoginPayload> loginPacket => await DispatchLoginAsync(loginPacket, cancellationToken).ConfigureAwait(false),
             Packet<StatusPayload> statusPacket => await DispatchStatusAsync(statusPacket, cancellationToken).ConfigureAwait(false),
             Packet<AckPayload> ackPacket => DispatchAck(ackPacket),
+            Packet<ChatPayload> chatPacket => DispatchChat(chatPacket),
             Packet typedPacket => throw new InvalidDataException($"Unsupported packet type: {typedPacket.Type}"),
             _ => throw new InvalidDataException("Unsupported packet envelope.")
         };
@@ -310,6 +313,38 @@ public sealed class PacketDispatcher
             RequiresMachineBinding: true,
             CommandAckPacket: ackPacket,
             TraceDirection: "COMMAND_ACK",
+            TraceMessage: message);
+    }
+
+    private static PacketDispatchResult DispatchChat(Packet<ChatPayload> chatPacket)
+    {
+        ChatPayload? payload = chatPacket.TypedPayload;
+        if (payload is null)
+        {
+            throw new InvalidDataException("CHAT payload is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Sender))
+        {
+            throw new InvalidDataException("CHAT sender is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Receiver))
+        {
+            throw new InvalidDataException("CHAT receiver is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(payload.Message))
+        {
+            throw new InvalidDataException("CHAT message is required.");
+        }
+
+        string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(chatPacket));
+        return new PacketDispatchResult(
+            Response: null,
+            MachineId: payload.Sender.Trim(),
+            ChatPacket: chatPacket,
+            TraceDirection: "CHAT",
             TraceMessage: message);
     }
 

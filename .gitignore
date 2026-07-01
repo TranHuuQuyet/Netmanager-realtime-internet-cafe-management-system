@@ -485,3 +485,5 @@ $RECYCLE.BIN/
 
 # Local CodeGraph index/cache files
 .codegraph/
+
+.agents/

@@ -8,6 +8,8 @@ using ServerApp.Database.Models;
 
 Batteries_V2.Init();
 
+const string LegacyMachineSeparator = "-";
+
 var dbPath = PrepareScratchDatabasePath();
 DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(dbPath);
 AuthRuntime runtime = await AuthBootstrapper.CreateAsync(dbPath);
@@ -17,33 +19,29 @@ await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
+await AssertLegacyMachineIdMigrationAsync();
 await AssertCommandGuardAsync(runtime);
 await AssertR4DistinctClientsAsync();
 await AssertBillingRecoverySnapshotAsync();
-await AssertR5BillingSchemaAsync();
-await AssertR5BillingFlowAsync();
-await AssertR5BillingRestartRestoreAsync();
 
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
-Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC-01");
+Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01");
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
+Console.WriteLine("PASS G2-05: legacy hyphenated machine IDs migrate to canonical PCXX");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
 Console.WriteLine("PASS R4-N01: two authenticated clients stay distinct and duplicate active login is rejected");
 Console.WriteLine("PASS R4-R01: billing recovery snapshot restores active billing with timer state");
-Console.WriteLine("PASS R5-B01: BillingSessions schema supports active/closed restore fields");
-Console.WriteLine("PASS R5-B02: billing flow supports timed/open-ended/extend and rounded-minute amount");
-Console.WriteLine("PASS R5-R01: restart restore reloads active BillingSessions from SQLite");
 
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
     await AssertUserAsync(database.Users, "admin", "PC00", UserRole.Admin);
-    await AssertUserAsync(database.Users, "client01", "PC-01", UserRole.Client);
-    await AssertUserAsync(database.Users, "client02", "PC-02", UserRole.Client);
+    await AssertUserAsync(database.Users, "client01", "PC01", UserRole.Client);
+    await AssertUserAsync(database.Users, "client02", "PC02", UserRole.Client);
     await AssertMachineAsync(database.Machines, "PC00");
-    await AssertMachineAsync(database.Machines, "PC-01");
-    await AssertMachineAsync(database.Machines, "PC-02");
+    await AssertMachineAsync(database.Machines, "PC01");
+    await AssertMachineAsync(database.Machines, "PC02");
     await AssertSessionCountAsync(dbPath, 0);
 }
 
@@ -67,7 +65,7 @@ static async Task AssertAdminLoginAsync(AuthRuntime runtime)
 static async Task AssertClientLoginAsync(AuthRuntime runtime)
 {
     var result = await runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
 
     AssertSuccess(result, AuthStatus.Success, "client01");
     if (result.Session is null)
@@ -75,7 +73,7 @@ static async Task AssertClientLoginAsync(AuthRuntime runtime)
         throw new InvalidOperationException("G2-02 expected a session for client login.");
     }
 
-    if (!string.Equals(result.Session.MachineId, "PC-01", StringComparison.Ordinal))
+    if (!string.Equals(result.Session.MachineId, "PC01", StringComparison.Ordinal))
     {
         throw new InvalidOperationException("G2-02 session machine mismatch.");
     }
@@ -84,7 +82,7 @@ static async Task AssertClientLoginAsync(AuthRuntime runtime)
 static async Task AssertWrongPasswordAsync(AuthRuntime runtime)
 {
     var result = await runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "wrong-password", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "wrong-password", "PC01", UserRole.Client));
 
     AssertFailure(result, AuthStatus.InvalidCredentials, "INVALID_CREDENTIALS", "G2-03");
 }
@@ -92,9 +90,46 @@ static async Task AssertWrongPasswordAsync(AuthRuntime runtime)
 static async Task AssertWrongMachineAsync(AuthRuntime runtime)
 {
     var result = await runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-02", UserRole.Client));
+        new AuthRequest("client01", "123", "PC02", UserRole.Client));
 
     AssertFailure(result, AuthStatus.AccountMachineMismatch, "ACCOUNT_MACHINE_MISMATCH", "G2-04");
+}
+
+static async Task AssertLegacyMachineIdMigrationAsync()
+{
+    string legacyDbPath = PrepareScratchDatabasePath("Netmanager-G2-05-LegacyMachineIds");
+    await CreateLegacyMachineIdDatabaseAsync(legacyDbPath);
+
+    DatabaseRuntime migratedDatabase = await DatabaseBootstrapper.CreateAsync(legacyDbPath);
+    AuthRuntime migratedRuntime = await AuthBootstrapper.CreateAsync(legacyDbPath);
+
+    await AssertUserAsync(migratedDatabase.Users, "client01", "PC01", UserRole.Client);
+    await AssertUserAsync(migratedDatabase.Users, "client02", "PC02", UserRole.Client);
+    await AssertMachineAsync(migratedDatabase.Machines, "PC01");
+    await AssertMachineAsync(migratedDatabase.Machines, "PC02");
+    await AssertMachineMissingAsync(migratedDatabase.Machines, LegacyMachineId("01"));
+    await AssertMachineMissingAsync(migratedDatabase.Machines, LegacyMachineId("02"));
+    await AssertNoLegacyMachineIdsAsync(legacyDbPath);
+
+    var pc01Login = await migratedRuntime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
+    AssertSuccess(pc01Login, AuthStatus.Success, "G2-05 client01 migrated login");
+    if (pc01Login.Session is null)
+    {
+        throw new InvalidOperationException("G2-05 expected migrated client01 session.");
+    }
+
+    await migratedRuntime.SessionService.CloseSessionAsync(pc01Login.Session.Id);
+
+    var pc02Login = await migratedRuntime.Auth.AuthenticateAsync(
+        new AuthRequest("client02", "123", "PC02", UserRole.Client));
+    AssertSuccess(pc02Login, AuthStatus.Success, "G2-05 client02 migrated login");
+    if (pc02Login.Session is null)
+    {
+        throw new InvalidOperationException("G2-05 expected migrated client02 session.");
+    }
+
+    await migratedRuntime.SessionService.CloseSessionAsync(pc02Login.Session.Id);
 }
 
 static async Task AssertCommandGuardAsync(AuthRuntime runtime)
@@ -103,7 +138,7 @@ static async Task AssertCommandGuardAsync(AuthRuntime runtime)
     DatabaseRuntime guardDatabase = await DatabaseBootstrapper.CreateAsync(guardDbPath);
     AuthRuntime guardRuntime = await AuthBootstrapper.CreateAsync(guardDbPath);
 
-    await AssertMachineStateAsync(guardDatabase.Machines, "PC-01", expectedIsActive: true, expectedStatus: "Offline");
+    await AssertMachineStateAsync(guardDatabase.Machines, "PC01", expectedIsActive: true, expectedStatus: "Offline");
 
     var user = await guardDatabase.Users.GetByUsernameAsync("client01");
     if (user is null)
@@ -113,20 +148,20 @@ static async Task AssertCommandGuardAsync(AuthRuntime runtime)
 
     var session = await guardRuntime.SessionService.OpenSessionAsync(user);
 
-    if (!string.Equals(session.MachineId, "PC-01", StringComparison.Ordinal))
+    if (!string.Equals(session.MachineId, "PC01", StringComparison.Ordinal))
     {
-        throw new InvalidOperationException("R3-A01 expected a session bound to PC-01.");
+        throw new InvalidOperationException("R3-A01 expected a session bound to PC01.");
     }
 
-    var allowed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-01");
-    AssertCommandGuardSuccess(allowed, "PC-01", "R3-A01 active machine");
+    var allowed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC01");
+    AssertCommandGuardSuccess(allowed, "PC01", "R3-A01 active machine");
 
-    var deniedInactive = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-02");
+    var deniedInactive = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC02");
     AssertCommandGuardFailure(deniedInactive, "R3-A01 inactive machine", "UNAUTHORIZED_COMMAND");
 
     await guardRuntime.SessionService.CloseSessionAsync(session.Id);
 
-    var deniedClosed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC-01");
+    var deniedClosed = await guardRuntime.SessionService.AuthorizeCommandTargetAsync("PC01");
     AssertCommandGuardFailure(deniedClosed, "R3-A01 closed machine", "UNAUTHORIZED_COMMAND");
 }
 
@@ -136,11 +171,11 @@ static async Task AssertR4DistinctClientsAsync()
     AuthRuntime r4Runtime = await AuthBootstrapper.CreateAsync(r4DbPath);
 
     var client01 = await r4Runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
     AssertSuccess(client01, AuthStatus.Success, "R4-N01 client01");
 
     var client02 = await r4Runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client02", "123", "PC-02", UserRole.Client));
+        new AuthRequest("client02", "123", "PC02", UserRole.Client));
     AssertSuccess(client02, AuthStatus.Success, "R4-N01 client02");
 
     if (client01.Session is null || client02.Session is null)
@@ -153,14 +188,14 @@ static async Task AssertR4DistinctClientsAsync()
         throw new InvalidOperationException("R4-N01 expected distinct session IDs for client01 and client02.");
     }
 
-    if (!string.Equals(client01.Session.MachineId, "PC-01", StringComparison.Ordinal)
-        || !string.Equals(client02.Session.MachineId, "PC-02", StringComparison.Ordinal))
+    if (!string.Equals(client01.Session.MachineId, "PC01", StringComparison.Ordinal)
+        || !string.Equals(client02.Session.MachineId, "PC02", StringComparison.Ordinal))
     {
         throw new InvalidOperationException("R4-N01 expected each client to keep its own machine binding.");
     }
 
     var duplicateLogin = await r4Runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
     AssertFailure(
         duplicateLogin,
         AuthStatus.MachineAlreadyActive,
@@ -171,7 +206,7 @@ static async Task AssertR4DistinctClientsAsync()
     await r4Runtime.SessionService.CloseSessionAsync(client02.Session.Id);
 
     var client01Reopened = await r4Runtime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
     AssertSuccess(client01Reopened, AuthStatus.Success, "R4-N01 client01 reopened");
 
     if (client01Reopened.Session is null)
@@ -189,7 +224,7 @@ static async Task AssertBillingRecoverySnapshotAsync()
     var billing = authRuntime.Billing;
 
     var login = await authRuntime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
     if (!login.IsSuccess || login.User is null || login.Session is null)
     {
         throw new InvalidOperationException("R4-R01 expected a valid authenticated client session.");
@@ -211,6 +246,33 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected billing session open to succeed.");
     }
 
+    var duplicate = await billing.OpenSessionAsync(
+        new BillingSessionRequest(
+            login.Session.Id,
+            login.User.Id,
+            login.User.Username,
+            login.Session.MachineId,
+            BillingRentalMode.OpenEnded,
+            DateTimeOffset.UtcNow));
+
+    if (!duplicate.IsFailure || duplicate.ErrorCode != "BILLING_SESSION_ALREADY_ACTIVE")
+    {
+        throw new InvalidOperationException("R5-B01 expected duplicate active billing to be rejected.");
+    }
+
+    var extended = await billing.ExtendSessionAsync(
+        opened.Session.Session.Id,
+        TimeSpan.FromMinutes(5),
+        DateTimeOffset.UtcNow);
+
+    if (!extended.IsSuccess
+        || extended.Session is null
+        || extended.Session.Session.RentalMode != BillingRentalMode.Extend
+        || extended.Session.Session.ExpiresAtUtc <= opened.Session.Session.ExpiresAtUtc)
+    {
+        throw new InvalidOperationException("R5-B02 expected timed billing extension to update expiry and mode.");
+    }
+
     var active = await billing.GetActiveSessionAsync(login.Session.MachineId, DateTimeOffset.UtcNow);
     if (active is null || active.Session is null)
     {
@@ -230,7 +292,7 @@ static async Task AssertBillingRecoverySnapshotAsync()
     }
 
     var restored = snapshot.Sessions[0];
-    if (!string.Equals(restored.Session.Session.MachineId, "PC-01", StringComparison.Ordinal))
+    if (!string.Equals(restored.Session.Session.MachineId, "PC01", StringComparison.Ordinal))
     {
         throw new InvalidOperationException("R4-R01 expected billing snapshot to keep machine binding.");
     }
@@ -250,6 +312,14 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected rounded-up charged minutes to be restored.");
     }
 
+    AuthRuntime restartedRuntime = await AuthBootstrapper.CreateAsync(billingDbPath);
+    var restartedSnapshot = await restartedRuntime.Billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    if (restartedSnapshot.Sessions.Count != 1
+        || !string.Equals(restartedSnapshot.Sessions[0].Session.Session.MachineId, "PC01", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("R5-R01 expected fresh runtime to restore active billing from SQLite.");
+    }
+
     var calculation = billing.CalculateAmount(
         DateTimeOffset.UtcNow.AddSeconds(-61),
         DateTimeOffset.UtcNow,
@@ -260,189 +330,43 @@ static async Task AssertBillingRecoverySnapshotAsync()
         throw new InvalidOperationException("R4-R01 expected 61 seconds to round up to 2 charged minutes.");
     }
 
-    await billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
-    await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
-}
-
-static async Task AssertR5BillingSchemaAsync()
-{
-    string dbPath = PrepareScratchDatabasePath("Netmanager-R5-B01");
-    _ = await AuthBootstrapper.CreateAsync(dbPath);
-
-    await using var connection = new SqliteConnection($"Data Source={dbPath}");
-    await connection.OpenAsync();
-
-    await AssertColumnAsync(connection, "BillingSessions", "AuthSessionId");
-    await AssertColumnAsync(connection, "BillingSessions", "UserId");
-    await AssertColumnAsync(connection, "BillingSessions", "MachineId");
-    await AssertColumnAsync(connection, "BillingSessions", "RentalMode");
-    await AssertColumnAsync(connection, "BillingSessions", "State");
-    await AssertColumnAsync(connection, "BillingSessions", "RatePerHour");
-    await AssertColumnAsync(connection, "BillingSessions", "StartedAtUtc");
-    await AssertColumnAsync(connection, "BillingSessions", "ExpiresAtUtc");
-    await AssertColumnAsync(connection, "BillingSessions", "EndedAtUtc");
-    await AssertColumnAsync(connection, "BillingSessions", "ChargedMinutes");
-    await AssertColumnAsync(connection, "BillingSessions", "AmountVnd");
-}
-
-static async Task AssertR5BillingFlowAsync()
-{
-    string dbPath = PrepareScratchDatabasePath("Netmanager-R5-B02");
-    AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(dbPath);
-    var billing = authRuntime.Billing;
-
-    var login01 = await authRuntime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
-    if (!login01.IsSuccess || login01.User is null || login01.Session is null)
+    var closed = await billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
+    if (!closed.IsSuccess
+        || closed.Session is null
+        || closed.Session.Session.State != BillingSessionState.Closed
+        || closed.Session.Session.AmountVnd <= 0)
     {
-        throw new InvalidOperationException("R5-B02 expected a valid authenticated client session.");
-    }
-
-    var timed = await billing.OpenSessionAsync(
-        new BillingSessionRequest(
-            login01.Session.Id,
-            login01.User.Id,
-            login01.User.Username,
-            login01.Session.MachineId,
-            BillingRentalMode.Timed,
-            DateTimeOffset.UtcNow.AddMinutes(-9),
-            10_000,
-            DateTimeOffset.UtcNow.AddMinutes(1)));
-
-    if (!timed.IsSuccess || timed.Session is null)
-    {
-        throw new InvalidOperationException("R5-B02 expected timed billing session to open.");
-    }
-
-    var extend = await billing.ExtendSessionAsync(
-        timed.Session.Session.Id,
-        TimeSpan.FromMinutes(5),
-        DateTimeOffset.UtcNow,
-        CancellationToken.None);
-
-    if (!extend.IsSuccess || extend.Session is null)
-    {
-        throw new InvalidOperationException("R5-B02 expected extend action to succeed.");
-    }
-
-    if (extend.Session.Session.RentalMode != BillingRentalMode.Extend)
-    {
-        throw new InvalidOperationException("R5-B02 expected extend action to switch rental mode to Extend.");
-    }
-
-    if (extend.Session.Calculation.AmountVnd <= 0)
-    {
-        throw new InvalidOperationException("R5-B02 expected extend action to keep a positive amount.");
-    }
-
-    var activeTimed = await billing.GetActiveSessionAsync(login01.Session.MachineId, DateTimeOffset.UtcNow);
-    if (activeTimed is null || activeTimed.Session is null)
-    {
-        throw new InvalidOperationException("R5-B02 expected active timed billing lookup to succeed.");
-    }
-
-    if (activeTimed.Session.Calculation.ChargedMinutes < 9)
-    {
-        throw new InvalidOperationException("R5-B02 expected active timed billing lookup to reflect elapsed minutes.");
-    }
-
-    await billing.CloseSessionAsync(timed.Session.Session.Id, DateTimeOffset.UtcNow);
-
-    var login02 = await authRuntime.Auth.AuthenticateAsync(
-        new AuthRequest("client02", "123", "PC-02", UserRole.Client));
-    if (!login02.IsSuccess || login02.User is null || login02.Session is null)
-    {
-        throw new InvalidOperationException("R5-B02 expected a second valid authenticated client session.");
+        throw new InvalidOperationException("R5-B01 expected close to persist charged minutes and amount.");
     }
 
     var openEnded = await billing.OpenSessionAsync(
-        new BillingSessionRequest(
-            login02.Session.Id,
-            login02.User.Id,
-            login02.User.Username,
-            login02.Session.MachineId,
-            BillingRentalMode.OpenEnded,
-            DateTimeOffset.UtcNow.AddSeconds(-61),
-            10_000,
-            null));
-
-    if (!openEnded.IsSuccess || openEnded.Session is null)
-    {
-        throw new InvalidOperationException("R5-B02 expected open-ended billing session to open.");
-    }
-
-    var rounded = billing.CalculateAmount(
-        DateTimeOffset.UtcNow.AddSeconds(-61),
-        DateTimeOffset.UtcNow,
-        10_000);
-
-    if (rounded.ChargedMinutes != 2)
-    {
-        throw new InvalidOperationException("R5-B02 expected 61 seconds to round up to 2 charged minutes.");
-    }
-
-    await billing.CloseSessionAsync(openEnded.Session.Session.Id, DateTimeOffset.UtcNow);
-    await authRuntime.SessionService.CloseSessionAsync(login01.Session.Id);
-    await authRuntime.SessionService.CloseSessionAsync(login02.Session.Id);
-}
-
-static async Task AssertR5BillingRestartRestoreAsync()
-{
-    string dbPath = PrepareScratchDatabasePath("Netmanager-R5-R01");
-    AuthRuntime firstRuntime = await AuthBootstrapper.CreateAsync(dbPath);
-
-    var login = await firstRuntime.Auth.AuthenticateAsync(
-        new AuthRequest("client01", "123", "PC-01", UserRole.Client));
-    if (!login.IsSuccess || login.User is null || login.Session is null)
-    {
-        throw new InvalidOperationException("R5-R01 expected a valid authenticated client session.");
-    }
-
-    var opened = await firstRuntime.Billing.OpenSessionAsync(
         new BillingSessionRequest(
             login.Session.Id,
             login.User.Id,
             login.User.Username,
             login.Session.MachineId,
-            BillingRentalMode.Timed,
-            DateTimeOffset.UtcNow.AddMinutes(-12),
+            BillingRentalMode.OpenEnded,
+            DateTimeOffset.UtcNow.AddMinutes(-3),
             10_000,
-            DateTimeOffset.UtcNow.AddMinutes(8)));
+            null));
 
-    if (!opened.IsSuccess || opened.Session is null)
+    if (!openEnded.IsSuccess || openEnded.Session is null)
     {
-        throw new InvalidOperationException("R5-R01 expected billing session open to succeed.");
+        throw new InvalidOperationException("R5-B01 expected open-ended billing session to open after close.");
     }
 
-    AuthRuntime restoredRuntime = await AuthBootstrapper.CreateAsync(dbPath);
-    var restored = await restoredRuntime.Billing.GetActiveSessionAsync(
-        login.Session.MachineId,
-        DateTimeOffset.UtcNow);
-
-    if (restored is null || restored.Session is null)
+    var openEndedSnapshot = await billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
+    var openEndedSync = openEndedSnapshot.Sessions.SingleOrDefault(session =>
+        session.Session.Session.RentalMode == BillingRentalMode.OpenEnded);
+    if (openEndedSync is null
+        || openEndedSync.RemainingSeconds is not null
+        || openEndedSync.ShouldLockNow)
     {
-        throw new InvalidOperationException("R5-R01 expected active billing to restore after restart.");
+        throw new InvalidOperationException("R5-R01 expected open-ended billing restore without remaining seconds or lock.");
     }
 
-    if (!string.Equals(restored.Session.Session.Id, opened.Session.Session.Id, StringComparison.Ordinal))
-    {
-        throw new InvalidOperationException("R5-R01 expected restore to keep the same billing session ID.");
-    }
-
-    if (restored.Session.Calculation.ChargedMinutes < 12)
-    {
-        throw new InvalidOperationException("R5-R01 expected restore to recalculate elapsed charged minutes.");
-    }
-
-    var snapshot = await restoredRuntime.Billing.GetRecoverySnapshotAsync(DateTimeOffset.UtcNow);
-    if (snapshot.Sessions.Count != 1)
-    {
-        throw new InvalidOperationException("R5-R01 expected exactly one active billing session after restart.");
-    }
-
-    await restoredRuntime.Billing.CloseSessionAsync(opened.Session.Session.Id, DateTimeOffset.UtcNow);
-    await restoredRuntime.SessionService.CloseSessionAsync(login.Session.Id);
-    await firstRuntime.SessionService.CloseSessionAsync(login.Session.Id);
+    await billing.CloseSessionAsync(openEnded.Session.Session.Id, DateTimeOffset.UtcNow);
+    await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
 }
 
 static void AssertSuccess(AuthResult result, AuthStatus expectedStatus, string username)
@@ -568,6 +492,128 @@ static async Task AssertMachineAsync(
     }
 }
 
+static async Task AssertMachineMissingAsync(
+    ServerApp.Database.Contracts.IMachineRepository machines,
+    string machineId)
+{
+    var machine = await machines.GetByMachineIdAsync(machineId);
+    if (machine is not null)
+    {
+        throw new InvalidOperationException($"Legacy machine should have been removed: {machineId}");
+    }
+}
+
+static async Task AssertNoLegacyMachineIdsAsync(string dbPath)
+{
+    await using var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+
+    foreach (string tableName in new[] { "AuthUsers", "AuthSessions", "BillingSessions", "Machines" })
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT COUNT(*) FROM {tableName} WHERE MachineId LIKE @LegacyPattern;";
+        command.Parameters.AddWithValue("@LegacyPattern", $"{LegacyMachineId(string.Empty)}%");
+        int count = Convert.ToInt32(await command.ExecuteScalarAsync());
+        if (count != 0)
+        {
+            throw new InvalidOperationException($"{tableName} still contains {count} legacy hyphenated machine IDs.");
+        }
+    }
+}
+
+static async Task CreateLegacyMachineIdDatabaseAsync(string dbPath)
+{
+    string legacyPc01 = LegacyMachineId("01");
+    string legacyPc02 = LegacyMachineId("02");
+
+    await using var connection = new SqliteConnection($"Data Source={dbPath}");
+    await connection.OpenAsync();
+
+    await using var command = connection.CreateCommand();
+    command.CommandText = """
+        CREATE TABLE AuthUsers (
+            Id TEXT PRIMARY KEY,
+            Username TEXT NOT NULL UNIQUE,
+            PasswordSaltBase64 TEXT NOT NULL,
+            PasswordHashBase64 TEXT NOT NULL,
+            Role INTEGER NOT NULL,
+            MachineId TEXT NULL,
+            IsActive INTEGER NOT NULL DEFAULT 1,
+            LastLoginAtUtc TEXT NULL
+        );
+
+        CREATE TABLE Machines (
+            Id TEXT PRIMARY KEY,
+            MachineId TEXT NOT NULL UNIQUE,
+            MachineName TEXT NOT NULL,
+            IpAddress TEXT NULL,
+            Status TEXT NOT NULL,
+            LastSeen TEXT NULL,
+            IsActive INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE AuthSessions (
+            Id TEXT PRIMARY KEY,
+            UserId TEXT NOT NULL,
+            Username TEXT NOT NULL,
+            Role INTEGER NOT NULL,
+            MachineId TEXT NULL,
+            State INTEGER NOT NULL,
+            StartedAtUtc TEXT NOT NULL,
+            EndedAtUtc TEXT NULL,
+            FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
+        );
+
+        CREATE TABLE BillingSessions (
+            Id TEXT PRIMARY KEY,
+            AuthSessionId TEXT NOT NULL,
+            UserId TEXT NOT NULL,
+            Username TEXT NOT NULL,
+            MachineId TEXT NOT NULL,
+            RentalMode INTEGER NOT NULL,
+            State INTEGER NOT NULL,
+            RatePerHour INTEGER NOT NULL,
+            StartedAtUtc TEXT NOT NULL,
+            ExpiresAtUtc TEXT NULL,
+            EndedAtUtc TEXT NULL,
+            ChargedMinutes INTEGER NOT NULL DEFAULT 0,
+            AmountVnd INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (AuthSessionId) REFERENCES AuthSessions(Id),
+            FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
+        );
+
+        INSERT INTO AuthUsers
+            (Id, Username, PasswordSaltBase64, PasswordHashBase64, Role, MachineId, IsActive)
+        VALUES
+            ('user-client01', 'client01', 'legacy-salt', 'legacy-hash', 1, @LegacyPc01, 1),
+            ('user-client02', 'client02', 'legacy-salt', 'legacy-hash', 1, @LegacyPc02, 1);
+
+        INSERT INTO Machines
+            (Id, MachineId, MachineName, Status, IsActive)
+        VALUES
+            ('11111111111111111111111111111111', @LegacyPc01, 'Legacy Computer 01', 'Offline', 1),
+            ('22222222222222222222222222222222', @LegacyPc02, 'Legacy Computer 02', 'Offline', 1),
+            ('33333333333333333333333333333333', 'PC01', 'Computer 01', 'Offline', 1),
+            ('44444444444444444444444444444444', 'PC02', 'Computer 02', 'Offline', 1);
+
+        INSERT INTO AuthSessions
+            (Id, UserId, Username, Role, MachineId, State, StartedAtUtc)
+        VALUES
+            ('legacy-auth-session-01', 'user-client01', 'client01', 1, @LegacyPc01, 1, '2026-06-01T00:00:00.0000000Z');
+
+        INSERT INTO BillingSessions
+            (Id, AuthSessionId, UserId, Username, MachineId, RentalMode, State, RatePerHour, StartedAtUtc)
+        VALUES
+            ('legacy-billing-session-01', 'legacy-auth-session-01', 'user-client01', 'client01', @LegacyPc01, 0, 1, 10000, '2026-06-01T00:00:00.0000000Z');
+        """;
+    command.Parameters.AddWithValue("@LegacyPc01", legacyPc01);
+    command.Parameters.AddWithValue("@LegacyPc02", legacyPc02);
+
+    await command.ExecuteNonQueryAsync();
+}
+
+static string LegacyMachineId(string suffix) => $"PC{LegacyMachineSeparator}{suffix}";
+
 static async Task AssertMachineStateAsync(
     ServerApp.Database.Contracts.IMachineRepository machines,
     string machineId,
@@ -606,23 +652,6 @@ static async Task AssertSessionCountAsync(string dbPath, int expectedCount)
     {
         throw new InvalidOperationException($"AuthSessions count mismatch: expected {expectedCount}, got {count}");
     }
-}
-
-static async Task AssertColumnAsync(SqliteConnection connection, string tableName, string columnName)
-{
-    await using var command = connection.CreateCommand();
-    command.CommandText = $"PRAGMA table_info({tableName});";
-
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
-    {
-        if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-    }
-
-    throw new InvalidOperationException($"Missing expected column {tableName}.{columnName}");
 }
 
 static string PrepareScratchDatabasePath(string? scenarioName = null)

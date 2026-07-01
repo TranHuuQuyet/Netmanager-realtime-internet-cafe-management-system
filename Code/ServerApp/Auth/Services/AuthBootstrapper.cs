@@ -11,6 +11,7 @@ public sealed record AuthRuntime(
     IUserRepository Users,
     ISessionRepository SessionRepository,
     IMachineRepository Machines,
+    ICustomerRepository Customers,
     ISessionService SessionService,
     IAuthService Auth,
     IBillingService Billing);
@@ -23,10 +24,10 @@ public static class AuthBootstrapper {
         DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(databasePath, cancellationToken).ConfigureAwait(false);
 
         ISessionService sessionService = new SessionService(database.Sessions, database.Machines);
-        IAuthService auth = new AuthService(database.Users, database.Machines, sessionService);
+        IAuthService auth = new AuthService(database.Users, database.Machines, sessionService, database.Customers);
         IBillingService billing = new BillingService(database.BillingSessions);
 
-        return new AuthRuntime(database.Users, database.Sessions, database.Machines, sessionService, auth, billing);
+        return new AuthRuntime(database.Users, database.Sessions, database.Machines, database.Customers, sessionService, auth, billing);
     }
 
     // Helper cho UI form khi chi can IAuthService, khong can dereference AuthRuntime.

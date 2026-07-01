@@ -9,15 +9,22 @@ namespace ServerApp.Auth.Services;
 // Xu ly logic dang nhap cap nghiep vu: check input, user, password, machine va mo session.
 public sealed class AuthService : IAuthService {
     private const string MachineStatusOnline = "Online";
+    private const string CustomerAuthUserIdPrefix = "customer-";
 
     private readonly IUserRepository _users;
     private readonly IMachineRepository _machines;
     private readonly ISessionService _sessions;
+    private readonly ICustomerRepository? _customers;
 
-    public AuthService(IUserRepository users, IMachineRepository machines, ISessionService sessions) {
+    public AuthService(
+        IUserRepository users,
+        IMachineRepository machines,
+        ISessionService sessions,
+        ICustomerRepository? customers = null) {
         _users = users;
         _machines = machines;
         _sessions = sessions;
+        _customers = customers;
     }
 
     public async Task<AuthResult> AuthenticateAsync(AuthRequest request, CancellationToken cancellationToken = default) {
@@ -37,6 +44,18 @@ public sealed class AuthService : IAuthService {
         try {
             // Buoc 2: tim user trong DB va loai bo cac truong hop khong hop le som.
             var user = await _users.GetByUsernameAsync(username, cancellationToken).ConfigureAwait(false);
+            if (request.RequiredRole == AuthUserRole.Client) {
+                AuthResult? customerResult = await TryAuthenticateCustomerAsync(
+                    username,
+                    password,
+                    machineId,
+                    user,
+                    cancellationToken).ConfigureAwait(false);
+                if (customerResult is not null) {
+                    return customerResult;
+                }
+            }
+
             if (user is null) {
                 return AuthResult.Failure(AuthStatus.InvalidCredentials, "Account was not found.");
             }
@@ -108,4 +127,85 @@ public sealed class AuthService : IAuthService {
 
     private static bool IsMachineOnline(string? status)
         => string.Equals(status?.Trim(), MachineStatusOnline, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<AuthResult?> TryAuthenticateCustomerAsync(
+        string username,
+        string password,
+        string machineId,
+        UserRecord? existingAuthUser,
+        CancellationToken cancellationToken) {
+        if (_customers is null) {
+            return null;
+        }
+
+        var customer = await _customers.GetByUsernameAsync(username, cancellationToken).ConfigureAwait(false);
+
+        if (customer is null) {
+            return IsCustomerAuthUser(existingAuthUser)
+                ? AuthResult.Failure(AuthStatus.InvalidCredentials, "Customer account was not found.")
+                : null;
+        }
+
+        string customerAuthUserId = CreateCustomerAuthUserId(customer.CustomerId);
+        if (existingAuthUser is not null
+            && !string.Equals(existingAuthUser.Id, customerAuthUserId, StringComparison.OrdinalIgnoreCase)) {
+            return null;
+        }
+
+        if (!string.Equals(customer.Password, password, StringComparison.Ordinal)) {
+            return AuthResult.Failure(AuthStatus.InvalidCredentials, "Password is incorrect.");
+        }
+
+        if (string.IsNullOrWhiteSpace(machineId)) {
+            return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine ID is required.");
+        }
+
+        var machine = await _machines.GetByMachineIdAsync(machineId, cancellationToken).ConfigureAwait(false);
+        if (machine is null) {
+            return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine was not found.");
+        }
+
+        if (!machine.IsActive) {
+            return AuthResult.Failure(AuthStatus.AccountDisabled, "Machine is disabled.");
+        }
+
+        if (IsMachineOnline(machine.Status)) {
+            return AuthResult.Failure(AuthStatus.MachineAlreadyActive, "Machine is already active.");
+        }
+
+        UserRecord authUser = CreateCustomerAuthUser(customer, machineId);
+        await _users.AddAsync(authUser, cancellationToken).ConfigureAwait(false);
+
+        var session = await _sessions.OpenSessionAsync(authUser, cancellationToken).ConfigureAwait(false);
+        await _users.UpdateLastLoginAtAsync(authUser.Id, session.StartedAtUtc, cancellationToken).ConfigureAwait(false);
+
+        var summary = new UserSummary(
+            authUser.Id,
+            authUser.Username,
+            AuthUserRole.Client,
+            machineId,
+            true,
+            session.StartedAtUtc);
+
+        return AuthResult.Success(summary, session);
+    }
+
+    private static UserRecord CreateCustomerAuthUser(CustomerRecord customer, string machineId) {
+        ServerApp.Database.Models.PasswordHash hash = ServerApp.Database.PasswordHasher.Hash(customer.Password);
+        return new UserRecord(
+            CreateCustomerAuthUserId(customer.CustomerId),
+            customer.Username,
+            hash.SaltBase64,
+            hash.HashBase64,
+            AuthUserRole.Client,
+            machineId,
+            true,
+            null);
+    }
+
+    private static string CreateCustomerAuthUserId(string customerId)
+        => $"{CustomerAuthUserIdPrefix}{customerId.Trim()}";
+
+    private static bool IsCustomerAuthUser(UserRecord? user)
+        => user?.Id.StartsWith(CustomerAuthUserIdPrefix, StringComparison.OrdinalIgnoreCase) == true;
 }

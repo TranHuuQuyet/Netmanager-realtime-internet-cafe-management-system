@@ -1,5 +1,6 @@
 using ServerApp.Database.Contracts;
 using ServerApp.Database.Entities;
+using ServerApp.Database.Models;
 using ServerApp.Networking;
 using ServerApp.Presentation;
 using Shared.Enums;
@@ -14,20 +15,28 @@ public partial class MainForm : Form
 
     // Định danh nguồn phát lệnh để phía networking có thể ghi log/audit lệnh admin.
     private const string AdminCommandIssuer = "ServerApp.MainForm";
+    private const string MachineCardLabelName = "lblMachineCardText";
+    private const string UnreadBadgeLabelName = "lblUnreadChatBadge";
 
     // Repository có thể null khi chạy giao diện demo không kết nối cơ sở dữ liệu.
     private readonly IMachineRepository? _machines;
+    private readonly ICustomerRepository? _customers;
 
     // Hai service luôn có giá trị. Nếu dependency không được truyền vào, constructor
     // dùng implementation "Unavailable" để trả lỗi có kiểm soát thay vì NullReference.
     private readonly IAdminCommandService _adminCommands;
     private readonly IAdminChatService _adminChat;
+    private readonly IAdminNotificationService _adminNotification;
     private readonly IAdminBillingService? _adminBilling;
     private readonly System.Windows.Forms.Timer _billingRefreshTimer = new();
 
     // Lưu lịch sử chat riêng theo từng MachineId. So sánh không phân biệt hoa/thường
     // để PC01 và pc01 không tạo thành hai cuộc hội thoại khác nhau.
     private readonly Dictionary<string, List<AdminChatMessage>> _chatHistoryByMachine =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    // Số tin nhắn client đã gửi nhưng admin chưa mở cuộc hội thoại của máy đó.
+    private readonly Dictionary<string, int> _unreadChatCountByMachine =
         new(StringComparer.OrdinalIgnoreCase);
 
     // Cờ chống vòng lặp sự kiện: SelectMachine thay đổi CurrentRow, thao tác đó lại
@@ -77,11 +86,24 @@ public partial class MainForm : Form
         IAdminCommandService? adminCommands,
         IAdminChatService? adminChat,
         IAdminBillingService? adminBilling)
+        : this(machines, adminCommands, adminChat, adminBilling, null, null)
+    {
+    }
+
+    private MainForm(
+        IMachineRepository? machines,
+        IAdminCommandService? adminCommands,
+        IAdminChatService? adminChat,
+        IAdminBillingService? adminBilling,
+        IAdminNotificationService? adminNotification,
+        ICustomerRepository? customers)
     {
         // Lưu dependency và thay dependency thiếu bằng service trả lỗi có kiểm soát.
         _machines = machines;
+        _customers = customers;
         _adminCommands = adminCommands ?? new UnavailableAdminCommandService();
         _adminChat = adminChat ?? new UnavailableAdminChatService();
+        _adminNotification = adminNotification ?? new UnavailableAdminNotificationService();
         _adminBilling = adminBilling;
 
         // Dựng control trước khi cấu hình trạng thái ban đầu vì các hàm sau cần truy
@@ -113,6 +135,15 @@ public partial class MainForm : Form
     }
 
     public MainForm(IMachineRepository? machines, TcpJsonLineServer? networkServer, IAdminBillingService? adminBilling)
+        : this(machines, networkServer, adminBilling, null)
+    {
+    }
+
+    public MainForm(
+        IMachineRepository? machines,
+        TcpJsonLineServer? networkServer,
+        IAdminBillingService? adminBilling,
+        ICustomerRepository? customers)
         : this(
             machines,
             networkServer is null
@@ -121,7 +152,11 @@ public partial class MainForm : Form
             networkServer is null
                 ? null
                 : new NetworkAdminChatService(networkServer),
-            adminBilling)
+            adminBilling,
+            networkServer is null
+                ? null
+                : new NetworkAdminNotificationService(networkServer),
+            customers)
     {
     }
 
@@ -161,19 +196,28 @@ public partial class MainForm : Form
 
     private void ConfigureBillingPanel()
     {
-        var rightPanel = new TableLayoutPanel
+        var rightTabs = new TabControl
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2
+            Alignment = TabAlignment.Top
         };
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 48F));
-        rightPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 52F));
+
+        var billingTab = new TabPage
+        {
+            Text = "Billing",
+            Padding = new Padding(8)
+        };
+
+        var chatTab = new TabPage
+        {
+            Text = "Chat",
+            Padding = new Padding(8)
+        };
 
         var billingGroup = new GroupBox
         {
             Dock = DockStyle.Fill,
-            Text = "Billing",
+            Text = string.Empty,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             Padding = new Padding(8)
         };
@@ -237,9 +281,12 @@ public partial class MainForm : Form
         billingGroup.Controls.Add(billingLayout);
 
         machineSplit.Panel2.Controls.Remove(chatGroup);
-        rightPanel.Controls.Add(billingGroup, 0, 0);
-        rightPanel.Controls.Add(chatGroup, 0, 1);
-        machineSplit.Panel2.Controls.Add(rightPanel);
+        chatGroup.Text = string.Empty;
+        billingTab.Controls.Add(billingGroup);
+        chatTab.Controls.Add(chatGroup);
+        rightTabs.TabPages.Add(billingTab);
+        rightTabs.TabPages.Add(chatTab);
+        machineSplit.Panel2.Controls.Add(rightTabs);
         SetBillingActionEnabled(false);
     }
 
@@ -258,12 +305,12 @@ public partial class MainForm : Form
     }
 
     /// <summary>
-    /// Nạp dữ liệu khi form mở. Dữ liệu khách hàng hiện là dữ liệu mẫu; danh sách
-    /// máy ưu tiên repository thật và chỉ quay về dữ liệu mẫu khi không có dữ liệu.
+    /// Nạp dữ liệu khi form mở. Danh sách khách hàng đọc trực tiếp từ database;
+    /// danh sách máy ưu tiên repository thật và chỉ quay về dữ liệu mẫu khi không có dữ liệu.
     /// </summary>
     private async void MainForm_Load(object sender, EventArgs e)
     {
-        LoadSampleCustomerData();
+        await LoadCustomerDataAsync();
 
         // TryLoad trả true khi đã có ít nhất một máy runtime và tự chọn máy đầu tiên.
         if (!await TryLoadRuntimeMachineDataAsync())
@@ -329,7 +376,7 @@ public partial class MainForm : Form
             string machineName = $"{SampleMachinePrefix}{machineNumber:00}";
 
             // Cập nhật hai cách hiển thị từ cùng một nguồn để bảng và card nhất quán.
-            dgvMachines.Rows.Add(machineNumber, machineNumber, statuses[index], machineName);
+            dgvMachines.Rows.Add(machineNumber, machineNumber, statuses[index], FormatMoney(0), machineName);
             pnlMachineCards.Controls.Add(CreateMachineCard(machineName, statuses[index]));
         }
     }
@@ -484,6 +531,7 @@ public partial class MainForm : Form
         // Label lấp phần diện tích còn lại và hiển thị cùng lúc tên máy, trạng thái.
         var label = new Label
         {
+            Name = MachineCardLabelName,
             Dock = DockStyle.Fill,
             Text = FormatMachineLabel(machineName, status),
             TextAlign = ContentAlignment.MiddleCenter,
@@ -492,15 +540,37 @@ public partial class MainForm : Form
             Tag = machineName
         };
 
+        var unreadBadge = new Label
+        {
+            Name = UnreadBadgeLabelName,
+            AutoSize = false,
+            Width = 24,
+            Height = 20,
+            Location = new Point(card.Width - 30, 4),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            BackColor = Color.FromArgb(220, 45, 45),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Cursor = Cursors.Hand,
+            Tag = machineName,
+            Visible = false
+        };
+
         // Thứ tự Add kết hợp với Dock quyết định icon ở trên, label ở dưới.
         card.Controls.Add(label);
         card.Controls.Add(icon);
+        card.Controls.Add(unreadBadge);
+        unreadBadge.BringToFront();
 
         // Gắn cùng handler cho container và hai control con để click ở bất kỳ vùng
         // nào trên card cũng chọn đúng máy.
         card.Click += MachineCard_Click;
         icon.Click += MachineCard_Click;
         label.Click += MachineCard_Click;
+        unreadBadge.Click += MachineCard_Click;
+
+        UpdateUnreadChatBadge(card, GetUnreadChatCount(machineName));
 
         return card;
     }
@@ -599,6 +669,7 @@ public partial class MainForm : Form
             // dựa trên MachineId vừa chọn.
             _selectedMachineName = machineName;
             lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
+            MarkMachineChatAsRead(machineName);
             RenderSelectedChatHistory();
             SetChatActionEnabled(true);
             SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
@@ -637,6 +708,18 @@ public partial class MainForm : Form
     /// lịch sử cục bộ và khôi phục trạng thái nhập sau khi hoàn tất.
     /// </summary>
     private async void BtnSendChat_Click(object? sender, EventArgs e)
+        => await SendAdminChatAsync();
+
+    private void TxtChatMessage_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.Enter && !e.Shift)
+        {
+            e.SuppressKeyPress = true;
+            _ = SendAdminChatAsync();
+        }
+    }
+
+    private async Task SendAdminChatAsync()
     {
         // Trim loại bỏ khoảng trắng đầu/cuối và coi chuỗi toàn khoảng trắng là rỗng.
         string message = txtChatMessage.Text.Trim();
@@ -698,6 +781,106 @@ public partial class MainForm : Form
         }
     }
 
+    private async void BtnSendNotification_Click(object? sender, EventArgs e)
+    {
+        string message = txtChatMessage.Text.Trim();
+
+        if (message.Length == 0 || string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            if (string.IsNullOrWhiteSpace(_selectedMachineName))
+            {
+                lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
+            }
+
+            return;
+        }
+
+        string targetMachineId = _selectedMachineName;
+        var request = new AdminNotificationRequest(targetMachineId, message, "Info", "Direct");
+
+        lblServerStatus.Text = $"Dang gui thong bao toi {targetMachineId}...";
+        SetChatActionEnabled(false);
+
+        try
+        {
+            AdminNotificationResult result = await _adminNotification.SendAsync(request);
+            lblServerStatus.Text = FormatNotificationResult(result);
+
+            if (!result.IsError)
+            {
+                AppendChatMessage(new AdminChatMessage(
+                    targetMachineId,
+                    "Thong bao",
+                    message,
+                    DateTimeOffset.Now));
+
+                txtChatMessage.Clear();
+                RenderSelectedChatHistory();
+            }
+        }
+        catch (Exception ex)
+        {
+            AdminNotificationResult error = AdminNotificationResult.ControlledError(
+                request,
+                "NOTIFICATION_SERVICE_ERROR",
+                ex.Message);
+            lblServerStatus.Text = FormatNotificationResult(error);
+        }
+        finally
+        {
+            SetChatActionEnabled(!string.IsNullOrWhiteSpace(_selectedMachineName));
+            txtChatMessage.Focus();
+        }
+    }
+
+    private async void BtnBroadcastNotification_Click(object? sender, EventArgs e)
+    {
+        string message = txtChatMessage.Text.Trim();
+        if (message.Length == 0)
+        {
+            return;
+        }
+
+        var request = new AdminNotificationRequest("ALL", message, "Info", "Broadcast");
+
+        lblServerStatus.Text = "Dang broadcast thong bao...";
+        SetChatActionEnabled(false);
+
+        try
+        {
+            AdminNotificationResult result = await _adminNotification.BroadcastAsync(request);
+            lblServerStatus.Text = FormatNotificationResult(result);
+
+            if (!result.IsError)
+            {
+                foreach (string machineId in _chatHistoryByMachine.Keys.ToArray())
+                {
+                    AppendChatMessage(new AdminChatMessage(
+                        machineId,
+                        "Broadcast",
+                        message,
+                        DateTimeOffset.Now));
+                }
+
+                txtChatMessage.Clear();
+                RenderSelectedChatHistory();
+            }
+        }
+        catch (Exception ex)
+        {
+            AdminNotificationResult error = AdminNotificationResult.ControlledError(
+                request,
+                "NOTIFICATION_BROADCAST_SERVICE_ERROR",
+                ex.Message);
+            lblServerStatus.Text = FormatNotificationResult(error);
+        }
+        finally
+        {
+            SetChatActionEnabled(!string.IsNullOrWhiteSpace(_selectedMachineName));
+            txtChatMessage.Focus();
+        }
+    }
+
     /// <summary>
     /// Nhận tin nhắn client gửi lên, chuẩn hóa MachineId, lưu đúng cuộc hội thoại và
     /// chỉ render lại ngay nếu admin đang xem máy đó.
@@ -722,7 +905,12 @@ public partial class MainForm : Form
         // Tin nhắn của máy khác vẫn được lưu nhưng không thay nội dung admin đang đọc.
         if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
         {
+            MarkMachineChatAsRead(machineId);
             RenderSelectedChatHistory();
+        }
+        else
+        {
+            IncrementUnreadChatCount(machineId);
         }
 
         lblServerStatus.Text = string.Format(
@@ -858,6 +1046,11 @@ public partial class MainForm : Form
             ? $"Billing {result.MachineId}: {result.ErrorCode ?? "Error"} - {result.Message}"
             : $"Billing {result.MachineId}: {result.Message}";
 
+        if (result.Timer is not null)
+        {
+            UpdateMachineBillingAmount(result.Timer.MachineId, result.Timer.AmountVnd);
+        }
+
         if (!string.Equals(result.MachineId, _selectedMachineName, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -877,20 +1070,19 @@ public partial class MainForm : Form
         return
             $"{timer.Status} {timer.RentalMode}{warning}{Environment.NewLine}" +
             $"Time: {remaining} / charged {timer.ChargedMinutes} min{Environment.NewLine}" +
-            $"Amount: {timer.AmountVnd:N0} VND";
+            $"Used cost: {FormatMoney(timer.AmountVnd)}";
     }
 
     /// <summary>
-    /// Ánh xạ nút thao tác máy sang CommandType và điều phối việc gửi lệnh. Nút tắt
-    /// máy hiện chỉ hiển thị trạng thái "chờ triển khai" vì chưa có CommandType tương ứng.
+    /// Ánh xạ nút thao tác máy sang CommandType và điều phối việc gửi lệnh.
     /// </summary>
     private async void MachineAction_Click(object? sender, EventArgs e)
     {
-        // Chỉ Lock và Unlock được ánh xạ thành lệnh mạng ở phiên bản hiện tại.
         CommandType? command = sender switch
         {
             Button button when button == btnLockMachine => CommandType.LOCK,
             Button button when button == btnUnlockMachine => CommandType.UNLOCK,
+            Button button when button == btnShutdownMachine => CommandType.SHUTDOWN,
             _ => null
         };
 
@@ -899,6 +1091,7 @@ public partial class MainForm : Form
         {
             CommandType.LOCK => UiStrings.MainLockMachine,
             CommandType.UNLOCK => UiStrings.MainUnlockMachine,
+            CommandType.SHUTDOWN => UiStrings.MainShutdownMachine,
             _ when sender == btnShutdownMachine => UiStrings.MainShutdownMachine,
             _ => UiStrings.MainPendingAction
         };
@@ -910,8 +1103,6 @@ public partial class MainForm : Form
             return;
         }
 
-        // Nút có action nhưng chưa có command sẽ không gọi service, tránh gửi một
-        // yêu cầu không hợp lệ tới client.
         if (command is null)
         {
             lblServerStatus.Text = string.Format(UiStrings.MainActionPendingTemplate, action, _selectedMachineName);
@@ -933,9 +1124,13 @@ public partial class MainForm : Form
             machineName,
             command,
             AdminCommandIssuer,
-            command == CommandType.LOCK
-                ? UiStrings.MainCommandLockReason
-                : UiStrings.MainCommandUnlockReason);
+            command switch
+            {
+                CommandType.LOCK => UiStrings.MainCommandLockReason,
+                CommandType.UNLOCK => UiStrings.MainCommandUnlockReason,
+                CommandType.SHUTDOWN => "Admin requested client shutdown.",
+                _ => "Admin requested machine command."
+            });
 
         lblServerStatus.Text = string.Format(UiStrings.MainCommandSubmittingTemplate, action, machineName);
         SetMachineActionButtonsEnabled(false);
@@ -963,23 +1158,65 @@ public partial class MainForm : Form
         }
     }
 
-    /// <summary>
-    /// Nhận sự kiện từ nhóm nút khách hàng và hiển thị chức năng dự kiến. CRUD khách
-    /// hàng chưa được nối tới repository trong phiên bản hiện tại.
-    /// </summary>
-    private void CustomerAction_Click(object? sender, EventArgs e)
+    private async void CustomerAction_Click(object? sender, EventArgs e)
     {
-        // So sánh chính instance Button để tất cả nút có thể dùng chung một handler.
-        string action = sender switch
+        if (sender == btnCancelCustomer)
         {
-            Button button when button == btnAddCustomer => UiStrings.MainAddCustomerButton,
-            Button button when button == btnEditCustomer => UiStrings.MainEditCustomerButton,
-            Button button when button == btnDeleteCustomer => UiStrings.MainDeleteCustomerButton,
-            Button button when button == btnCancelCustomer => UiStrings.MainCancelCustomerButton,
-            _ => UiStrings.MainPendingAction
-        };
+            ClearCustomerInputs();
+            dgvCustomers.ClearSelection();
+            lblServerStatus.Text = "Đã hủy thao tác khách hàng.";
+            return;
+        }
 
-        lblServerStatus.Text = string.Format(UiStrings.MainCustomerActionPendingTemplate, action);
+        if (_customers is null)
+        {
+            ShowCustomerMessage("Chưa kết nối database khách hàng.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            if (sender == btnDeleteCustomer)
+            {
+                await DeleteSelectedCustomerAsync();
+                return;
+            }
+
+            if (!TryBuildCustomerRecord(out CustomerRecord? customer) || customer is null)
+            {
+                return;
+            }
+
+            if (sender == btnAddCustomer)
+            {
+                await _customers.AddAsync(customer).ConfigureAwait(true);
+                await LoadCustomerDataAsync(customer.CustomerId);
+                lblServerStatus.Text = $"Đã thêm khách hàng {customer.CustomerId}.";
+                return;
+            }
+
+            if (sender == btnEditCustomer)
+            {
+                var existing = await _customers.GetByIdAsync(customer.CustomerId).ConfigureAwait(true);
+                if (existing is null)
+                {
+                    ShowCustomerMessage($"Không tìm thấy khách hàng {customer.CustomerId} để sửa.", MessageBoxIcon.Warning);
+                    return;
+                }
+
+                await _customers.UpdateAsync(customer).ConfigureAwait(true);
+                await LoadCustomerDataAsync(customer.CustomerId);
+                lblServerStatus.Text = $"Đã cập nhật khách hàng {customer.CustomerId}.";
+            }
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException ex) when (ex.SqliteErrorCode == 19)
+        {
+            ShowCustomerMessage("Mã KH hoặc tên đăng nhập đã tồn tại trong database.", MessageBoxIcon.Warning);
+        }
+        catch (Exception ex)
+        {
+            ShowCustomerMessage($"Không thể lưu dữ liệu khách hàng: {ex.Message}", MessageBoxIcon.Error);
+        }
     }
 
     /// <summary>
@@ -1021,6 +1258,11 @@ public partial class MainForm : Form
             // Đồng bộ nền Label với Panel. PictureBox giữ nền riêng để icon được vẽ ổn định.
             foreach (Control child in card.Controls)
             {
+                if (child is Label { Name: UnreadBadgeLabelName })
+                {
+                    continue;
+                }
+
                 if (child is not PictureBox)
                 {
                     child.BackColor = card.BackColor;
@@ -1045,6 +1287,7 @@ public partial class MainForm : Form
         lblMachineTitle.Text = UiStrings.MainMachineTitle;
         _selectedMachineName = null;
         _chatHistoryByMachine.Clear();
+        _unreadChatCountByMachine.Clear();
         SetMachineActionButtonsEnabled(true);
         SetBillingActionEnabled(_adminBilling is not null);
         SetChatActionEnabled(false);
@@ -1091,7 +1334,22 @@ public partial class MainForm : Form
 
         // Bảng cần hai cột số. Nếu ID không chứa chữ số, helper trả 0 thay vì ném lỗi.
         int machineNumber = TryGetMachineNumber(machineName);
-        dgvMachines.Rows.Add(machineNumber, machineNumber, status, machineName);
+        dgvMachines.Rows.Add(machineNumber, machineNumber, status, FormatMoney(0), machineName);
+    }
+
+    private void UpdateMachineBillingAmount(string machineName, long amountVnd)
+    {
+        foreach (DataGridViewRow row in dgvMachines.Rows)
+        {
+            if (string.Equals(
+                    row.Cells["MachineNameColumn"].Value?.ToString(),
+                    machineName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                row.Cells["TienSuDungColumn"].Value = FormatMoney(amountVnd);
+                return;
+            }
+        }
     }
 
     /// <summary>
@@ -1118,7 +1376,7 @@ public partial class MainForm : Form
     /// Ghi status mới vào icon và label của card. Invalidate yêu cầu WinForms phát
     /// lại Paint để chấm màu trạng thái đổi ngay trên màn hình.
     /// </summary>
-    private static void UpdateMachineCardStatus(Panel card, string machineName, string status)
+    private void UpdateMachineCardStatus(Panel card, string machineName, string status)
     {
         foreach (Control child in card.Controls)
         {
@@ -1127,16 +1385,21 @@ public partial class MainForm : Form
                 icon.Tag = status;
                 icon.Invalidate();
             }
-            else if (child is Label label)
+            else if (child is Label { Name: MachineCardLabelName } label)
             {
                 label.Text = FormatMachineLabel(machineName, status);
             }
         }
+
+        UpdateUnreadChatBadge(card, GetUnreadChatCount(machineName));
     }
 
     // Quy tắc hiển thị card được gom một chỗ để lúc tạo và cập nhật cho kết quả giống nhau.
     private static string FormatMachineLabel(string machineName, string status)
         => $"{machineName} - {status}";
+
+    private static string FormatMoney(long amountVnd)
+        => $"{amountVnd:N0} VND";
 
     /// <summary>
     /// Chuyển kết quả lệnh thành chuỗi UI. Với lỗi có ErrorCode, mã lỗi được ưu tiên
@@ -1175,6 +1438,21 @@ public partial class MainForm : Form
         return string.Format(template, result.MachineId, status, result.Message);
     }
 
+    private static string FormatNotificationResult(AdminNotificationResult result)
+    {
+        if (result.IsError)
+        {
+            string errorCode = string.IsNullOrWhiteSpace(result.ErrorCode)
+                ? "NOTIFICATION_ERROR"
+                : result.ErrorCode;
+            return $"Thong bao toi {result.MachineId} that bai ({errorCode}): {result.Message}";
+        }
+
+        return string.IsNullOrWhiteSpace(result.RequestId)
+            ? $"Da gui thong bao toi {result.MachineId}."
+            : $"Da gui thong bao toi {result.MachineId} ({result.RequestId}).";
+    }
+
     /// <summary>
     /// Thêm tin nhắn vào lịch sử của đúng máy, đồng thời tạo danh sách hội thoại ở
     /// lần nhắn đầu tiên.
@@ -1189,6 +1467,68 @@ public partial class MainForm : Form
         }
 
         history.Add(message);
+    }
+
+    private int GetUnreadChatCount(string machineId)
+        => _unreadChatCountByMachine.TryGetValue(machineId, out int count) ? count : 0;
+
+    private void IncrementUnreadChatCount(string machineId)
+    {
+        int count = GetUnreadChatCount(machineId) + 1;
+        _unreadChatCountByMachine[machineId] = count;
+        UpdateUnreadChatBadge(machineId, count);
+    }
+
+    private void MarkMachineChatAsRead(string machineId)
+    {
+        if (!_unreadChatCountByMachine.Remove(machineId))
+        {
+            return;
+        }
+
+        UpdateUnreadChatBadge(machineId, 0);
+    }
+
+    private void UpdateUnreadChatBadge(string machineId, int unreadCount)
+    {
+        Panel? card = FindMachineCard(machineId);
+        if (card is not null)
+        {
+            UpdateUnreadChatBadge(card, unreadCount);
+        }
+    }
+
+    private Panel? FindMachineCard(string machineId)
+    {
+        foreach (Control control in pnlMachineCards.Controls)
+        {
+            if (control is Panel card
+                && card.Tag is string existingMachineName
+                && string.Equals(existingMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                return card;
+            }
+        }
+
+        return null;
+    }
+
+    private static void UpdateUnreadChatBadge(Panel card, int unreadCount)
+    {
+        Label? badge = card.Controls
+            .OfType<Label>()
+            .FirstOrDefault(label => string.Equals(label.Name, UnreadBadgeLabelName, StringComparison.Ordinal));
+
+        if (badge is null)
+        {
+            return;
+        }
+
+        badge.Visible = unreadCount > 0;
+        badge.Text = unreadCount > 99 ? "99+" : unreadCount.ToString();
+        badge.Width = unreadCount > 99 ? 32 : 24;
+        badge.Location = new Point(card.Width - badge.Width - 6, 4);
+        badge.BringToFront();
     }
 
     /// <summary>
@@ -1228,6 +1568,7 @@ public partial class MainForm : Form
     {
         btnLockMachine.Enabled = enabled;
         btnUnlockMachine.Enabled = enabled;
+        btnShutdownMachine.Enabled = enabled;
     }
 
     /// <summary>Bật/tắt đồng thời ô nhập và nút gửi chat.</summary>
@@ -1235,6 +1576,8 @@ public partial class MainForm : Form
     {
         txtChatMessage.Enabled = enabled;
         btnSendChat.Enabled = enabled;
+        btnSendNotification.Enabled = enabled;
+        btnBroadcastNotification.Enabled = enabled;
     }
 
     private void SetBillingActionEnabled(bool enabled)
@@ -1297,16 +1640,14 @@ public partial class MainForm : Form
             AdminCommandRequest request,
             CancellationToken cancellationToken = default)
         {
-            // Client protocol nhận cờ lockMachine; LOCK là true và UNLOCK là false.
             // ConfigureAwait(false) phù hợp vì phần ánh xạ sau đó không truy cập UI.
             MachineCommandSendResult commandResult = await networkServer.SendMachineCommandWithResultAsync(
                 request.MachineId,
-                lockMachine: request.Command == CommandType.LOCK,
-                issuedBy: request.IssuedBy,
-                reason: request.Reason,
+                request.Command,
+                request.IssuedBy,
+                request.Reason,
                 cancellationToken).ConfigureAwait(false);
 
-            // Giữ RequestId ở cả hai nhánh để có thể đối chiếu request với phản hồi/log.
             return commandResult.Sent
                 ? AdminCommandResult.Submitted(request, commandResult.Message, commandResult.RequestId)
                 : AdminCommandResult.ControlledError(
@@ -1358,20 +1699,246 @@ public partial class MainForm : Form
         }
     }
 
-    /// <summary>
-    /// Nạp dữ liệu khách hàng minh họa vào bảng. Hàm luôn xóa bảng trước để việc gọi
-    /// lại không tạo dòng trùng; dữ liệu này chưa được đọc từ repository.
-    /// </summary>
-    private void LoadSampleCustomerData()
+    private sealed class NetworkAdminNotificationService : IAdminNotificationService
     {
-        // Xóa dữ liệu hiện có trước khi thêm lại bộ dữ liệu mẫu cố định.
+        private readonly TcpJsonLineServer _networkServer;
+
+        public NetworkAdminNotificationService(TcpJsonLineServer networkServer)
+        {
+            _networkServer = networkServer ?? throw new ArgumentNullException(nameof(networkServer));
+        }
+
+        public async Task<AdminNotificationResult> SendAsync(
+            AdminNotificationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            MachineNotificationSendResult result = await _networkServer.SendNotificationAsync(
+                request.MachineId,
+                request.Message,
+                request.Severity,
+                request.Scope,
+                cancellationToken).ConfigureAwait(false);
+
+            return result.Sent
+                ? AdminNotificationResult.Sent(request, result.Message, result.RequestId)
+                : AdminNotificationResult.ControlledError(
+                    request,
+                    result.ErrorCode ?? "NOTIFICATION_SEND_FAILED",
+                    result.Message,
+                    result.RequestId);
+        }
+
+        public async Task<AdminNotificationResult> BroadcastAsync(
+            AdminNotificationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            MachineNotificationBroadcastResult result = await _networkServer.BroadcastNotificationAsync(
+                request.Message,
+                request.Severity,
+                cancellationToken).ConfigureAwait(false);
+
+            string message = $"{result.Message} Targets={result.TargetCount}, Sent={result.SentCount}.";
+            return result.Sent
+                ? AdminNotificationResult.Sent(request, message)
+                : AdminNotificationResult.ControlledError(
+                    request,
+                    result.ErrorCode ?? "NOTIFICATION_BROADCAST_FAILED",
+                    message);
+        }
+    }
+
+    private async Task LoadCustomerDataAsync(string? selectedCustomerId = null)
+    {
         dgvCustomers.Rows.Clear();
 
-        // Thứ tự giá trị của mỗi dòng phải khớp thứ tự cột khai báo trong Designer.
-        dgvCustomers.Rows.Add(1, "Chi", "Nguyễn", "0128475621", "264493270", "16/04/1996", "Chi123", "123456", "10000");
-        dgvCustomers.Rows.Add(2, "Thanh", "Nguyễn", "0902548345", "025351810", "12/12/1995", "Thanh123", "123456", "20000");
-        dgvCustomers.Rows.Add(3, "Hà", "Trần", "012038950", "025351818", "03/02/1990", "Ha", "123456", "10000");
-        dgvCustomers.Rows.Add(4, "Châu", "Trần", "0919512120", "025609999", "03/08/1990", "Chaubc", "123456", "5000");
-        dgvCustomers.Rows.Add(5, "Linh", "Võ", "01212239011", "025607777", "30/04/1990", "PkLanh", "123456", "20000");
+        if (_customers is null)
+        {
+            ClearCustomerInputs();
+            lblServerStatus.Text = "Chưa kết nối database khách hàng.";
+            return;
+        }
+
+        IReadOnlyList<CustomerRecord> customers = await _customers.ListAsync().ConfigureAwait(true);
+        foreach (CustomerRecord customer in customers)
+        {
+            dgvCustomers.Rows.Add(
+                customer.CustomerId,
+                customer.FirstName,
+                customer.LastName,
+                customer.Phone,
+                customer.IdentityNumber,
+                customer.Birthday,
+                customer.Username,
+                customer.Password,
+                customer.AccountBalance.ToString());
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedCustomerId) && SelectCustomerRow(selectedCustomerId))
+        {
+            return;
+        }
+
+        if (dgvCustomers.Rows.Count == 0)
+        {
+            ClearCustomerInputs();
+            lblServerStatus.Text = "Danh sách khách hàng đang trống.";
+        }
+    }
+
+    private async Task DeleteSelectedCustomerAsync()
+    {
+        if (_customers is null)
+        {
+            ShowCustomerMessage("Chưa kết nối database khách hàng.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        string customerId = GetSelectedCustomerId();
+        if (string.IsNullOrWhiteSpace(customerId))
+        {
+            ShowCustomerMessage("Vui lòng chọn khách hàng cần xóa.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        DialogResult confirm = MessageBox.Show(
+            this,
+            $"Bạn có chắc muốn xóa khách hàng {customerId}?",
+            "Quản lý khách hàng",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+        if (confirm != DialogResult.Yes)
+        {
+            return;
+        }
+
+        await _customers.DeleteAsync(customerId).ConfigureAwait(true);
+        await LoadCustomerDataAsync().ConfigureAwait(true);
+        ClearCustomerInputs();
+        lblServerStatus.Text = $"Đã xóa khách hàng {customerId}.";
+    }
+
+    private bool TryBuildCustomerRecord(out CustomerRecord? customer)
+    {
+        customer = null;
+
+        if (!TryReadRequiredText(txtCustomerId, "Mã KH", out string customerId) ||
+            !TryReadRequiredText(txtFirstName, "Tên", out string firstName) ||
+            !TryReadRequiredText(txtLastName, "Họ", out string lastName) ||
+            !TryReadRequiredText(txtPhone, "SĐT", out string phone) ||
+            !TryReadRequiredText(txtIdentity, "Số CMND", out string identity) ||
+            !TryReadRequiredText(txtBirthday, "Ngày sinh", out string birthday) ||
+            !TryReadRequiredText(txtUsername, "Tên đăng nhập", out string username) ||
+            !TryReadRequiredText(txtPassword, "Mật khẩu", out string password) ||
+            !TryReadRequiredText(txtAccountBalance, "Tài khoản", out string accountBalanceText))
+        {
+            return false;
+        }
+
+        if (!long.TryParse(accountBalanceText, out long accountBalance) || accountBalance < 0)
+        {
+            ShowCustomerMessage("Tài khoản phải là số không âm.", MessageBoxIcon.Warning, txtAccountBalance);
+            return false;
+        }
+
+        customer = new CustomerRecord(
+            customerId,
+            firstName,
+            lastName,
+            phone,
+            identity,
+            birthday,
+            username,
+            password,
+            accountBalance);
+        return true;
+    }
+
+    private bool TryReadRequiredText(TextBox textBox, string fieldName, out string value)
+    {
+        value = textBox.Text.Trim();
+        if (value.Length > 0)
+        {
+            return true;
+        }
+
+        ShowCustomerMessage($"Vui lòng nhập {fieldName}.", MessageBoxIcon.Warning, textBox);
+        return false;
+    }
+
+    private bool SelectCustomerRow(string customerId)
+    {
+        foreach (DataGridViewRow row in dgvCustomers.Rows)
+        {
+            if (!string.Equals(
+                    GetCustomerCellValue(row, CustomerIdColumn.Name),
+                    customerId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            row.Selected = true;
+            dgvCustomers.CurrentCell = row.Cells[0];
+            FillCustomerInputs(row);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void DgvCustomers_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (dgvCustomers.CurrentRow is null || dgvCustomers.CurrentRow.IsNewRow)
+        {
+            return;
+        }
+
+        FillCustomerInputs(dgvCustomers.CurrentRow);
+    }
+
+    private void FillCustomerInputs(DataGridViewRow row)
+    {
+        txtCustomerId.Text = GetCustomerCellValue(row, CustomerIdColumn.Name);
+        txtFirstName.Text = GetCustomerCellValue(row, FirstNameColumn.Name);
+        txtLastName.Text = GetCustomerCellValue(row, LastNameColumn.Name);
+        txtPhone.Text = GetCustomerCellValue(row, PhoneColumn.Name);
+        txtIdentity.Text = GetCustomerCellValue(row, IdentityColumn.Name);
+        txtBirthday.Text = GetCustomerCellValue(row, BirthdayColumn.Name);
+        txtUsername.Text = GetCustomerCellValue(row, UsernameColumn.Name);
+        txtPassword.Text = GetCustomerCellValue(row, PasswordColumn.Name);
+        txtAccountBalance.Text = GetCustomerCellValue(row, AccountBalanceColumn.Name);
+    }
+
+    private void ClearCustomerInputs()
+    {
+        txtCustomerId.Clear();
+        txtFirstName.Clear();
+        txtLastName.Clear();
+        txtPhone.Clear();
+        txtIdentity.Clear();
+        txtBirthday.Clear();
+        txtUsername.Clear();
+        txtPassword.Clear();
+        txtAccountBalance.Clear();
+    }
+
+    private string GetSelectedCustomerId()
+    {
+        if (dgvCustomers.CurrentRow is not null && !dgvCustomers.CurrentRow.IsNewRow)
+        {
+            return GetCustomerCellValue(dgvCustomers.CurrentRow, CustomerIdColumn.Name);
+        }
+
+        return txtCustomerId.Text.Trim();
+    }
+
+    private static string GetCustomerCellValue(DataGridViewRow row, string columnName)
+        => row.Cells[columnName].Value?.ToString() ?? string.Empty;
+
+    private void ShowCustomerMessage(string message, MessageBoxIcon icon, Control? focusControl = null)
+    {
+        lblServerStatus.Text = message;
+        MessageBox.Show(this, message, "Quản lý khách hàng", MessageBoxButtons.OK, icon);
+        focusControl?.Focus();
     }
 }

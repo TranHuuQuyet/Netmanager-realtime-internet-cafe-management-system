@@ -32,6 +32,7 @@ partial class MainForm
         MaMayColumn = new DataGridViewTextBoxColumn();
         SoMayColumn = new DataGridViewTextBoxColumn();
         TinhTrangColumn = new DataGridViewTextBoxColumn();
+        TienSuDungColumn = new DataGridViewTextBoxColumn();
         MachineNameColumn = new DataGridViewTextBoxColumn();
         chatGroup = new GroupBox();
         chatLayout = new TableLayoutPanel();
@@ -40,6 +41,8 @@ partial class MainForm
         chatInputLayout = new TableLayoutPanel();
         txtChatMessage = new TextBox();
         btnSendChat = new Button();
+        btnSendNotification = new Button();
+        btnBroadcastNotification = new Button();
         tabCustomers = new TabPage();
         customerLayout = new TableLayoutPanel();
         customerTopLayout = new TableLayoutPanel();
@@ -232,7 +235,7 @@ partial class MainForm
         dgvMachines.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         dgvMachines.BackgroundColor = Color.White;
         dgvMachines.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-        dgvMachines.Columns.AddRange(new DataGridViewColumn[] { MaMayColumn, SoMayColumn, TinhTrangColumn, MachineNameColumn });
+        dgvMachines.Columns.AddRange(new DataGridViewColumn[] { MaMayColumn, SoMayColumn, TinhTrangColumn, TienSuDungColumn, MachineNameColumn });
         dgvMachines.Dock = DockStyle.Fill;
         dgvMachines.Location = new Point(0, 0);
         dgvMachines.MultiSelect = false;
@@ -261,6 +264,12 @@ partial class MainForm
         TinhTrangColumn.HeaderText = "Tình trạng";
         TinhTrangColumn.Name = "TinhTrangColumn";
         TinhTrangColumn.ReadOnly = true;
+        // 
+        // TienSuDungColumn
+        // 
+        TienSuDungColumn.HeaderText = "Tiền đã dùng";
+        TienSuDungColumn.Name = "TienSuDungColumn";
+        TienSuDungColumn.ReadOnly = true;
         // 
         // MachineNameColumn
         // 
@@ -323,11 +332,15 @@ partial class MainForm
         // 
         // chatInputLayout
         // 
-        chatInputLayout.ColumnCount = 2;
+        chatInputLayout.ColumnCount = 4;
         chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 82F));
+        chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
+        chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
+        chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
         chatInputLayout.Controls.Add(txtChatMessage, 0, 0);
         chatInputLayout.Controls.Add(btnSendChat, 1, 0);
+        chatInputLayout.Controls.Add(btnSendNotification, 2, 0);
+        chatInputLayout.Controls.Add(btnBroadcastNotification, 3, 0);
         chatInputLayout.Dock = DockStyle.Fill;
         chatInputLayout.Location = new Point(3, 78);
         chatInputLayout.Name = "chatInputLayout";
@@ -342,22 +355,45 @@ partial class MainForm
         txtChatMessage.Location = new Point(3, 3);
         txtChatMessage.Name = "txtChatMessage";
         txtChatMessage.PlaceholderText = "Nhập tin nhắn...";
-        txtChatMessage.Size = new Size(192, 23);
+        txtChatMessage.Size = new Size(106, 23);
         txtChatMessage.TabIndex = 0;
+        txtChatMessage.KeyDown += TxtChatMessage_KeyDown;
         // 
         // btnSendChat
         // 
         btnSendChat.Dock = DockStyle.Fill;
-        btnSendChat.Location = new Point(201, 3);
+        btnSendChat.Location = new Point(115, 3);
         btnSendChat.Name = "btnSendChat";
-        btnSendChat.Size = new Size(76, 28);
+        btnSendChat.Size = new Size(50, 28);
         btnSendChat.TabIndex = 1;
         btnSendChat.Text = "Gửi";
         btnSendChat.UseVisualStyleBackColor = true;
         btnSendChat.Click += BtnSendChat_Click;
-        // 
+        //
+        // btnSendNotification
+        //
+        btnSendNotification.Dock = DockStyle.Fill;
+        btnSendNotification.Location = new Point(171, 3);
+        btnSendNotification.Name = "btnSendNotification";
+        btnSendNotification.Size = new Size(50, 28);
+        btnSendNotification.TabIndex = 2;
+        btnSendNotification.Text = "TB";
+        btnSendNotification.UseVisualStyleBackColor = true;
+        btnSendNotification.Click += BtnSendNotification_Click;
+        //
+        // btnBroadcastNotification
+        //
+        btnBroadcastNotification.Dock = DockStyle.Fill;
+        btnBroadcastNotification.Location = new Point(227, 3);
+        btnBroadcastNotification.Name = "btnBroadcastNotification";
+        btnBroadcastNotification.Size = new Size(50, 28);
+        btnBroadcastNotification.TabIndex = 3;
+        btnBroadcastNotification.Text = "All";
+        btnBroadcastNotification.UseVisualStyleBackColor = true;
+        btnBroadcastNotification.Click += BtnBroadcastNotification_Click;
+        //
         // tabCustomers
-        // 
+        //
         tabCustomers.Controls.Add(customerLayout);
         tabCustomers.Location = new Point(4, 24);
         tabCustomers.Name = "tabCustomers";
@@ -366,7 +402,7 @@ partial class MainForm
         tabCustomers.TabIndex = 1;
         tabCustomers.Text = "Quản lý khách hàng";
         tabCustomers.UseVisualStyleBackColor = true;
-        // 
+        //
         // customerLayout
         // 
         customerLayout.ColumnCount = 1;
@@ -654,6 +690,7 @@ partial class MainForm
         dgvCustomers.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         dgvCustomers.Size = new Size(842, 237);
         dgvCustomers.TabIndex = 1;
+        dgvCustomers.SelectionChanged += DgvCustomers_SelectionChanged;
         // 
         // CustomerIdColumn
         // 
@@ -834,6 +871,7 @@ partial class MainForm
     private DataGridViewTextBoxColumn MaMayColumn;
     private DataGridViewTextBoxColumn SoMayColumn;
     private DataGridViewTextBoxColumn TinhTrangColumn;
+    private DataGridViewTextBoxColumn TienSuDungColumn;
     private DataGridViewTextBoxColumn MachineNameColumn;
     private GroupBox chatGroup;
     private TableLayoutPanel chatLayout;
@@ -842,6 +880,8 @@ partial class MainForm
     private TableLayoutPanel chatInputLayout;
     private TextBox txtChatMessage;
     private Button btnSendChat;
+    private Button btnSendNotification;
+    private Button btnBroadcastNotification;
     private FlowLayoutPanel machineActions;
     private Button btnLockMachine;
     private Button btnUnlockMachine;

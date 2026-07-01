@@ -111,7 +111,9 @@ public sealed class ClientMainForm : Form
         _commandHandler = new ClientRuntimeCommandHandler(_connection, _machineId);
         _commandHandler.LockRequested += ApplyLockCommand;
         _commandHandler.UnlockRequested += ApplyUnlockCommand;
+        _commandHandler.ShutdownRequested += ApplyShutdownCommand;
         _commandHandler.ChatReceived += ApplyChatPacket;
+        _commandHandler.NotificationReceived += ApplyNotificationPacket;
         _commandHandler.TimerReceived += ApplyTimerPacket;
         _commandHandler.InvalidPacketIgnored += CommandHandler_InvalidPacketIgnored;
 
@@ -168,7 +170,7 @@ public sealed class ClientMainForm : Form
         AddInfoRow(infoLayout, 5, "Login time", FormatLoginTime(_loginTimeUtc));
         _billingModeTextBox = AddInfoRow(infoLayout, 6, "Billing", "No active billing");
         _billingTimeTextBox = AddInfoRow(infoLayout, 7, "Timer", "N/A");
-        _billingAmountTextBox = AddInfoRow(infoLayout, 8, "Amount", "0 VND");
+        _billingAmountTextBox = AddInfoRow(infoLayout, 8, "Used cost", "0 VND");
         _serverTextBox = infoLayout.GetControlFromPosition(1, 4) as TextBox ?? _serverTextBox;
         return infoLayout;
     }
@@ -425,6 +427,25 @@ public sealed class ClientMainForm : Form
         UpdateServerConnectionStatus("connected - chat received");
     }
 
+    private void ApplyNotificationPacket(Packet<NotificationPayload> packet)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyNotificationPacket(packet));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        NotificationPayload payload = packet.TypedPayload;
+        string severity = string.IsNullOrWhiteSpace(payload.Severity) ? "Info" : payload.Severity.Trim();
+        AppendClientChatLine($"Thong bao {severity}", payload.Message.Trim());
+        UpdateServerConnectionStatus("connected - notification received");
+    }
+
     private void ApplyTimerPacket(Packet<TimerPayload> packet)
     {
         if (InvokeRequired)
@@ -539,6 +560,27 @@ public sealed class ClientMainForm : Form
         SetClientSurfaceLocked(false);
         UpdateServerConnectionStatus("connected - unlocked by server");
         _ = SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Unlock applied.");
+    }
+
+    private async void ApplyShutdownCommand(Packet<ShutdownPayload> packet)
+    {
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => ApplyShutdownCommand(packet));
+            return;
+        }
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        UpdateServerConnectionStatus("connected - shutdown requested");
+        await SendCommandAckAsync(packet.Type, packet.RequestId, "Success", "Shutdown accepted.");
+        if (!IsDisposed)
+        {
+            Close();
+        }
     }
 
     // Dọn tham chiếu khi màn hình khóa đóng và hủy handler để tránh giữ object cũ.
@@ -682,7 +724,9 @@ public sealed class ClientMainForm : Form
         // Ngừng nhận lệnh trước rồi Dispose command handler.
         _commandHandler.LockRequested -= ApplyLockCommand;
         _commandHandler.UnlockRequested -= ApplyUnlockCommand;
+        _commandHandler.ShutdownRequested -= ApplyShutdownCommand;
         _commandHandler.ChatReceived -= ApplyChatPacket;
+        _commandHandler.NotificationReceived -= ApplyNotificationPacket;
         _commandHandler.TimerReceived -= ApplyTimerPacket;
         _commandHandler.InvalidPacketIgnored -= CommandHandler_InvalidPacketIgnored;
         _commandHandler.Dispose();

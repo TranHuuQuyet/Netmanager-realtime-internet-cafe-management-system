@@ -6,4 +6,5 @@ public sealed record DatabaseRuntime(
     IUserRepository Users,
     ISessionRepository Sessions,
     IMachineRepository Machines,
-    IBillingSessionRepository BillingSessions);
+    IBillingSessionRepository BillingSessions,
+    ICustomerRepository Customers);

@@ -59,6 +59,18 @@ public sealed class DbInitializer
                 EndedAtUtc TEXT NULL,
                 FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
             );
+
+            CREATE TABLE IF NOT EXISTS Customers (
+                CustomerId TEXT PRIMARY KEY,
+                FirstName TEXT NOT NULL,
+                LastName TEXT NOT NULL,
+                Phone TEXT NOT NULL,
+                IdentityNumber TEXT NOT NULL,
+                Birthday TEXT NOT NULL,
+                Username TEXT NOT NULL UNIQUE,
+                Password TEXT NOT NULL,
+                AccountBalance INTEGER NOT NULL DEFAULT 0
+            );
             """;
     }
 }

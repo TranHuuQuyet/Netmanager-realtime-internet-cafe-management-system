@@ -11,15 +11,15 @@ public static class SeedData
     public static IReadOnlyList<UserEntity> Users { get; } = new List<UserEntity>
     {
         CreateUser("admin", "Admin", "PC00"),
-        CreateUser("client01", "Client", "PC-01"),
-        CreateUser("client02", "Client", "PC-02")
+        CreateUser("client01", "Client", "PC01"),
+        CreateUser("client02", "Client", "PC02")
     };
 
     public static IReadOnlyList<MachineEntity> Machines { get; } = new List<MachineEntity>
     {
         CreateMachine("PC00", "Computer 00"),
-        CreateMachine("PC-01", "Computer 01"),
-        CreateMachine("PC-02", "Computer 02")
+        CreateMachine("PC01", "Computer 01"),
+        CreateMachine("PC02", "Computer 02")
     };
 
     private static UserEntity CreateUser(string username, string role, string? machineId)

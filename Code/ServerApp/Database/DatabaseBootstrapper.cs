@@ -16,24 +16,114 @@ public static class DatabaseBootstrapper
 
         var store = new DatabaseStore(databasePath);
         await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await MigrateLegacyMachineIdsAsync(store, cancellationToken).ConfigureAwait(false);
 
         var users = new SqliteUserRepository(store);
         var sessions = new SqliteSessionRepository(store);
         var machines = new SqliteMachineRepository(store);
         var billingSessions = new SqliteBillingSessionRepository(store);
+        var customers = new SqliteCustomerRepository(store);
 
         await SeedUsersAsync(users, cancellationToken).ConfigureAwait(false);
         await SeedMachinesAsync(machines, cancellationToken).ConfigureAwait(false);
 
-        return new DatabaseRuntime(users, sessions, machines, billingSessions);
+        return new DatabaseRuntime(users, sessions, machines, billingSessions, customers);
     }
+
+    private static async Task MigrateLegacyMachineIdsAsync(DatabaseStore store, CancellationToken cancellationToken)
+    {
+        foreach ((string Legacy, string Canonical) mapping in LegacyMachineIdMappings)
+        {
+            await using var connection = store.CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var transaction = connection.BeginTransaction();
+
+            await ExecuteMachineIdMigrationAsync(
+                connection,
+                transaction,
+                "UPDATE AuthUsers SET MachineId = @Canonical WHERE MachineId = @Legacy;",
+                mapping.Legacy,
+                mapping.Canonical,
+                cancellationToken).ConfigureAwait(false);
+
+            await ExecuteMachineIdMigrationAsync(
+                connection,
+                transaction,
+                "UPDATE AuthSessions SET MachineId = @Canonical WHERE MachineId = @Legacy;",
+                mapping.Legacy,
+                mapping.Canonical,
+                cancellationToken).ConfigureAwait(false);
+
+            await ExecuteMachineIdMigrationAsync(
+                connection,
+                transaction,
+                "UPDATE BillingSessions SET MachineId = @Canonical WHERE MachineId = @Legacy;",
+                mapping.Legacy,
+                mapping.Canonical,
+                cancellationToken).ConfigureAwait(false);
+
+            await ExecuteMachineIdMigrationAsync(
+                connection,
+                transaction,
+                """
+                UPDATE Machines
+                SET MachineId = @Canonical
+                WHERE MachineId = @Legacy
+                  AND NOT EXISTS (SELECT 1 FROM Machines WHERE MachineId = @Canonical);
+                """,
+                mapping.Legacy,
+                mapping.Canonical,
+                cancellationToken).ConfigureAwait(false);
+
+            await ExecuteMachineIdMigrationAsync(
+                connection,
+                transaction,
+                """
+                DELETE FROM Machines
+                WHERE MachineId = @Legacy
+                  AND EXISTS (SELECT 1 FROM Machines WHERE MachineId = @Canonical);
+                """,
+                mapping.Legacy,
+                mapping.Canonical,
+                cancellationToken).ConfigureAwait(false);
+
+            transaction.Commit();
+        }
+    }
+
+    private static async Task ExecuteMachineIdMigrationAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string commandText,
+        string legacyMachineId,
+        string canonicalMachineId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+        command.Parameters.AddWithValue("@Legacy", legacyMachineId);
+        command.Parameters.AddWithValue("@Canonical", canonicalMachineId);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static readonly IReadOnlyList<(string Legacy, string Canonical)> LegacyMachineIdMappings =
+        new List<(string Legacy, string Canonical)>
+        {
+            new(CreateLegacyMachineId("01"), "PC01"),
+            new(CreateLegacyMachineId("02"), "PC02")
+        };
+
+    private const string LegacyMachineSeparator = "-";
+
+    private static string CreateLegacyMachineId(string suffix) => $"PC{LegacyMachineSeparator}{suffix}";
 
     private static IReadOnlyList<SeedAccount> BuildSeedUsers()
         => new List<SeedAccount>
         {
             new("admin", "123", "PC00", UserRole.Admin, true),
-            new("client01", "123", "PC-01", UserRole.Client, true),
-            new("client02", "123", "PC-02", UserRole.Client, true)
+            new("client01", "123", "PC01", UserRole.Client, true),
+            new("client02", "123", "PC02", UserRole.Client, true)
         };
 
     private static async Task SeedUsersAsync(SqliteUserRepository users, CancellationToken cancellationToken)
@@ -200,10 +290,195 @@ internal sealed class DatabaseStore
                    FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
                );
 
+               CREATE TABLE IF NOT EXISTS Customers (
+                   CustomerId TEXT PRIMARY KEY,
+                   FirstName TEXT NOT NULL,
+                   LastName TEXT NOT NULL,
+                   Phone TEXT NOT NULL,
+                   IdentityNumber TEXT NOT NULL,
+                   Birthday TEXT NOT NULL,
+                   Username TEXT NOT NULL UNIQUE,
+                   Password TEXT NOT NULL,
+                   AccountBalance INTEGER NOT NULL DEFAULT 0
+               );
+
                CREATE INDEX IF NOT EXISTS IX_BillingSessions_MachineId_State ON BillingSessions (MachineId, State);
                CREATE INDEX IF NOT EXISTS IX_BillingSessions_AuthSessionId_State ON BillingSessions (AuthSessionId, State);
+               CREATE INDEX IF NOT EXISTS IX_Customers_Username ON Customers (Username);
                """;
     }
+}
+
+internal sealed class SqliteCustomerRepository : ICustomerRepository
+{
+    private readonly DatabaseStore _store;
+
+    public SqliteCustomerRepository(DatabaseStore store)
+    {
+        _store = store;
+    }
+
+    public async Task<IReadOnlyList<CustomerRecord>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        var customers = new List<CustomerRecord>();
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT CustomerId, FirstName, LastName, Phone, IdentityNumber, Birthday, Username, Password, AccountBalance
+            FROM Customers
+            ORDER BY CustomerId;
+            """;
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            customers.Add(ReadCustomer(reader));
+        }
+
+        return customers;
+    }
+
+    public async Task<CustomerRecord?> GetByIdAsync(string customerId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(customerId))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT CustomerId, FirstName, LastName, Phone, IdentityNumber, Birthday, Username, Password, AccountBalance
+            FROM Customers
+            WHERE CustomerId = @CustomerId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@CustomerId", customerId.Trim());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return ReadCustomer(reader);
+    }
+
+    public async Task<CustomerRecord?> GetByUsernameAsync(string username, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            return null;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT CustomerId, FirstName, LastName, Phone, IdentityNumber, Birthday, Username, Password, AccountBalance
+            FROM Customers
+            WHERE Username = @Username
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("@Username", username.Trim());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return ReadCustomer(reader);
+    }
+
+    public async Task AddAsync(CustomerRecord customer, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(customer);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO Customers
+                (CustomerId, FirstName, LastName, Phone, IdentityNumber, Birthday, Username, Password, AccountBalance)
+            VALUES
+                (@CustomerId, @FirstName, @LastName, @Phone, @IdentityNumber, @Birthday, @Username, @Password, @AccountBalance);
+            """;
+        BindCustomer(command, customer);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task UpdateAsync(CustomerRecord customer, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(customer);
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE Customers
+            SET FirstName = @FirstName,
+                LastName = @LastName,
+                Phone = @Phone,
+                IdentityNumber = @IdentityNumber,
+                Birthday = @Birthday,
+                Username = @Username,
+                Password = @Password,
+                AccountBalance = @AccountBalance
+            WHERE CustomerId = @CustomerId;
+            """;
+        BindCustomer(command, customer);
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteAsync(string customerId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(customerId))
+        {
+            return;
+        }
+
+        await using var connection = _store.CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM Customers WHERE CustomerId = @CustomerId;";
+        command.Parameters.AddWithValue("@CustomerId", customerId.Trim());
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void BindCustomer(SqliteCommand command, CustomerRecord customer)
+    {
+        command.Parameters.AddWithValue("@CustomerId", customer.CustomerId);
+        command.Parameters.AddWithValue("@FirstName", customer.FirstName);
+        command.Parameters.AddWithValue("@LastName", customer.LastName);
+        command.Parameters.AddWithValue("@Phone", customer.Phone);
+        command.Parameters.AddWithValue("@IdentityNumber", customer.IdentityNumber);
+        command.Parameters.AddWithValue("@Birthday", customer.Birthday);
+        command.Parameters.AddWithValue("@Username", customer.Username);
+        command.Parameters.AddWithValue("@Password", customer.Password);
+        command.Parameters.AddWithValue("@AccountBalance", customer.AccountBalance);
+    }
+
+    private static CustomerRecord ReadCustomer(SqliteDataReader reader)
+        => new(
+            reader.GetString(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            reader.GetString(7),
+            reader.GetInt64(8));
 }
 
 internal sealed class SqliteUserRepository : IUserRepository

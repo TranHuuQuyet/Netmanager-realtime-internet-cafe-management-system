@@ -29,7 +29,7 @@ static class Program
                 authRuntime.Billing,
                 authRuntime.SessionRepository,
                 networkServer);
-            using var mainForm = new MainForm(authRuntime.Machines, networkServer, billingService);
+            using var mainForm = new MainForm(authRuntime.Machines, networkServer, billingService, authRuntime.Customers);
 
             if (networkServer is not null)
             {

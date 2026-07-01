@@ -19,6 +19,8 @@ await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
+await AssertRoleMismatchAsync(runtime);
+await AssertUnknownMachineAsync();
 await AssertLegacyMachineIdMigrationAsync();
 await AssertSeedBootstrapResetsStaleMachineStatusAsync();
 await AssertCommandGuardAsync(runtime);
@@ -30,6 +32,8 @@ Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
 Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01");
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
+Console.WriteLine("PASS TC-A08: role mismatch returns INVALID_CREDENTIALS");
+Console.WriteLine("PASS TC-A09: unknown machine ID returns INVALID_MACHINE_ID");
 Console.WriteLine("PASS G2-05: legacy hyphenated machine IDs migrate to canonical PCXX");
 Console.WriteLine("PASS G2-06: server startup resets stale machine status to Offline");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
@@ -95,6 +99,34 @@ static async Task AssertWrongMachineAsync(AuthRuntime runtime)
         new AuthRequest("client01", "123", "PC02", UserRole.Client));
 
     AssertFailure(result, AuthStatus.AccountMachineMismatch, "ACCOUNT_MACHINE_MISMATCH", "G2-04");
+}
+
+static async Task AssertRoleMismatchAsync(AuthRuntime runtime)
+{
+    var result = await runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC01", UserRole.Admin));
+
+    AssertFailure(result, AuthStatus.RoleMismatch, "INVALID_CREDENTIALS", "TC-A08");
+}
+
+static async Task AssertUnknownMachineAsync()
+{
+    AuthRuntime runtime = await AuthBootstrapper.CreateAsync(PrepareScratchDatabasePath("Netmanager-TC-A09-UnknownMachine"));
+    ServerApp.Database.Models.PasswordHash runtimePasswordHash = ServerApp.Database.PasswordHasher.Hash("123");
+    await runtime.Users.AddAsync(new UserRecord(
+        "user-missing-machine",
+        "missingmachine",
+        runtimePasswordHash.SaltBase64,
+        runtimePasswordHash.HashBase64,
+        UserRole.Client,
+        "PC99",
+        true,
+        null));
+
+    var result = await runtime.Auth.AuthenticateAsync(
+        new AuthRequest("missingmachine", "123", "PC99", UserRole.Client));
+
+    AssertFailure(result, AuthStatus.InvalidMachineId, "INVALID_MACHINE_ID", "TC-A09");
 }
 
 static async Task AssertLegacyMachineIdMigrationAsync()

@@ -84,13 +84,13 @@ public sealed class AuthService : IAuthService {
                 return AuthResult.Failure(AuthStatus.InvalidMachineId, "This account has no machine assignment.");
             }
 
-            if (!string.Equals(user.MachineId, machineId, StringComparison.OrdinalIgnoreCase)) {
-                return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "This account is not assigned to the selected machine.");
-            }
-
             var machine = await _machines.GetByMachineIdAsync(machineId, cancellationToken).ConfigureAwait(false);
             if (machine is null) {
                 return AuthResult.Failure(AuthStatus.InvalidMachineId, "Machine was not found.");
+            }
+
+            if (!string.Equals(user.MachineId, machineId, StringComparison.OrdinalIgnoreCase)) {
+                return AuthResult.Failure(AuthStatus.AccountMachineMismatch, "This account is not assigned to the selected machine.");
             }
 
             if (!machine.IsActive) {

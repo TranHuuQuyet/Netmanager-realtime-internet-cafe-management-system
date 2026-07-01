@@ -20,6 +20,7 @@ await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
 await AssertLegacyMachineIdMigrationAsync();
+await AssertSeedBootstrapResetsStaleMachineStatusAsync();
 await AssertCommandGuardAsync(runtime);
 await AssertR4DistinctClientsAsync();
 await AssertBillingRecoverySnapshotAsync();
@@ -30,6 +31,7 @@ Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01"
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
 Console.WriteLine("PASS G2-05: legacy hyphenated machine IDs migrate to canonical PCXX");
+Console.WriteLine("PASS G2-06: server startup resets stale machine status to Offline");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
 Console.WriteLine("PASS R4-N01: two authenticated clients stay distinct and duplicate active login is rejected");
 Console.WriteLine("PASS R4-R01: billing recovery snapshot restores active billing with timer state");
@@ -130,6 +132,18 @@ static async Task AssertLegacyMachineIdMigrationAsync()
     }
 
     await migratedRuntime.SessionService.CloseSessionAsync(pc02Login.Session.Id);
+}
+
+static async Task AssertSeedBootstrapResetsStaleMachineStatusAsync()
+{
+    string staleStatusDbPath = PrepareScratchDatabasePath("Netmanager-G2-06-StaleMachineStatus");
+    DatabaseRuntime initialDatabase = await DatabaseBootstrapper.CreateAsync(staleStatusDbPath);
+
+    await initialDatabase.Machines.UpdateStatusAsync("PC01", "Online", DateTime.UtcNow);
+    await AssertMachineStateAsync(initialDatabase.Machines, "PC01", expectedIsActive: true, expectedStatus: "Online");
+
+    DatabaseRuntime restartedDatabase = await DatabaseBootstrapper.CreateAsync(staleStatusDbPath);
+    await AssertMachineStateAsync(restartedDatabase.Machines, "PC01", expectedIsActive: true, expectedStatus: "Offline");
 }
 
 static async Task AssertCommandGuardAsync(AuthRuntime runtime)

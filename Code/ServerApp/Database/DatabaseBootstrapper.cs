@@ -1169,6 +1169,8 @@ internal sealed class SqliteMachineRepository : IMachineRepository
             ON CONFLICT(MachineId) DO UPDATE SET
                 MachineName = excluded.MachineName,
                 IpAddress = excluded.IpAddress,
+                Status = excluded.Status,
+                LastSeen = excluded.LastSeen,
                 IsActive = excluded.IsActive;
             """;
         command.Parameters.AddWithValue("@Id", machine.Id.ToString("N"));

@@ -8,172 +8,104 @@ using Shared.Utilities.JsonHelper;
 
 namespace ClientApp.Networking;
 
-public sealed class ClientRuntimeCommandHandler : IDisposable
+public sealed record ClientLaunchOptions(string MachineId, string ServerHost, int ServerPort)
 {
-    private readonly TcpClientConnection _connection;
-    private readonly string _machineId;
+    public const string DefaultMachineId = "PC-01";
+    public const string DefaultServerHost = "127.0.0.1";
+    public const int DefaultServerPort = 5000;
 
-    public ClientRuntimeCommandHandler(TcpClientConnection connection, string machineId)
+    public static ClientLaunchOptions Default { get; } =
+        new(DefaultMachineId, DefaultServerHost, DefaultServerPort);
+
+     public static bool TryParse(string[] args, out ClientLaunchOptions options, out string error)
     {
-        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
-        _machineId = machineId?.Trim() ?? string.Empty;
-        _connection.MessageReceived += Connection_MessageReceived;
-    }
+        string machineId = Default.MachineId;
+        string serverHost = Default.ServerHost;
+        int serverPort = Default.ServerPort;
 
-    public event Action<Packet<LockPayload>>? LockRequested;
-
-    public event Action<Packet<UnlockPayload>>? UnlockRequested;
-
-    public event Action<Packet<ShutdownPayload>>? ShutdownRequested;
-
-    public event Action<Packet<ChatPayload>>? ChatReceived;
-
-    public event Action<Packet<NotificationPayload>>? NotificationReceived;
-
-    public event Action<Packet<TimerPayload>>? TimerReceived;
-
-    public event Action? InvalidPacketIgnored;
-
-    private void Connection_MessageReceived(string message)
-    {
-        try
+        for (int index = 0; index < args.Length; index++)
         {
-            object packet = JsonHelper.DeserializePacket(message);
+            string argument = args[index];
 
-            switch (packet)
+            if (!TryGetValue(args, ref index, argument, "--machine-id", out string? value)
+                && !TryGetValue(args, ref index, argument, "--server-host", out value)
+                && !TryGetValue(args, ref index, argument, "--server-port", out value))
             {
-                case Packet<LockPayload> lockPacket:
-                    if (IsCommandForThisMachine(lockPacket.TypedPayload.MachineId, lockPacket.Target))
-                    {
-                        LockRequested?.Invoke(lockPacket);
-                    }
-                    else
-                    {
-                        _ = SendCommandAckAsync(
-                            lockPacket,
-                            ResolveCommandMachineId(lockPacket.TypedPayload.MachineId, lockPacket.Target),
-                            "Ignored",
-                            "LOCK ignored because target machine does not match this client.");
-                    }
+                options = Default;
+                error = $"Tham số không được hỗ trợ: {argument}";
+                return false;
+            }
 
-                    break;
-                case Packet<UnlockPayload> unlockPacket:
-                    if (IsCommandForThisMachine(unlockPacket.TypedPayload.MachineId, unlockPacket.Target))
-                    {
-                        UnlockRequested?.Invoke(unlockPacket);
-                    }
-                    else
-                    {
-                        _ = SendCommandAckAsync(
-                            unlockPacket,
-                            ResolveCommandMachineId(unlockPacket.TypedPayload.MachineId, unlockPacket.Target),
-                            "Ignored",
-                            "UNLOCK ignored because target machine does not match this client.");
-                    }
-
-                    break;
-                case Packet<ShutdownPayload> shutdownPacket:
-                    if (IsCommandForThisMachine(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target))
-                    {
-                        ShutdownRequested?.Invoke(shutdownPacket);
-                    }
-                    else
-                    {
-                        _ = SendCommandAckAsync(
-                            shutdownPacket,
-                            ResolveCommandMachineId(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target),
-                            "Ignored",
-                            "SHUTDOWN ignored because target machine does not match this client.");
-                    }
-
-                    break;
-                case Packet<ChatPayload> chatPacket:
-                    if (IsChatForThisMachine(chatPacket.TypedPayload, chatPacket.Target))
-                    {
-                        ChatReceived?.Invoke(chatPacket);
-                    }
-
-                    break;
-                case Packet<NotificationPayload> notificationPacket:
-                    if (IsNotificationForThisMachine(notificationPacket.TypedPayload, notificationPacket.Target))
-                    {
-                        NotificationReceived?.Invoke(notificationPacket);
-                    }
-
-                    break;
-                case Packet<TimerPayload> timerPacket:
-                    if (IsCommandForThisMachine(timerPacket.TypedPayload.MachineId, timerPacket.Target))
-                    {
-                        TimerReceived?.Invoke(timerPacket);
-                    }
-
-                    break;
+            if (MatchesOption(argument, "--machine-id"))
+            {
+                machineId = value!;
+            }
+            else if (MatchesOption(argument, "--server-host"))
+            {
+                serverHost = value!;
+            }
+            else if (!int.TryParse(value, out serverPort) || serverPort is < 1 or > 65535)
+            {
+                options = Default;
+                error = "Cổng máy chủ phải là số từ 1 đến 65535.";
+                return false;
             }
         }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException or JsonException)
+
+        machineId = machineId.Trim();
+        serverHost = serverHost.Trim();
+
+        if (machineId.Length == 0)
         {
-            InvalidPacketIgnored?.Invoke();
+            options = Default;
+            error = "Mã máy trạm không được để trống.";
+            return false;
         }
-    }
 
-    private bool IsCommandForThisMachine(string? payloadMachineId, string? packetTarget)
-    {
-        string commandMachineId = ResolveCommandMachineId(payloadMachineId, packetTarget);
-
-        return string.Equals(commandMachineId, _machineId, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ResolveCommandMachineId(string? payloadMachineId, string? packetTarget)
-        => string.IsNullOrWhiteSpace(payloadMachineId)
-            ? packetTarget?.Trim() ?? string.Empty
-            : payloadMachineId.Trim();
-
-    private bool IsChatForThisMachine(ChatPayload payload, string? packetTarget)
-    {
-        string receiver = string.IsNullOrWhiteSpace(payload.Receiver)
-            ? packetTarget?.Trim() ?? string.Empty
-            : payload.Receiver.Trim();
-
-        return string.Equals(receiver, _machineId, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(packetTarget?.Trim(), _machineId, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private bool IsNotificationForThisMachine(NotificationPayload payload, string? packetTarget)
-    {
-        string target = packetTarget?.Trim() ?? string.Empty;
-        string scope = payload.Scope?.Trim() ?? string.Empty;
-
-        return string.Equals(target, _machineId, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(scope, "All", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(scope, "Broadcast", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private async Task SendCommandAckAsync(Packet commandPacket, string machineId, string status, string message)
-    {
-        try
+        if (serverHost.Length == 0)
         {
-            var ackPacket = PacketFactory.CreateAck(
-                source: _machineId,
-                target: NetworkProtocol.ServerSource,
-                payload: new AckPayload
-                {
-                    MachineId = string.IsNullOrWhiteSpace(machineId) ? _machineId : machineId,
-                    AckFor = commandPacket.Type.ToString(),
-                    Status = status,
-                    Message = message
-                },
-                requestId: commandPacket.RequestId);
+            options = Default;
+            error = "Địa chỉ máy chủ không được để trống.";
+            return false;
+        }
 
-            await _connection.SendAsync(JsonHelper.SerializeToJson(ackPacket)).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
-        {
-            InvalidPacketIgnored?.Invoke();
-        }
+        options = new ClientLaunchOptions(machineId, serverHost, serverPort);
+        error = string.Empty;
+        return true;
     }
 
-    public void Dispose()
+    private static bool TryGetValue(
+        string[] args,
+        ref int index,
+        string argument,
+        string optionName,
+        out string? value)
     {
-        _connection.MessageReceived -= Connection_MessageReceived;
+        if (string.Equals(argument, optionName, StringComparison.OrdinalIgnoreCase))
+        {
+            if (index + 1 >= args.Length
+                || args[index + 1].StartsWith("--", StringComparison.Ordinal))
+            {
+                value = string.Empty;
+                return true;
+            }
+
+            value = args[++index];
+            return true;
+        }
+
+        string prefix = $"{optionName}=";
+        if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            value = argument[prefix.Length..];
+            return true;
+        }
+
+        value = null;
+        return false;
     }
+
+    private static bool MatchesOption(string argument, string optionName) =>
+        string.Equals(argument, optionName, StringComparison.OrdinalIgnoreCase)
+        || argument.StartsWith($"{optionName}=", StringComparison.OrdinalIgnoreCase);
 }

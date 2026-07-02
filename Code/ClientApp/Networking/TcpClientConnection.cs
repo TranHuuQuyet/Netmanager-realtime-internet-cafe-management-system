@@ -80,7 +80,7 @@ Tức là chỉ 1 thread ghi stream tại một thời điểm*/
             {
                 if (_isDisconnected)
                 {
-                    return;
+                    throw new InvalidOperationException("Cannot send message because the client is disconnected.");
                 }
 
                 writer = _writer;
@@ -88,22 +88,25 @@ Tức là chỉ 1 thread ghi stream tại một thời điểm*/
 
             if (writer == null)
             {
-                return;
+                throw new InvalidOperationException("Cannot send message because the connection writer is unavailable.");
             }
 
             await writer.WriteLineAsync(outgoingMessage.AsMemory(), cancellationToken);
         }
-        catch (IOException)
+        catch (IOException ex)
         {
             HandleConnectionLost();
+            throw new InvalidOperationException("Unable to send message because the server connection was lost.", ex);
         }
-        catch (SocketException)
+        catch (SocketException ex)
         {
             HandleConnectionLost();
+            throw new InvalidOperationException("Unable to send message because the socket connection failed.", ex);
         }
-        catch (ObjectDisposedException)
+        catch (ObjectDisposedException ex)
         {
             HandleConnectionLost();
+            throw new InvalidOperationException("Unable to send message because the connection was closed.", ex);
         }
         finally
         {

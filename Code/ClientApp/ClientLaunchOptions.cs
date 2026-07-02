@@ -6,7 +6,7 @@ using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 
-namespace ClientApp.Networking;
+namespace ClientApp;
 
 public sealed record ClientLaunchOptions(string MachineId, string ServerHost, int ServerPort)
 {

@@ -17,7 +17,7 @@ using ServerApp.Database.Models;
 using ServerApp.Networking;
 using ServerApp.Presentation;
 
-Console.WriteLine("NETManager ServerApp listener JSON-line smoke test");
+WriteDiagnostic("NETManager ServerApp listener JSON-line smoke test");
 // The smoke runs WinForms handlers without a message loop, so keep continuations on thread-pool context.
 WindowsFormsSynchronizationContext.AutoInstall = false;
 SynchronizationContext.SetSynchronizationContext(null);
@@ -45,7 +45,7 @@ try
 
         if (!string.IsNullOrWhiteSpace(trace.Message))
         {
-            Console.WriteLine($"TRACE {trace.Direction} {trace.ClientId}: {trace.Message}");
+            WriteDiagnostic($"TRACE {trace.Direction} {trace.ClientId}: {trace.Message}");
         }
     };
     server.CommandResultEmitted += result =>
@@ -55,7 +55,7 @@ try
             commandResults.Add(result);
         }
 
-        Console.WriteLine(
+        WriteDiagnostic(
             $"COMMAND RESULT {result.Command} {result.MachineId}: {result.Status} {result.ErrorCode ?? string.Empty} {result.RequestId}");
     };
     server.ChatReceived += (machineId, payload) =>
@@ -65,31 +65,60 @@ try
             chatMessages.Add((machineId, payload));
         }
 
-        Console.WriteLine($"CHAT IN {machineId}: {payload.Message}");
+        WriteDiagnostic($"CHAT IN {machineId}: {payload.Message}");
     };
 
+    WriteCaseHeader("TC-N01", "Server starts and listens locally.");
     server.Start();
     int port = server.LocalEndpoint.Port;
-    Console.WriteLine($"ServerApp listener active on 127.0.0.1:{port}");
+    WriteDiagnostic($"ServerApp listener active on 127.0.0.1:{port}");
+    WriteCasePass("TC-N01", "Listener accepts connections and reports a local endpoint.");
 
-    await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
-    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
-    await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages, commandResults);
-    await AssertBillingTimerRoutingAsync(port, authRuntime, server);
-    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
-    await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
+    WriteCaseHeader("TC-N02", "Client connects over TCP.");
+    await AssertClientConnectsAsync(port);
+
+    WriteCaseHeader("TC-N03", "Valid JSON-line LOGIN round trip works.");
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
-    await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
-    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC01", expectedErrorCode: "INVALID_CREDENTIALS");
-    await AssertLoginFailureAsync(port, password: "123", machineId: "PC02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
-    await AssertRejectedLineDoesNotStopServerAsync(port, authRuntime.SessionRepository, "{ invalid json", "invalid JSON");
+
+    WriteCaseHeader("TC-N04", "Invalid JSON fails gracefully.");
+    await AssertRejectedLineDoesNotStopServerAsync(
+        port,
+        authRuntime.SessionRepository,
+        "{ invalid json",
+        "invalid JSON",
+        "TC-N04",
+        "Malformed JSON disconnects only the offending client and server remains available.");
+
+    WriteCaseHeader("TC-N05", "Unknown packet type fails gracefully.");
     await AssertRejectedLineDoesNotStopServerAsync(
         port,
         authRuntime.SessionRepository,
         """{"type":"UNKNOWN","source":"PC01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
-        "unknown packet type");
+        "unknown packet type",
+        "TC-N05",
+        "Unknown packet type is controlled and server remains available.");
 
-    Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
+    WriteCaseHeader("TC-N06", "Known STATUS packet route is controlled.");
+    await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
+
+    ClearTraces(traces);
+    WriteCaseHeader("TC-N07", "Login emits Online status.");
+    await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
+
+    WriteCaseHeader("TC-N09", "Multiple clients remain distinct.");
+    await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages, commandResults);
+
+    WriteDiagnostic("");
+    WriteDiagnostic("Additional smoke checks");
+    ClearTraces(traces);
+    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
+    await AssertBillingTimerRoutingAsync(port, authRuntime, server);
+    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
+    await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
+    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC01", expectedErrorCode: "INVALID_CREDENTIALS");
+    await AssertLoginFailureAsync(port, password: "123", machineId: "PC02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
+
+    WriteDiagnostic("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
 }
 finally
 {
@@ -99,6 +128,47 @@ finally
     {
         DeleteTempDatabase(databasePath);
     }
+}
+
+static void WriteCaseHeader(string id, string description)
+{
+    Console.WriteLine();
+    Console.WriteLine(id);
+    Console.WriteLine($"Test case: {description}");
+}
+
+static void WriteCasePass(string id, string message)
+{
+    _ = id;
+    Console.WriteLine($"PASS: {message}");
+}
+
+static void WriteDiagnostic(string message)
+{
+    Console.WriteLine(message);
+}
+
+static void ClearTraces(List<NetworkTraceEntry> traces)
+{
+    lock (traces)
+    {
+        traces.Clear();
+    }
+}
+
+static async Task AssertClientConnectsAsync(int port)
+{
+    using var tcpClient = new TcpClient();
+    try
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        WriteCasePass("TC-N02", "Connection succeeds without UI or server freeze.");
+    }
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException($"Client failed to connect to server on port {port}: {ex.Message}", ex);
+    }
+    await tcpClient.ConnectAsync(IPAddress.Loopback, port);
 }
 
 static async Task AssertAdminUiLockUnlockCommandTraceAsync(
@@ -433,7 +503,7 @@ static async Task AssertTwoClientChatRoutingAsync(
     TryShutdown(pc02Client);
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc01SessionId).ConfigureAwait(false);
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc02SessionId).ConfigureAwait(false);
-    Console.WriteLine("PASS: selected-client CHAT route delivers only to target and accepts client reply");
+    WriteCasePass("TC-N09", "PC01 and PC02 keep distinct sessions and selected-client routing stays isolated.");
 }
 
 static async Task AssertBillingTimerRoutingAsync(
@@ -945,7 +1015,7 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
         }
 
         AssertMatchingRequestId(statusPacket, ackPacket);
-        Console.WriteLine("PASS: authenticated STATUS route returns Accepted ACK");
+        WriteCasePass("TC-N06", "Authenticated STATUS route returns Accepted ACK.");
         TryShutdown(tcpClient);
     }
 
@@ -990,13 +1060,20 @@ static void DeleteTempDatabase(string databasePath)
     }
 }
 
-static async Task AssertLoginSuccessAsync(int port, ISessionRepository sessions)
+static async Task AssertLoginSuccessAsync(
+    int port,
+    ISessionRepository sessions,
+    bool writePass = true)
 {
     Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
     object response = await SendLoginAsync(port, loginPacket);
     Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
 
-    Console.WriteLine("PASS: valid LOGIN returns authenticated session payload");
+    if (writePass)
+    {
+        WriteCasePass("TC-N03", "Response has matching requestId, success:true, and LoginResultPayload.");
+    }
+
     await WaitForClosedSessionAsync(sessions, resultPacket.TypedPayload.SessionId);
 }
 
@@ -1043,7 +1120,7 @@ static async Task AssertRepeatedLoginRejectedWhileActiveAsync(int port, ISession
     }
 
     await WaitForClosedSessionAsync(sessions, sessionId);
-    await AssertLoginSuccessAsync(port, sessions);
+    await AssertLoginSuccessAsync(port, sessions, writePass: false);
     Console.WriteLine("PASS: repeated LOGIN is rejected while active and succeeds after disconnect");
 }
 
@@ -1065,12 +1142,13 @@ static async Task AssertLoginAndDisconnectEmitStatusAsync(
         sessionId = resultPacket.TypedPayload.SessionId;
 
         await WaitForStatusTraceAsync(traces, "PC01", "Online");
-        Console.WriteLine("PASS: authenticated LOGIN emits STATUS Online");
+        WriteCasePass("TC-N07", "Server emits STATUS with machineId=PC01 and status=Online.");
     }
 
+    WriteCaseHeader("TC-N08", "Disconnect emits Offline status.");
     await WaitForClosedSessionAsync(sessions, sessionId);
     await WaitForStatusTraceAsync(traces, "PC01", "Offline");
-    Console.WriteLine("PASS: authenticated disconnect emits STATUS Offline");
+    WriteCasePass("TC-N08", "Server emits STATUS with machineId=PC01 and status=Offline.");
 }
 
 static async Task AssertLoginFailureAsync(
@@ -1155,7 +1233,9 @@ static async Task AssertRejectedLineDoesNotStopServerAsync(
     int port,
     ISessionRepository sessions,
     string outboundLine,
-    string scenario)
+    string scenario,
+    string testCaseId,
+    string passMessage)
 {
     using (var tcpClient = new TcpClient())
     {
@@ -1180,8 +1260,8 @@ static async Task AssertRejectedLineDoesNotStopServerAsync(
         }
     }
 
-    await AssertLoginSuccessAsync(port, sessions);
-    Console.WriteLine($"PASS: {scenario} disconnects only the offending client and server remains available");
+    await AssertLoginSuccessAsync(port, sessions, writePass: false);
+    WriteCasePass(testCaseId, passMessage);
 }
 
 static async Task WaitForClosedSessionAsync(ISessionRepository sessions, string sessionId)

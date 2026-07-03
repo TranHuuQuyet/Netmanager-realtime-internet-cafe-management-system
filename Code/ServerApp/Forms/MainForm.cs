@@ -4,6 +4,7 @@ using ServerApp.Database.Models;
 using ServerApp.Networking;
 using ServerApp.Presentation;
 using Shared.Enums;
+using System.Media;
 
 namespace ServerApp;
 
@@ -12,6 +13,7 @@ public partial class MainForm : Form
     // Tiền tố chỉ dùng khi tạo danh sách máy mẫu; dữ liệu thật giữ nguyên MachineId
     // do repository hoặc client gửi lên.
     private const string SampleMachinePrefix = "PC";
+    private const string ServerMachineId = "PC00";
 
     // Định danh nguồn phát lệnh để phía networking có thể ghi log/audit lệnh admin.
     private const string AdminCommandIssuer = "ServerApp.MainForm";
@@ -29,6 +31,7 @@ public partial class MainForm : Form
     private readonly IAdminNotificationService _adminNotification;
     private readonly IAdminBillingService? _adminBilling;
     private readonly System.Windows.Forms.Timer _billingRefreshTimer = new();
+    private readonly ToolTip _incomingChatTip = new();
 
     // Lưu lịch sử chat riêng theo từng MachineId. So sánh không phân biệt hoa/thường
     // để PC01 và pc01 không tạo thành hai cuộc hội thoại khác nhau.
@@ -37,6 +40,9 @@ public partial class MainForm : Form
 
     // Số tin nhắn client đã gửi nhưng admin chưa mở cuộc hội thoại của máy đó.
     private readonly Dictionary<string, int> _unreadChatCountByMachine =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly Dictionary<string, List<TopUpChatAction>> _topUpActionsByMachine =
         new(StringComparer.OrdinalIgnoreCase);
 
     // Cờ chống vòng lặp sự kiện: SelectMachine thay đổi CurrentRow, thao tác đó lại
@@ -51,10 +57,18 @@ public partial class MainForm : Form
     private string? _selectedMachineName;
     private ComboBox _billingModeComboBox = null!;
     private NumericUpDown _billingMinutesInput = null!;
+    private NumericUpDown _billingRatePerHourInput = null!;
     private Button _btnStartBilling = null!;
     private Button _btnExtendBilling = null!;
     private Button _btnCloseBilling = null!;
     private TextBox _txtBillingMonitor = null!;
+    private TableLayoutPanel _billingTopUpRequestPanel = null!;
+    private Label _billingTopUpRequestLabel = null!;
+    private FlowLayoutPanel _billingTopUpButtonRow = null!;
+    private Button _btnRejectBillingTopUp = null!;
+    private Button _btnConfirmBillingTopUp = null!;
+    private Label _billingTopUpStatusLabel = null!;
+    private FlowLayoutPanel _chatHistoryPanel = null!;
 
     // Các constructor rút gọn đều chuyển về constructor đầy đủ để việc khởi tạo
     // dependency và đăng ký sự kiện chỉ nằm tại một nơi.
@@ -110,6 +124,7 @@ public partial class MainForm : Form
         // cập label, button và textbox do Designer tạo.
         InitializeComponent();
         ConfigureResizableLayout();
+        ConfigureInlineChatHistory();
         ConfigureBillingPanel();
         ConfigureR1ShellState();
 
@@ -119,7 +134,7 @@ public partial class MainForm : Form
         if (_adminBilling is not null)
         {
             _adminBilling.BillingUpdated += AdminBilling_BillingUpdated;
-            _billingRefreshTimer.Interval = 5000;
+            _billingRefreshTimer.Interval = 1000;
             _billingRefreshTimer.Tick += BillingRefreshTimer_Tick;
             _billingRefreshTimer.Start();
         }
@@ -194,6 +209,25 @@ public partial class MainForm : Form
         customerLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
     }
 
+    private void ConfigureInlineChatHistory()
+    {
+        _chatHistoryPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Padding = new Padding(6),
+            BackColor = Color.White
+        };
+        _chatHistoryPanel.Resize += (_, _) => ResizeChatHistoryItems();
+
+        chatLayout.Controls.Remove(txtChatHistory);
+        txtChatHistory.Visible = false;
+        chatLayout.Controls.Add(_chatHistoryPanel, 0, 1);
+        _chatHistoryPanel.BringToFront();
+    }
+
     private void ConfigureBillingPanel()
     {
         var rightTabs = new TabControl
@@ -228,21 +262,28 @@ public partial class MainForm : Form
             ColumnCount = 1,
             RowCount = 2
         };
-        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112F));
         billingLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
-        var controls = new FlowLayoutPanel
+        var controls = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            WrapContents = true,
-            AutoScroll = true
+            ColumnCount = 3,
+            RowCount = 3,
+            Padding = new Padding(0, 2, 0, 2)
         };
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 144F));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 152F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
 
         _billingModeComboBox = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Width = 132,
-            Margin = new Padding(3, 2, 6, 2)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 2, 8, 2)
         };
         _billingModeComboBox.Items.AddRange(["Timed", "Open-ended"]);
         _billingModeComboBox.SelectedIndex = 0;
@@ -250,21 +291,46 @@ public partial class MainForm : Form
         _billingMinutesInput = new NumericUpDown
         {
             Minimum = 1,
-            Maximum = 1440,
+            Maximum = 1_000_000,
             Value = 10,
-            Width = 76,
-            Margin = new Padding(3, 2, 6, 2)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 2, 8, 2)
+        };
+
+        _billingRatePerHourInput = new NumericUpDown
+        {
+            Minimum = 1_000,
+            Maximum = 1_000_000_000,
+            Increment = 1_000,
+            ThousandsSeparator = true,
+            Value = 10_000,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 2, 0, 2)
         };
 
         _btnStartBilling = BuildBillingButton("Start", BillingStart_Click);
         _btnExtendBilling = BuildBillingButton("Extend", BillingExtend_Click);
         _btnCloseBilling = BuildBillingButton("Close", BillingClose_Click);
 
-        controls.Controls.Add(_billingModeComboBox);
-        controls.Controls.Add(_billingMinutesInput);
-        controls.Controls.Add(_btnStartBilling);
-        controls.Controls.Add(_btnExtendBilling);
-        controls.Controls.Add(_btnCloseBilling);
+        controls.Controls.Add(BuildBillingFieldLabel("Mode"), 0, 0);
+        controls.Controls.Add(BuildBillingFieldLabel("Minutes"), 1, 0);
+        controls.Controls.Add(BuildBillingFieldLabel("Rate (VND/hour)"), 2, 0);
+        controls.Controls.Add(_billingModeComboBox, 0, 1);
+        controls.Controls.Add(_billingMinutesInput, 1, 1);
+        controls.Controls.Add(_billingRatePerHourInput, 2, 1);
+
+        var buttonRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Margin = new Padding(0, 4, 0, 0)
+        };
+        buttonRow.Controls.Add(_btnStartBilling);
+        buttonRow.Controls.Add(_btnExtendBilling);
+        buttonRow.Controls.Add(_btnCloseBilling);
+        controls.Controls.Add(buttonRow, 0, 2);
+        controls.SetColumnSpan(buttonRow, 3);
 
         _txtBillingMonitor = new TextBox
         {
@@ -276,8 +342,86 @@ public partial class MainForm : Form
             Text = "No billing session selected."
         };
 
+        var billingMonitorLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = Padding.Empty
+        };
+        billingMonitorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        billingMonitorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _billingTopUpRequestPanel = new TableLayoutPanel
+        {
+            AutoSize = true,
+            BackColor = Color.White,
+            ColumnCount = 1,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 6, 0, 0),
+            Padding = new Padding(8, 6, 8, 6),
+            RowCount = 3,
+            Visible = false
+        };
+        _billingTopUpRequestPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        _billingTopUpRequestPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _billingTopUpRequestPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _billingTopUpRequestPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _billingTopUpRequestPanel.Resize += (_, _) => UpdateBillingTopUpRequestLabelWidth();
+
+        _billingTopUpRequestLabel = new Label
+        {
+            AutoSize = true,
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Margin = new Padding(0, 0, 0, 6)
+        };
+
+        _billingTopUpButtonRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            WrapContents = false
+        };
+
+        _btnRejectBillingTopUp = new Button
+        {
+            Text = "Từ chối",
+            Width = 92,
+            Margin = new Padding(0, 0, 8, 0),
+            UseVisualStyleBackColor = true
+        };
+        _btnRejectBillingTopUp.Click += TopUpRejectButton_Click;
+
+        _btnConfirmBillingTopUp = new Button
+        {
+            Text = "Xác nhận",
+            Width = 92,
+            Margin = new Padding(0, 0, 0, 0),
+            UseVisualStyleBackColor = true
+        };
+        _btnConfirmBillingTopUp.Click += TopUpConfirmButton_Click;
+
+        _billingTopUpStatusLabel = new Label
+        {
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            Margin = new Padding(0, 4, 0, 0),
+            Visible = false
+        };
+
+        _billingTopUpButtonRow.Controls.Add(_btnRejectBillingTopUp);
+        _billingTopUpButtonRow.Controls.Add(_btnConfirmBillingTopUp);
+        _billingTopUpRequestPanel.Controls.Add(_billingTopUpRequestLabel, 0, 0);
+        _billingTopUpRequestPanel.Controls.Add(_billingTopUpButtonRow, 0, 1);
+        _billingTopUpRequestPanel.Controls.Add(_billingTopUpStatusLabel, 0, 2);
+
+        billingMonitorLayout.Controls.Add(_txtBillingMonitor, 0, 0);
+        billingMonitorLayout.Controls.Add(_billingTopUpRequestPanel, 0, 1);
+
         billingLayout.Controls.Add(controls, 0, 0);
-        billingLayout.Controls.Add(_txtBillingMonitor, 0, 1);
+        billingLayout.Controls.Add(billingMonitorLayout, 0, 1);
         billingGroup.Controls.Add(billingLayout);
 
         machineSplit.Panel2.Controls.Remove(chatGroup);
@@ -303,6 +447,16 @@ public partial class MainForm : Form
         button.Click += clickHandler;
         return button;
     }
+
+    private static Label BuildBillingFieldLabel(string text)
+        => new()
+        {
+            Dock = DockStyle.Fill,
+            Text = text,
+            Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+            TextAlign = ContentAlignment.BottomLeft,
+            Margin = new Padding(0, 0, 8, 0)
+        };
 
     /// <summary>
     /// Nạp dữ liệu khi form mở. Danh sách khách hàng đọc trực tiếp từ database;
@@ -475,9 +629,15 @@ public partial class MainForm : Form
             normalizedMachineId,
             normalizedStatus);
 
-        if (string.Equals(normalizedStatus, "ONLINE", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedStatus, "ONLINE", StringComparison.OrdinalIgnoreCase)
+            && !IsServerMachine(normalizedMachineId))
         {
-            _ = SyncBillingForMachineAsync(normalizedMachineId);
+            _ = EnsureBillingForMachineAsync(normalizedMachineId);
+        }
+        else if (string.Equals(normalizedStatus, "OFFLINE", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "DISCONNECT", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = CloseBillingForMachineAsync(normalizedMachineId);
         }
     }
 
@@ -671,8 +831,11 @@ public partial class MainForm : Form
             lblSelectedClient.Text = string.Format(UiStrings.ChatWithMachineTemplate, machineName);
             MarkMachineChatAsRead(machineName);
             RenderSelectedChatHistory();
+            RenderSelectedBillingTopUpRequest();
             SetChatActionEnabled(true);
-            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
+            SetBillingActionEnabled(_adminBilling is not null
+                && _isRuntimeMachineDataActive
+                && !IsServerMachine(machineName));
             lblServerStatus.Text = string.Format(UiStrings.MainSelectedMachineStatusTemplate, machineName);
             _ = SyncBillingForMachineAsync(machineName);
 
@@ -901,12 +1064,17 @@ public partial class MainForm : Form
         string machineId = NormalizeMachineId(message.MachineId);
         AdminChatMessage normalizedMessage = message with { MachineId = machineId };
         AppendChatMessage(normalizedMessage);
+        if (TryParseTopUpRequest(normalizedMessage, out long requestedAmount))
+        {
+            AddTopUpChatAction(normalizedMessage, requestedAmount);
+        }
 
         // Tin nhắn của máy khác vẫn được lưu nhưng không thay nội dung admin đang đọc.
         if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
         {
             MarkMachineChatAsRead(machineId);
             RenderSelectedChatHistory();
+            RenderSelectedBillingTopUpRequest();
         }
         else
         {
@@ -916,6 +1084,214 @@ public partial class MainForm : Form
         lblServerStatus.Text = string.Format(
             UiStrings.MainChatReceivedTemplate,
             machineId);
+        ShowIncomingChatNotification(normalizedMessage);
+    }
+
+    private void ShowIncomingChatNotification(AdminChatMessage message)
+    {
+        SystemSounds.Asterisk.Play();
+
+        string notification = $"Tin nhan moi tu {message.MachineId}: {message.Message}";
+        Control anchor = FindMachineCard(message.MachineId) is Control card
+            ? card
+            : chatGroup;
+        _incomingChatTip.Show(notification, anchor, 16, 16, 5000);
+    }
+
+    public async Task HandleTopUpRequestDecisionAsync(
+        string machineId,
+        long requestedAmount,
+        DialogResult decision,
+        CancellationToken cancellationToken = default)
+    {
+        string targetMachineId = NormalizeMachineId(machineId);
+        if (string.IsNullOrWhiteSpace(targetMachineId)
+            || string.Equals(targetMachineId, "UNKNOWN", StringComparison.OrdinalIgnoreCase)
+            || IsServerMachine(targetMachineId))
+        {
+            lblServerStatus.Text = "Yeu cau nap tien khong co may hop le.";
+            return;
+        }
+
+        if (requestedAmount <= 0)
+        {
+            lblServerStatus.Text = $"Yeu cau nap tien cua {targetMachineId} khong hop le.";
+            return;
+        }
+
+        if (decision == DialogResult.Yes)
+        {
+            if (_adminBilling is null)
+            {
+                lblServerStatus.Text = "Billing service is unavailable.";
+                return;
+            }
+
+            AdminBillingResult result = await _adminBilling.TopUpMachineAsync(
+                targetMachineId,
+                requestedAmount,
+                cancellationToken);
+            ApplyBillingUpdate(result);
+            await LoadCustomerDataAsync().ConfigureAwait(true);
+            lblServerStatus.Text = result.IsError
+                ? $"Khong the nap tien cho {targetMachineId}: {result.Message}"
+                : $"Da xac nhan nap {FormatMoney(requestedAmount)} cho {targetMachineId}.";
+            return;
+        }
+
+        if (decision == DialogResult.No)
+        {
+            AdminBillingResult? syncResult = _adminBilling is null
+                ? null
+                : await _adminBilling.SyncMachineAsync(targetMachineId, cancellationToken);
+            if (syncResult is not null)
+            {
+                ApplyBillingUpdate(syncResult);
+            }
+
+            if (!ShouldLockAfterRejectedTopUp(syncResult))
+            {
+                long remainingSeconds = syncResult?.Timer?.RemainingUsageSeconds
+                    ?? syncResult?.Timer?.RemainingSeconds
+                    ?? 0;
+                lblServerStatus.Text =
+                    $"Da tu choi nap tien cho {targetMachineId}; may van con {FormatDuration(remainingSeconds)} theo so du nen khong khoa.";
+                return;
+            }
+
+            var request = new AdminCommandRequest(
+                targetMachineId,
+                CommandType.LOCK,
+                AdminCommandIssuer,
+                "Top-up request rejected and balance is depleted.");
+            AdminCommandResult result = await _adminCommands.SendAsync(request, cancellationToken);
+            lblServerStatus.Text = result.IsError
+                ? $"Tu choi nap tien nhung khoa {targetMachineId} loi: {result.Message}"
+                : $"Da tu choi nap tien va giu {targetMachineId} o trang thai khoa.";
+        }
+    }
+
+    private static bool ShouldLockAfterRejectedTopUp(AdminBillingResult? syncResult)
+    {
+        Shared.DTOs.CommandPayloads.TimerPayload? timer = syncResult?.Timer;
+        if (timer is null)
+        {
+            return true;
+        }
+
+        if (timer.ShouldLockNow)
+        {
+            return true;
+        }
+
+        if (timer.RemainingUsageSeconds is not null)
+        {
+            return timer.RemainingUsageSeconds.Value <= 0;
+        }
+
+        return timer.RemainingSeconds is <= 0;
+    }
+
+    private DialogResult ShowTopUpDecisionDialog(string machineId, long requestedAmount)
+    {
+        using var dialog = new Form
+        {
+            Text = "Yêu cầu nạp tiền",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(420, 148),
+            Padding = new Padding(14)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
+
+        layout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = $"{machineId} yêu cầu nạp {FormatMoney(requestedAmount)}.{Environment.NewLine}Bạn muốn xử lý yêu cầu này như thế nào?",
+            TextAlign = ContentAlignment.MiddleLeft,
+            Font = new Font("Segoe UI", 10F, FontStyle.Regular)
+        }, 0, 0);
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+        var confirmButton = new Button
+        {
+            Text = "Xác nhận",
+            Width = 92,
+            DialogResult = DialogResult.Yes
+        };
+        var rejectButton = new Button
+        {
+            Text = "Từ chối",
+            Width = 92,
+            DialogResult = DialogResult.No
+        };
+        buttons.Controls.Add(confirmButton);
+        buttons.Controls.Add(rejectButton);
+        layout.Controls.Add(buttons, 0, 1);
+
+        dialog.AcceptButton = confirmButton;
+        dialog.CancelButton = rejectButton;
+        dialog.Controls.Add(layout);
+        return dialog.ShowDialog(this);
+    }
+
+    public static bool TryParseTopUpRequest(AdminChatMessage message, out long requestedAmount)
+    {
+        requestedAmount = 0;
+        ArgumentNullException.ThrowIfNull(message);
+
+        string machineId = NormalizeMachineId(message.MachineId);
+        if (string.Equals(machineId, "UNKNOWN", StringComparison.OrdinalIgnoreCase)
+            || IsServerMachine(machineId))
+        {
+            return false;
+        }
+
+        string text = message.Message.Trim();
+        if (text.Length == 0)
+        {
+            return false;
+        }
+
+        const string pattern = @"^\s*(?<machine>PC\d+)\s+(?:yêu\s+cầu\s+nạp|yeu\s+cau\s+nap)\s+(?<amount>[\d.,]+)\s*VND\s*$";
+        var match = System.Text.RegularExpressions.Regex.Match(
+            text,
+            pattern,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        string requestedMachineId = NormalizeMachineId(match.Groups["machine"].Value);
+        if (!string.Equals(requestedMachineId, machineId, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string digits = new(match.Groups["amount"].Value.Where(char.IsDigit).ToArray());
+        return long.TryParse(
+            digits,
+            System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out requestedAmount)
+            && requestedAmount > 0;
     }
 
     // Adapter sự kiện rất mỏng: mọi quy tắc thread, chuẩn hóa và render nằm trong
@@ -934,9 +1310,10 @@ public partial class MainForm : Form
         SetBillingActionEnabled(false);
         try
         {
+            long ratePerHour = GetBillingRatePerHour();
             AdminBillingResult result = _billingModeComboBox.SelectedIndex == 1
-                ? await _adminBilling.StartOpenEndedAsync(_selectedMachineName)
-                : await _adminBilling.StartTimedAsync(_selectedMachineName, (int)_billingMinutesInput.Value);
+                ? await _adminBilling.StartOpenEndedAsync(_selectedMachineName, ratePerHour)
+                : await _adminBilling.StartTimedAsync(_selectedMachineName, (int)_billingMinutesInput.Value, ratePerHour);
             ApplyBillingUpdate(result);
         }
         finally
@@ -1005,6 +1382,16 @@ public partial class MainForm : Form
             return;
         }
 
+        if (IsServerMachine(machineId))
+        {
+            if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                _txtBillingMonitor.Text = "Server machine PC00 is not billed.";
+            }
+
+            return;
+        }
+
         AdminBillingResult? result = await _adminBilling.SyncMachineAsync(machineId);
         if (result is not null)
         {
@@ -1013,6 +1400,46 @@ public partial class MainForm : Form
         else if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
         {
             _txtBillingMonitor.Text = "No active billing session.";
+        }
+    }
+
+    public async Task EnsureBillingForMachineAsync(string machineId)
+    {
+        if (_adminBilling is null)
+        {
+            return;
+        }
+
+        if (IsServerMachine(machineId))
+        {
+            if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                _txtBillingMonitor.Text = "Server machine PC00 is not billed.";
+            }
+
+            return;
+        }
+
+        AdminBillingResult result = await _adminBilling.EnsureOpenEndedAsync(machineId, GetBillingRatePerHour());
+        ApplyBillingUpdate(result);
+    }
+
+    private async Task CloseBillingForMachineAsync(string machineId)
+    {
+        if (_adminBilling is null)
+        {
+            return;
+        }
+
+        if (IsServerMachine(machineId))
+        {
+            return;
+        }
+
+        AdminBillingResult result = await _adminBilling.CloseAsync(machineId);
+        if (result.IsSuccess || !string.Equals(result.ErrorCode, "BILLING_SESSION_NOT_FOUND", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplyBillingUpdate(result);
         }
     }
 
@@ -1063,14 +1490,39 @@ public partial class MainForm : Form
 
     private static string FormatBillingMonitor(Shared.DTOs.CommandPayloads.TimerPayload timer)
     {
-        string remaining = timer.RemainingSeconds is null
+        string elapsed = FormatDuration(timer.ElapsedSeconds);
+        string sessionRemaining = timer.RemainingSeconds is null
             ? "open-ended"
-            : $"{TimeSpan.FromSeconds(timer.RemainingSeconds.Value):hh\\:mm\\:ss}";
+            : FormatDuration(timer.RemainingSeconds.Value);
+        string totalBalance = timer.TotalBalanceVnd is null
+            ? "N/A"
+            : FormatMoney(timer.TotalBalanceVnd.Value);
+        string remainingBalance = timer.RemainingBalanceVnd is null
+            ? "N/A"
+            : FormatMoney(timer.RemainingBalanceVnd.Value);
+        string balanceTimeRemaining = timer.RemainingUsageSeconds is null
+            ? "N/A"
+            : FormatDuration(timer.RemainingUsageSeconds.Value);
         string warning = timer.IsWarning ? " / warning <=5m" : string.Empty;
         return
             $"{timer.Status} {timer.RentalMode}{warning}{Environment.NewLine}" +
-            $"Time: {remaining} / charged {timer.ChargedMinutes} min{Environment.NewLine}" +
-            $"Used cost: {FormatMoney(timer.AmountVnd)}";
+            $"Rate: {FormatMoney(timer.RatePerHour)}/hour{Environment.NewLine}" +
+            $"Total topped up: {totalBalance}{Environment.NewLine}" +
+            $"Used cost: {FormatMoney(timer.AmountVnd)}{Environment.NewLine}" +
+            $"Remaining balance: {remainingBalance}{Environment.NewLine}" +
+            $"Used time: {elapsed} / charged {timer.ChargedMinutes} min{Environment.NewLine}" +
+            $"Remaining time: {sessionRemaining} / balance {balanceTimeRemaining}";
+    }
+
+    private long GetBillingRatePerHour()
+        => _billingRatePerHourInput.Value <= 0
+            ? 10_000
+            : decimal.ToInt64(_billingRatePerHourInput.Value);
+
+    private static string FormatDuration(long totalSeconds)
+    {
+        TimeSpan time = TimeSpan.FromSeconds(Math.Max(0, totalSeconds));
+        return $"{(long)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}";
     }
 
     /// <summary>
@@ -1182,6 +1634,12 @@ public partial class MainForm : Form
                 return;
             }
 
+            if (sender == btnTopUpCustomer)
+            {
+                await TopUpSelectedCustomerAsync();
+                return;
+            }
+
             if (!TryBuildCustomerRecord(out CustomerRecord? customer) || customer is null)
             {
                 return;
@@ -1288,6 +1746,7 @@ public partial class MainForm : Form
         _selectedMachineName = null;
         _chatHistoryByMachine.Clear();
         _unreadChatCountByMachine.Clear();
+        _topUpActionsByMachine.Clear();
         SetMachineActionButtonsEnabled(true);
         SetBillingActionEnabled(_adminBilling is not null);
         SetChatActionEnabled(false);
@@ -1469,6 +1928,20 @@ public partial class MainForm : Form
         history.Add(message);
     }
 
+    private void AddTopUpChatAction(AdminChatMessage message, long requestedAmount)
+    {
+        if (!_topUpActionsByMachine.TryGetValue(message.MachineId, out List<TopUpChatAction>? actions))
+        {
+            actions = [];
+            _topUpActionsByMachine[message.MachineId] = actions;
+        }
+
+        actions.Add(new TopUpChatAction(
+            Guid.NewGuid().ToString("N"),
+            message,
+            requestedAmount));
+    }
+
     private int GetUnreadChatCount(string machineId)
         => _unreadChatCountByMachine.TryGetValue(machineId, out int count) ? count : 0;
 
@@ -1537,26 +2010,33 @@ public partial class MainForm : Form
     /// </summary>
     private void RenderSelectedChatHistory()
     {
+        _chatHistoryPanel.Controls.Clear();
+
         if (string.IsNullOrWhiteSpace(_selectedMachineName))
         {
-            txtChatHistory.Clear();
             return;
         }
 
         if (!_chatHistoryByMachine.TryGetValue(_selectedMachineName, out List<AdminChatMessage>? history)
             || history.Count == 0)
         {
-            txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, _selectedMachineName);
+            _chatHistoryPanel.Controls.Add(CreateChatPlaceholderLabel(
+                string.Format(UiStrings.ChatHistoryTemplate, _selectedMachineName)));
             return;
         }
 
         // Mỗi message thành một dòng có thời gian/người gửi; sau đó cuộn tới cuối để
         // tin mới nhất luôn nằm trong vùng nhìn thấy.
-        txtChatHistory.Lines = history
-            .Select(FormatChatMessage)
-            .ToArray();
-        txtChatHistory.SelectionStart = txtChatHistory.TextLength;
-        txtChatHistory.ScrollToCaret();
+        foreach (AdminChatMessage message in history)
+        {
+            _chatHistoryPanel.Controls.Add(CreateChatMessagePanel(message));
+        }
+
+        ResizeChatHistoryItems();
+        if (_chatHistoryPanel.Controls.Count > 0)
+        {
+            _chatHistoryPanel.ScrollControlIntoView(_chatHistoryPanel.Controls[^1]);
+        }
     }
 
     // Định dạng duy nhất cho cả tin server gửi và tin client gửi vào lịch sử.
@@ -1564,6 +2044,184 @@ public partial class MainForm : Form
         => $"[{message.Timestamp:HH:mm:ss}] {message.Sender}: {message.Message}";
 
     /// <summary>Bật/tắt đồng thời các nút gửi lệnh đã được hỗ trợ.</summary>
+    private Control CreateChatMessagePanel(AdminChatMessage message)
+    {
+        var panel = new Panel
+        {
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 4),
+            Padding = Padding.Empty,
+            BackColor = Color.White,
+            Tag = "chat-item"
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            AutoSize = true,
+            ColumnCount = 1,
+            RowCount = 1,
+            Dock = DockStyle.Top,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+        layout.Controls.Add(new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(GetChatItemWidth() - 8, 0),
+            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+            Text = FormatChatMessage(message),
+            Margin = new Padding(0, 0, 0, 4)
+        }, 0, 0);
+
+        panel.Controls.Add(layout);
+        panel.Width = GetChatItemWidth();
+        return panel;
+    }
+
+    private void RenderSelectedBillingTopUpRequest()
+    {
+        if (_billingTopUpRequestPanel is null)
+        {
+            return;
+        }
+
+        _billingTopUpRequestPanel.Visible = false;
+        _billingTopUpRequestLabel.Text = string.Empty;
+        _billingTopUpStatusLabel.Text = string.Empty;
+        _billingTopUpStatusLabel.Visible = false;
+        _billingTopUpButtonRow.Visible = false;
+        _btnRejectBillingTopUp.Tag = null;
+        _btnConfirmBillingTopUp.Tag = null;
+
+        if (string.IsNullOrWhiteSpace(_selectedMachineName))
+        {
+            return;
+        }
+
+        TopUpChatAction? action = FindVisibleTopUpActionForMachine(_selectedMachineName);
+        if (action is null)
+        {
+            return;
+        }
+
+        _billingTopUpRequestLabel.Text = FormatChatMessage(action.Message);
+        UpdateBillingTopUpRequestLabelWidth();
+
+        bool isPending = action.Status == TopUpChatActionStatus.Pending;
+        _billingTopUpButtonRow.Visible = isPending;
+        _btnRejectBillingTopUp.Enabled = isPending && !action.IsBusy;
+        _btnConfirmBillingTopUp.Enabled = isPending && !action.IsBusy;
+        _btnRejectBillingTopUp.Tag = action;
+        _btnConfirmBillingTopUp.Tag = action;
+
+        if (!isPending)
+        {
+            _billingTopUpStatusLabel.Text = action.Status switch
+            {
+                TopUpChatActionStatus.Confirmed => $"Da xac nhan nap {FormatMoney(action.RequestedAmount)}.",
+                TopUpChatActionStatus.Rejected => "Da tu choi yeu cau nap tien.",
+                _ => "Xu ly yeu cau nap tien bi loi."
+            };
+            _billingTopUpStatusLabel.ForeColor = action.Status == TopUpChatActionStatus.Error
+                ? Color.FromArgb(180, 45, 45)
+                : Color.FromArgb(55, 110, 55);
+            _billingTopUpStatusLabel.Visible = true;
+        }
+
+        _billingTopUpRequestPanel.Visible = true;
+    }
+
+    private void UpdateBillingTopUpRequestLabelWidth()
+    {
+        if (_billingTopUpRequestLabel is null || _billingTopUpRequestPanel is null)
+        {
+            return;
+        }
+
+        _billingTopUpRequestLabel.MaximumSize = new Size(
+            Math.Max(120, _billingTopUpRequestPanel.ClientSize.Width - 20),
+            0);
+    }
+
+    private Label CreateChatPlaceholderLabel(string text)
+        => new()
+        {
+            AutoSize = true,
+            MaximumSize = new Size(GetChatItemWidth() - 8, 0),
+            Text = text,
+            ForeColor = Color.Gray,
+            Margin = new Padding(0, 0, 0, 4)
+        };
+
+    private TopUpChatAction? FindVisibleTopUpActionForMachine(string machineId)
+    {
+        if (!_topUpActionsByMachine.TryGetValue(machineId, out List<TopUpChatAction>? actions)
+            || actions.Count == 0)
+        {
+            return null;
+        }
+
+        return actions.LastOrDefault(action => action.Status == TopUpChatActionStatus.Pending)
+            ?? actions.LastOrDefault();
+    }
+
+    private async void TopUpConfirmButton_Click(object? sender, EventArgs e)
+    {
+        if (sender is Button { Tag: TopUpChatAction action })
+        {
+            await ResolveTopUpActionAsync(action, DialogResult.Yes);
+        }
+    }
+
+    private async void TopUpRejectButton_Click(object? sender, EventArgs e)
+    {
+        if (sender is Button { Tag: TopUpChatAction action })
+        {
+            await ResolveTopUpActionAsync(action, DialogResult.No);
+        }
+    }
+
+    private async Task ResolveTopUpActionAsync(TopUpChatAction action, DialogResult decision)
+    {
+        if (action.Status != TopUpChatActionStatus.Pending || action.IsBusy)
+        {
+            return;
+        }
+
+        action.IsBusy = true;
+        RenderSelectedBillingTopUpRequest();
+
+        await HandleTopUpRequestDecisionAsync(
+            action.Message.MachineId,
+            action.RequestedAmount,
+            decision);
+
+        action.Status = decision == DialogResult.Yes
+            ? TopUpChatActionStatus.Confirmed
+            : TopUpChatActionStatus.Rejected;
+        action.IsBusy = false;
+        RenderSelectedBillingTopUpRequest();
+    }
+
+    private void ResizeChatHistoryItems()
+    {
+        if (_chatHistoryPanel is null)
+        {
+            return;
+        }
+
+        int width = GetChatItemWidth();
+        foreach (Control control in _chatHistoryPanel.Controls)
+        {
+            control.Width = width;
+        }
+    }
+
+    private int GetChatItemWidth()
+        => Math.Max(120, _chatHistoryPanel.ClientSize.Width - SystemInformation.VerticalScrollBarWidth - 16);
+
     private void SetMachineActionButtonsEnabled(bool enabled)
     {
         btnLockMachine.Enabled = enabled;
@@ -1582,9 +2240,12 @@ public partial class MainForm : Form
 
     private void SetBillingActionEnabled(bool enabled)
     {
-        bool canUseBilling = enabled && _adminBilling is not null;
+        bool canUseBilling = enabled
+            && _adminBilling is not null
+            && !IsServerMachine(_selectedMachineName);
         _billingModeComboBox.Enabled = canUseBilling;
         _billingMinutesInput.Enabled = canUseBilling;
+        _billingRatePerHourInput.Enabled = canUseBilling;
         _btnStartBilling.Enabled = canUseBilling;
         _btnExtendBilling.Enabled = canUseBilling;
         _btnCloseBilling.Enabled = canUseBilling;
@@ -1605,12 +2266,16 @@ public partial class MainForm : Form
         _billingRefreshTimer.Stop();
         _billingRefreshTimer.Tick -= BillingRefreshTimer_Tick;
         _billingRefreshTimer.Dispose();
+        _incomingChatTip.Dispose();
         base.OnFormClosed(e);
     }
 
     // Chuẩn hóa ID tại biên hệ thống: loại khoảng trắng và dùng UNKNOWN cho giá trị rỗng.
     private static string NormalizeMachineId(string machineId)
         => string.IsNullOrWhiteSpace(machineId) ? "UNKNOWN" : machineId.Trim();
+
+    private static bool IsServerMachine(string? machineId)
+        => string.Equals(machineId?.Trim(), ServerMachineId, StringComparison.OrdinalIgnoreCase);
 
     // Chuẩn hóa status thành chữ hoa để switch màu và nội dung hiển thị nhất quán.
     private static string NormalizeStatus(string status)
@@ -1624,6 +2289,27 @@ public partial class MainForm : Form
     {
         string digits = new(machineName.Where(char.IsDigit).ToArray());
         return int.TryParse(digits, out int machineNumber) ? machineNumber : 0;
+    }
+
+    private enum TopUpChatActionStatus
+    {
+        Pending,
+        Confirmed,
+        Rejected,
+        Error
+    }
+
+    private sealed class TopUpChatAction(string id, AdminChatMessage message, long requestedAmount)
+    {
+        public string Id { get; } = id;
+
+        public AdminChatMessage Message { get; } = message;
+
+        public long RequestedAmount { get; } = requestedAmount;
+
+        public TopUpChatActionStatus Status { get; set; } = TopUpChatActionStatus.Pending;
+
+        public bool IsBusy { get; set; }
     }
 
     /// <summary>
@@ -1815,6 +2501,123 @@ public partial class MainForm : Form
         await LoadCustomerDataAsync().ConfigureAwait(true);
         ClearCustomerInputs();
         lblServerStatus.Text = $"Đã xóa khách hàng {customerId}.";
+    }
+
+    private async Task TopUpSelectedCustomerAsync()
+    {
+        if (_customers is null)
+        {
+            ShowCustomerMessage("Chưa kết nối database khách hàng.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        string customerId = GetSelectedCustomerId();
+        if (string.IsNullOrWhiteSpace(customerId))
+        {
+            ShowCustomerMessage("Vui lòng chọn khách hàng cần nạp tiền.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        CustomerRecord? customer = await _customers.GetByIdAsync(customerId).ConfigureAwait(true);
+        if (customer is null)
+        {
+            ShowCustomerMessage($"Không tìm thấy khách hàng {customerId}.", MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (!TryPromptTopUpAmount(out long topUpAmount))
+        {
+            return;
+        }
+
+        CustomerRecord updatedCustomer = customer with
+        {
+            AccountBalance = customer.AccountBalance + topUpAmount
+        };
+
+        await _customers.UpdateAsync(updatedCustomer).ConfigureAwait(true);
+        await LoadCustomerDataAsync(updatedCustomer.CustomerId).ConfigureAwait(true);
+        await RefreshBillingSessionsAsync().ConfigureAwait(true);
+        lblServerStatus.Text =
+            $"Đã nạp {FormatMoney(topUpAmount)} cho {updatedCustomer.CustomerId}. Số dư mới: {FormatMoney(updatedCustomer.AccountBalance)}.";
+    }
+
+    private bool TryPromptTopUpAmount(out long amount)
+    {
+        amount = 0;
+        using var dialog = new Form
+        {
+            Text = "Nạp tiền khách hàng",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(320, 132),
+            Padding = new Padding(12)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 36F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 44F));
+
+        layout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "Số tiền nạp thêm (VND)",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 0, 0);
+
+        var amountInput = new NumericUpDown
+        {
+            Dock = DockStyle.Fill,
+            Minimum = 1_000,
+            Maximum = 1_000_000_000,
+            Increment = 1_000,
+            ThousandsSeparator = true,
+            Value = 10_000
+        };
+        layout.Controls.Add(amountInput, 0, 1);
+
+        var buttons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+        var okButton = new Button
+        {
+            Text = "Nạp tiền",
+            DialogResult = DialogResult.OK,
+            Width = 92
+        };
+        var cancelButton = new Button
+        {
+            Text = "Hủy",
+            DialogResult = DialogResult.Cancel,
+            Width = 76
+        };
+        buttons.Controls.Add(okButton);
+        buttons.Controls.Add(cancelButton);
+        layout.Controls.Add(buttons, 0, 2);
+
+        dialog.AcceptButton = okButton;
+        dialog.CancelButton = cancelButton;
+        dialog.Controls.Add(layout);
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return false;
+        }
+
+        amount = decimal.ToInt64(amountInput.Value);
+        return amount > 0;
     }
 
     private bool TryBuildCustomerRecord(out CustomerRecord? customer)

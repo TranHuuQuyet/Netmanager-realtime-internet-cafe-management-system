@@ -18,6 +18,10 @@ public class TimerPayload
     [Range(0, long.MaxValue)]
     public long? RemainingSeconds { get; set; }
 
+    [JsonPropertyName("elapsedSeconds")]
+    [Range(0, long.MaxValue)]
+    public long ElapsedSeconds { get; set; }
+
     [JsonPropertyName("startedAt")]
     [Required]
     public DateTimeOffset StartedAt { get; set; }
@@ -37,6 +41,21 @@ public class TimerPayload
     [JsonPropertyName("amountVnd")]
     [Range(0, long.MaxValue)]
     public long AmountVnd { get; set; }
+
+    [JsonPropertyName("remainingBalanceVnd")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [Range(0, long.MaxValue)]
+    public long? RemainingBalanceVnd { get; set; }
+
+    [JsonPropertyName("totalBalanceVnd")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [Range(0, long.MaxValue)]
+    public long? TotalBalanceVnd { get; set; }
+
+    [JsonPropertyName("remainingUsageSeconds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [Range(0, long.MaxValue)]
+    public long? RemainingUsageSeconds { get; set; }
 
     [JsonPropertyName("isWarning")]
     public bool IsWarning { get; set; }

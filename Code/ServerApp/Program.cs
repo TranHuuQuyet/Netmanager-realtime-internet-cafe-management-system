@@ -28,7 +28,8 @@ static class Program
             var billingService = new NetworkAdminBillingService(
                 authRuntime.Billing,
                 authRuntime.SessionRepository,
-                networkServer);
+                networkServer,
+                authRuntime.Customers);
             using var mainForm = new MainForm(authRuntime.Machines, networkServer, billingService, authRuntime.Customers);
 
             if (networkServer is not null)
@@ -36,10 +37,6 @@ static class Program
                 networkServer.StatusEmitted += status =>
                 {
                     mainForm.ApplyMachineStatusUpdate(status.MachineId, status.Status);
-                    if (string.Equals(status.Status, "Online", StringComparison.OrdinalIgnoreCase))
-                    {
-                        _ = mainForm.SyncBillingForMachineAsync(status.MachineId);
-                    }
                 };
                 // Network emits typed command results; presentation owns the UI-facing shape.
                 networkServer.CommandResultEmitted += result =>

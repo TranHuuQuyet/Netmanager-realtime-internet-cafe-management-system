@@ -80,6 +80,7 @@ partial class MainForm
         customerButtons = new FlowLayoutPanel();
         btnAddCustomer = new Button();
         btnEditCustomer = new Button();
+        btnTopUpCustomer = new Button();
         btnDeleteCustomer = new Button();
         btnCancelCustomer = new Button();
         statusStrip = new StatusStrip();
@@ -750,6 +751,7 @@ partial class MainForm
         // 
         customerButtons.Controls.Add(btnAddCustomer);
         customerButtons.Controls.Add(btnEditCustomer);
+        customerButtons.Controls.Add(btnTopUpCustomer);
         customerButtons.Controls.Add(btnDeleteCustomer);
         customerButtons.Controls.Add(btnCancelCustomer);
         customerButtons.Dock = DockStyle.Fill;
@@ -762,9 +764,9 @@ partial class MainForm
         // btnAddCustomer
         // 
         btnAddCustomer.Location = new Point(10, 12);
-        btnAddCustomer.Margin = new Padding(10, 0, 60, 0);
+        btnAddCustomer.Margin = new Padding(10, 0, 16, 0);
         btnAddCustomer.Name = "btnAddCustomer";
-        btnAddCustomer.Size = new Size(160, 42);
+        btnAddCustomer.Size = new Size(120, 42);
         btnAddCustomer.TabIndex = 0;
         btnAddCustomer.Text = "Thêm";
         btnAddCustomer.UseVisualStyleBackColor = true;
@@ -772,32 +774,43 @@ partial class MainForm
         // 
         // btnEditCustomer
         // 
-        btnEditCustomer.Location = new Point(230, 12);
-        btnEditCustomer.Margin = new Padding(0, 0, 60, 0);
+        btnEditCustomer.Location = new Point(146, 12);
+        btnEditCustomer.Margin = new Padding(0, 0, 16, 0);
         btnEditCustomer.Name = "btnEditCustomer";
-        btnEditCustomer.Size = new Size(160, 42);
+        btnEditCustomer.Size = new Size(120, 42);
         btnEditCustomer.TabIndex = 1;
         btnEditCustomer.Text = "Sửa";
         btnEditCustomer.UseVisualStyleBackColor = true;
         btnEditCustomer.Click += CustomerAction_Click;
         // 
+        // btnTopUpCustomer
+        // 
+        btnTopUpCustomer.Location = new Point(282, 12);
+        btnTopUpCustomer.Margin = new Padding(0, 0, 16, 0);
+        btnTopUpCustomer.Name = "btnTopUpCustomer";
+        btnTopUpCustomer.Size = new Size(120, 42);
+        btnTopUpCustomer.TabIndex = 2;
+        btnTopUpCustomer.Text = "Nạp tiền";
+        btnTopUpCustomer.UseVisualStyleBackColor = true;
+        btnTopUpCustomer.Click += CustomerAction_Click;
+        // 
         // btnDeleteCustomer
         // 
-        btnDeleteCustomer.Location = new Point(450, 12);
-        btnDeleteCustomer.Margin = new Padding(0, 0, 60, 0);
+        btnDeleteCustomer.Location = new Point(418, 12);
+        btnDeleteCustomer.Margin = new Padding(0, 0, 16, 0);
         btnDeleteCustomer.Name = "btnDeleteCustomer";
-        btnDeleteCustomer.Size = new Size(160, 42);
-        btnDeleteCustomer.TabIndex = 2;
+        btnDeleteCustomer.Size = new Size(120, 42);
+        btnDeleteCustomer.TabIndex = 3;
         btnDeleteCustomer.Text = "Xóa";
         btnDeleteCustomer.UseVisualStyleBackColor = true;
         btnDeleteCustomer.Click += CustomerAction_Click;
         // 
         // btnCancelCustomer
         // 
-        btnCancelCustomer.Location = new Point(673, 15);
+        btnCancelCustomer.Location = new Point(554, 12);
         btnCancelCustomer.Name = "btnCancelCustomer";
-        btnCancelCustomer.Size = new Size(160, 42);
-        btnCancelCustomer.TabIndex = 3;
+        btnCancelCustomer.Size = new Size(120, 42);
+        btnCancelCustomer.TabIndex = 4;
         btnCancelCustomer.Text = "Hủy";
         btnCancelCustomer.UseVisualStyleBackColor = true;
         btnCancelCustomer.Click += CustomerAction_Click;
@@ -922,6 +935,7 @@ partial class MainForm
     private FlowLayoutPanel customerButtons;
     private Button btnAddCustomer;
     private Button btnEditCustomer;
+    private Button btnTopUpCustomer;
     private Button btnDeleteCustomer;
     private Button btnCancelCustomer;
     private StatusStrip statusStrip;

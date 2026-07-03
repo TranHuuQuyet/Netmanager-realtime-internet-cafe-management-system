@@ -211,21 +211,11 @@ public partial class MainForm : Form
 
     private void ConfigureInlineChatHistory()
     {
-        _chatHistoryPanel = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoScroll = true,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Padding = new Padding(6),
-            BackColor = Color.White
-        };
-        _chatHistoryPanel.Resize += (_, _) => ResizeChatHistoryItems();
-
-        chatLayout.Controls.Remove(txtChatHistory);
-        txtChatHistory.Visible = false;
-        chatLayout.Controls.Add(_chatHistoryPanel, 0, 1);
-        _chatHistoryPanel.BringToFront();
+        txtChatHistory.Clear();
+        txtChatHistory.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+        txtChatHistory.BackColor = Color.White;
+        txtChatHistory.WordWrap = true;
+        txtChatHistory.ScrollBars = ScrollBars.Vertical;
     }
 
     private void ConfigureBillingPanel()
@@ -1067,6 +1057,7 @@ public partial class MainForm : Form
         if (TryParseTopUpRequest(normalizedMessage, out long requestedAmount))
         {
             AddTopUpChatAction(normalizedMessage, requestedAmount);
+            _ = EnsureMachineLockedForTopUpRequestAsync(machineId);
         }
 
         // Tin nhắn của máy khác vẫn được lưu nhưng không thay nội dung admin đang đọc.
@@ -1085,6 +1076,48 @@ public partial class MainForm : Form
             UiStrings.MainChatReceivedTemplate,
             machineId);
         ShowIncomingChatNotification(normalizedMessage);
+    }
+
+    private async Task EnsureMachineLockedForTopUpRequestAsync(string machineId)
+    {
+        AdminBillingResult? syncResult = null;
+
+        try
+        {
+            if (_adminBilling is not null)
+            {
+                syncResult = await _adminBilling.SyncMachineAsync(machineId).ConfigureAwait(true);
+                if (syncResult is not null)
+                {
+                    ApplyBillingUpdate(syncResult);
+                }
+            }
+
+            if (!ShouldLockAfterRejectedTopUp(syncResult))
+            {
+                return;
+            }
+
+            var request = new AdminCommandRequest(
+                machineId,
+                CommandType.LOCK,
+                AdminCommandIssuer,
+                "Client requested top-up while account balance is depleted.");
+            AdminCommandResult result = await _adminCommands.SendAsync(request).ConfigureAwait(true);
+            if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                lblServerStatus.Text = result.IsError
+                    ? $"Yeu cau nap tien nhung khoa {machineId} loi: {result.Message}"
+                    : $"Da khoa {machineId} trong luc cho admin xac nhan nap tien.";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                lblServerStatus.Text = $"Khong the khoa {machineId} sau yeu cau nap tien: {ex.Message}";
+            }
+        }
     }
 
     private void ShowIncomingChatNotification(AdminChatMessage message)
@@ -2010,7 +2043,7 @@ public partial class MainForm : Form
     /// </summary>
     private void RenderSelectedChatHistory()
     {
-        _chatHistoryPanel.Controls.Clear();
+        txtChatHistory.Clear();
 
         if (string.IsNullOrWhiteSpace(_selectedMachineName))
         {
@@ -2020,23 +2053,15 @@ public partial class MainForm : Form
         if (!_chatHistoryByMachine.TryGetValue(_selectedMachineName, out List<AdminChatMessage>? history)
             || history.Count == 0)
         {
-            _chatHistoryPanel.Controls.Add(CreateChatPlaceholderLabel(
-                string.Format(UiStrings.ChatHistoryTemplate, _selectedMachineName)));
+            txtChatHistory.Text = string.Format(UiStrings.ChatHistoryTemplate, _selectedMachineName);
             return;
         }
 
-        // Mỗi message thành một dòng có thời gian/người gửi; sau đó cuộn tới cuối để
-        // tin mới nhất luôn nằm trong vùng nhìn thấy.
-        foreach (AdminChatMessage message in history)
-        {
-            _chatHistoryPanel.Controls.Add(CreateChatMessagePanel(message));
-        }
-
-        ResizeChatHistoryItems();
-        if (_chatHistoryPanel.Controls.Count > 0)
-        {
-            _chatHistoryPanel.ScrollControlIntoView(_chatHistoryPanel.Controls[^1]);
-        }
+        txtChatHistory.Text = string.Join(
+            Environment.NewLine,
+            history.Select(FormatChatMessage));
+        txtChatHistory.SelectionStart = txtChatHistory.TextLength;
+        txtChatHistory.ScrollToCaret();
     }
 
     // Định dạng duy nhất cho cả tin server gửi và tin client gửi vào lịch sử.

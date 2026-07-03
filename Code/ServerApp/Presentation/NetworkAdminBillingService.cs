@@ -248,7 +248,8 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return await PublishAsync(
             BillingCalculator.BuildSyncSession(active.Session.Session, DateTimeOffset.UtcNow),
             $"Topped up {amountVnd:N0} VND.",
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            unlockWhenAvailable: true).ConfigureAwait(false);
     }
 
     public async Task<AdminBillingResult?> SyncMachineAsync(
@@ -352,7 +353,8 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
     private async Task<AdminBillingResult> PublishAsync(
         BillingSyncSession sync,
         string message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool unlockWhenAvailable = false)
     {
         TimerPayload payload = await ToTimerPayloadAsync(sync, cancellationToken).ConfigureAwait(false);
         string machineId = payload.MachineId;
@@ -374,7 +376,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             }
             else if (!payload.ShouldLockNow
                 && sync.Session.Session.State == BillingSessionState.Active
-                && _lockSentForBillingSessions.Remove(sync.Session.Session.Id))
+                && (_lockSentForBillingSessions.Remove(sync.Session.Session.Id) || unlockWhenAvailable))
             {
                 await _networkServer.SendMachineCommandWithResultAsync(
                     machineId,

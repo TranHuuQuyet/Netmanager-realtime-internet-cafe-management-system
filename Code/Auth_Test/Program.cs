@@ -5,6 +5,7 @@ using ServerApp.Auth.Services;
 using ServerApp.Billing.Models;
 using ServerApp.Database;
 using ServerApp.Database.Models;
+using ServerApp.Presentation;
 
 Batteries_V2.Init();
 
@@ -19,22 +20,28 @@ await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
+await AssertRoleMismatchAsync(runtime);
+await AssertUnknownMachineAsync();
 await AssertLegacyMachineIdMigrationAsync();
 await AssertSeedBootstrapResetsStaleMachineStatusAsync();
 await AssertCommandGuardAsync(runtime);
 await AssertR4DistinctClientsAsync();
 await AssertBillingRecoverySnapshotAsync();
+await AssertAutoOpenEndedBillingAsync();
 
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
 Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01");
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
+Console.WriteLine("PASS TC-A08: role mismatch returns INVALID_CREDENTIALS");
+Console.WriteLine("PASS TC-A09: unknown machine ID returns INVALID_MACHINE_ID");
 Console.WriteLine("PASS G2-05: legacy hyphenated machine IDs migrate to canonical PCXX");
 Console.WriteLine("PASS G2-06: server startup resets stale machine status to Offline");
 Console.WriteLine("PASS R3-A01: command guard accepts active target and rejects inactive target");
 Console.WriteLine("PASS R4-N01: two authenticated clients stay distinct and duplicate active login is rejected");
 Console.WriteLine("PASS R4-R01: billing recovery snapshot restores active billing with timer state");
+Console.WriteLine("PASS R5-B04: client online auto-starts open-ended billing and repeated sync is idempotent");
 
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
@@ -95,6 +102,34 @@ static async Task AssertWrongMachineAsync(AuthRuntime runtime)
         new AuthRequest("client01", "123", "PC02", UserRole.Client));
 
     AssertFailure(result, AuthStatus.AccountMachineMismatch, "ACCOUNT_MACHINE_MISMATCH", "G2-04");
+}
+
+static async Task AssertRoleMismatchAsync(AuthRuntime runtime)
+{
+    var result = await runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC01", UserRole.Admin));
+
+    AssertFailure(result, AuthStatus.RoleMismatch, "INVALID_CREDENTIALS", "TC-A08");
+}
+
+static async Task AssertUnknownMachineAsync()
+{
+    AuthRuntime runtime = await AuthBootstrapper.CreateAsync(PrepareScratchDatabasePath("Netmanager-TC-A09-UnknownMachine"));
+    ServerApp.Database.Models.PasswordHash runtimePasswordHash = ServerApp.Database.PasswordHasher.Hash("123");
+    await runtime.Users.AddAsync(new UserRecord(
+        "user-missing-machine",
+        "missingmachine",
+        runtimePasswordHash.SaltBase64,
+        runtimePasswordHash.HashBase64,
+        UserRole.Client,
+        "PC99",
+        true,
+        null));
+
+    var result = await runtime.Auth.AuthenticateAsync(
+        new AuthRequest("missingmachine", "123", "PC99", UserRole.Client));
+
+    AssertFailure(result, AuthStatus.InvalidMachineId, "INVALID_MACHINE_ID", "TC-A09");
 }
 
 static async Task AssertLegacyMachineIdMigrationAsync()
@@ -381,6 +416,51 @@ static async Task AssertBillingRecoverySnapshotAsync()
 
     await billing.CloseSessionAsync(openEnded.Session.Session.Id, DateTimeOffset.UtcNow);
     await authRuntime.SessionService.CloseSessionAsync(login.Session.Id);
+}
+
+static async Task AssertAutoOpenEndedBillingAsync()
+{
+    string billingDbPath = PrepareScratchDatabasePath("Netmanager-R5-B04-AutoBilling");
+    AuthRuntime authRuntime = await AuthBootstrapper.CreateAsync(billingDbPath);
+
+    var login = await authRuntime.Auth.AuthenticateAsync(
+        new AuthRequest("client01", "123", "PC01", UserRole.Client));
+    if (!login.IsSuccess || login.Session is null)
+    {
+        throw new InvalidOperationException("R5-B04 expected client01 to login before auto billing.");
+    }
+
+    var adminBilling = new NetworkAdminBillingService(
+        authRuntime.Billing,
+        authRuntime.SessionRepository,
+        networkServer: null);
+
+    AdminBillingResult opened = await adminBilling.EnsureOpenEndedAsync("PC01");
+    if (!opened.IsSuccess
+        || opened.Timer is null
+        || opened.Timer.RentalMode != BillingRentalMode.OpenEnded.ToString()
+        || opened.Timer.RemainingSeconds is not null
+        || opened.Timer.AmountVnd <= 0)
+    {
+        throw new InvalidOperationException("R5-B04 expected online client to auto-start open-ended billing.");
+    }
+
+    AdminBillingResult synced = await adminBilling.EnsureOpenEndedAsync("PC01");
+    if (!synced.IsSuccess
+        || synced.Timer is null
+        || synced.Timer.RentalMode != BillingRentalMode.OpenEnded.ToString()
+        || synced.Timer.ExpiresAt is not null)
+    {
+        throw new InvalidOperationException("R5-B04 expected repeated online sync to reuse the active billing session.");
+    }
+
+    AdminBillingResult closed = await adminBilling.CloseAsync("PC01");
+    if (!closed.IsSuccess
+        || closed.Timer is null
+        || closed.Timer.Status != BillingSessionState.Closed.ToString())
+    {
+        throw new InvalidOperationException("R5-B04 expected auto billing to close when client session ends.");
+    }
 }
 
 static void AssertSuccess(AuthResult result, AuthStatus expectedStatus, string username)

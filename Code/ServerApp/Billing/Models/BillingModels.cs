@@ -78,7 +78,7 @@ public static class BillingCalculator
         }
 
         double elapsedSeconds = (asOfUtc - startedAtUtc).TotalSeconds;
-        long chargedMinutes = (long)Math.Ceiling(elapsedSeconds / 60.0);
+        long chargedMinutes = (long)Math.Floor(elapsedSeconds / 60.0);
         long amountVnd = (long)Math.Ceiling(chargedMinutes * ratePerHour / 60.0);
 
         return new BillingCalculation(

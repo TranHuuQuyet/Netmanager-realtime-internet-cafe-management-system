@@ -159,16 +159,9 @@ static void ClearTraces(List<NetworkTraceEntry> traces)
 static async Task AssertClientConnectsAsync(int port)
 {
     using var tcpClient = new TcpClient();
-    try
-    {
-        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
-        WriteCasePass("TC-N02", "Connection succeeds without UI or server freeze.");
-    }
-    catch (Exception ex)
-    {
-        throw new InvalidOperationException($"Client failed to connect to server on port {port}: {ex.Message}", ex);
-    }
     await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+    WriteCasePass("TC-N02", "Connection succeeds without UI or server freeze.");
+
 }
 
 static async Task AssertAdminUiLockUnlockCommandTraceAsync(

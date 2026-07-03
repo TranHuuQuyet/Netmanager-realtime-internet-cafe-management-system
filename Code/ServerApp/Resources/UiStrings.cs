@@ -1,17 +1,22 @@
 using System.Globalization;
 using System.Resources;
 
+// Namespace goc cua ServerApp.
 namespace ServerApp;
 
+// Lop gom cac chuoi hien thi UI, co fallback neu resource file khong co key.
 internal static class UiStrings
 {
+    // ResourceManager doc chuoi tu file resource ServerApp.UiStrings neu duoc build kem app.
     private static readonly ResourceManager ResourceManager = new("ServerApp.UiStrings", typeof(UiStrings).Assembly);
 
+    // Lay chuoi theo ten; neu khong tim thay thi dung fallback viet san trong code.
     private static string Get(string name, string fallback)
     {
         return ResourceManager.GetString(name, CultureInfo.CurrentUICulture) ?? fallback;
     }
 
+    // Cac property ben duoi la key chuoi UI dung trong LoginForm/MainForm.
     public static string LoginTitle => Get(nameof(LoginTitle), "ĐĂNG NHẬP MÁY CHỦ");
     public static string LoginUsernameLabel => Get(nameof(LoginUsernameLabel), "Tài khoản");
     public static string LoginPasswordLabel => Get(nameof(LoginPasswordLabel), "Mật khẩu");

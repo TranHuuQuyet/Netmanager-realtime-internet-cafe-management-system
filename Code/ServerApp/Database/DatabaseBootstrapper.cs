@@ -6,12 +6,16 @@ using ServerApp.Database.Contracts;
 using ServerApp.Database.Entities;
 using ServerApp.Database.Models;
 
+// Namespace cua tang Database.
 namespace ServerApp.Database;
 
+// Lop khoi tao SQLite database, seed du lieu mac dinh va tao cac repository runtime.
 public static class DatabaseBootstrapper
 {
+    // Tao database runtime day du cho app.
     public static async Task<DatabaseRuntime> CreateAsync(string? databasePath = null, CancellationToken cancellationToken = default)
     {
+        // Khoi tao SQLitePCL, tao schema, migrate du lieu cu, roi tao repository.
         Batteries_V2.Init();
 
         var store = new DatabaseStore(databasePath);
@@ -30,6 +34,7 @@ public static class DatabaseBootstrapper
         return new DatabaseRuntime(users, sessions, machines, billingSessions, customers);
     }
 
+    // Chuyen cac ma may cu dang PC-01/PC-02 ve dang chuan PC01/PC02.
     private static async Task MigrateLegacyMachineIdsAsync(DatabaseStore store, CancellationToken cancellationToken)
     {
         foreach ((string Legacy, string Canonical) mapping in LegacyMachineIdMappings)
@@ -91,6 +96,7 @@ public static class DatabaseBootstrapper
         }
     }
 
+    // Chay mot cau SQL migration co tham so Legacy/Canonical.
     private static async Task ExecuteMachineIdMigrationAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -107,6 +113,7 @@ public static class DatabaseBootstrapper
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Bang map ma may cu sang ma may chuan.
     private static readonly IReadOnlyList<(string Legacy, string Canonical)> LegacyMachineIdMappings =
         new List<(string Legacy, string Canonical)>
         {
@@ -114,10 +121,13 @@ public static class DatabaseBootstrapper
             new(CreateLegacyMachineId("02"), "PC02")
         };
 
+    // Dau phan cach trong ma may cu.
     private const string LegacyMachineSeparator = "-";
 
+    // Tao ma may cu theo suffix.
     private static string CreateLegacyMachineId(string suffix) => $"PC{LegacyMachineSeparator}{suffix}";
 
+    // Danh sach user seed mac dinh.
     private static IReadOnlyList<SeedAccount> BuildSeedUsers()
         => new List<SeedAccount>
         {
@@ -126,6 +136,7 @@ public static class DatabaseBootstrapper
             new("client02", "123", "PC02", UserRole.Client, true)
         };
 
+    // Chen hoac cap nhat user seed vao database.
     private static async Task SeedUsersAsync(SqliteUserRepository users, CancellationToken cancellationToken)
     {
         foreach (var seed in BuildSeedUsers())
@@ -143,6 +154,7 @@ public static class DatabaseBootstrapper
         }
     }
 
+    // Chen hoac cap nhat may seed vao database.
     private static async Task SeedMachinesAsync(SqliteMachineRepository machines, CancellationToken cancellationToken)
     {
         foreach (var machine in BuildSeedMachines())
@@ -151,9 +163,11 @@ public static class DatabaseBootstrapper
         }
     }
 
+    // Lay danh sach may seed tu SeedData.
     private static IReadOnlyList<MachineEntity> BuildSeedMachines()
         => SeedData.Machines;
 
+    // Tao UserRecord tu SeedAccount, gom ca hash mat khau.
     private static UserRecord CreateUserRecord(SeedAccount seed)
     {
         var hash = PasswordHasher.Hash(seed.Password);
@@ -169,6 +183,7 @@ public static class DatabaseBootstrapper
             null);
     }
 
+    // Tao Guid on dinh tu chuoi de seed lap lai van cung Id.
     private static Guid StableGuid(string value)
     {
         var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
@@ -176,17 +191,21 @@ public static class DatabaseBootstrapper
     }
 }
 
+// Lop quan ly connection string va schema SQLite.
 internal sealed class DatabaseStore
 {
     private readonly string _connectionString;
 
+    // Constructor tao connection string tu duong dan database.
     public DatabaseStore(string? databasePath = null)
     {
         _connectionString = $"Data Source={ResolveDatabasePath(databasePath)}";
     }
 
+    // Tao connection moi moi khi repository can thao tac database.
     public SqliteConnection CreateConnection() => new(_connectionString);
 
+    // Mo database va chay schema script.
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = CreateConnection();
@@ -197,6 +216,7 @@ internal sealed class DatabaseStore
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    // Giai quyet duong dan database thanh absolute path.
     private static string ResolveDatabasePath(string? databasePath)
     {
         var options = new DatabaseOptions();
@@ -209,6 +229,7 @@ internal sealed class DatabaseStore
         return Path.GetFullPath(Path.Combine(ResolveRepositoryRoot(), path));
     }
 
+    // Tim thu muc goc repo de dat file database dung vi tri khi app chay tu bin.
     private static string ResolveRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -228,6 +249,7 @@ internal sealed class DatabaseStore
         return AppContext.BaseDirectory;
     }
 
+    // Lay SQL schema tu file neu co, neu khong dung chuoi fallback trong code.
     private static string GetSchemaScript()
     {
         var schemaPath = Path.Combine(AppContext.BaseDirectory, "Database", "DatabaseSchema.sql");

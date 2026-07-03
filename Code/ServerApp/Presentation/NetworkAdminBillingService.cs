@@ -6,21 +6,28 @@ using ServerApp.Networking;
 using Shared.Enums;
 using Shared.DTOs.CommandPayloads;
 
+// Namespace cua tang Presentation: noi UI admin voi service billing va network.
 namespace ServerApp.Presentation;
 
+// Service billing danh cho admin, co them kha nang gui timer/lock/unlock qua network.
 public sealed class NetworkAdminBillingService : IAdminBillingService
 {
+    // Cau hinh mac dinh cho tinh tien va cac quy uoc he thong.
     private const long DefaultRatePerHour = 10_000;
     private const string ServerMachineId = "PC00";
     private const string CustomerAuthUserIdPrefix = "customer-";
     private static readonly TimeSpan WarningWindow = TimeSpan.FromMinutes(5);
 
+    // Cac dependency chinh: billing service, session repository, network server va customer store.
     private readonly IBillingService _billing;
     private readonly ISessionRepository _sessions;
     private readonly TcpJsonLineServer? _networkServer;
     private readonly ICustomerRepository? _customers;
+
+    // Ghi nho billing session nao da gui lenh lock de tranh gui lap lai lien tuc.
     private readonly HashSet<string> _lockSentForBillingSessions = new(StringComparer.OrdinalIgnoreCase);
 
+    // Constructor nhan cac dependency can thiet.
     public NetworkAdminBillingService(
         IBillingService billing,
         ISessionRepository sessions,
@@ -33,8 +40,10 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         _customers = customers;
     }
 
+    // Event de UI biet billing cua may vua thay doi.
     public event Action<AdminBillingResult>? BillingUpdated;
 
+    // Bat dau phien billing co thoi luong co dinh.
     public async Task<AdminBillingResult> StartTimedAsync(
         string machineId,
         int durationMinutes,
@@ -62,6 +71,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Bat dau phien billing khong co gio ket thuc.
     public async Task<AdminBillingResult> StartOpenEndedAsync(
         string machineId,
         long ratePerHour = DefaultRatePerHour,
@@ -82,6 +92,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Neu may da co billing active thi dong bo lai; neu chua co thi mo phien open-ended.
     public async Task<AdminBillingResult> EnsureOpenEndedAsync(
         string machineId,
         long ratePerHour = DefaultRatePerHour,
@@ -115,6 +126,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Gia han billing dang active cua may.
     public async Task<AdminBillingResult> ExtendAsync(
         string machineId,
         int extensionMinutes,
@@ -159,6 +171,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Dong billing session dang active cua may.
     public async Task<AdminBillingResult> CloseAsync(
         string machineId,
         CancellationToken cancellationToken = default)
@@ -197,6 +210,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return await PublishAsync(sync, "Billing session closed.", cancellationToken).ConfigureAwait(false);
     }
 
+    // Nap tien vao tai khoan khach dang dung may, sau do dong bo lai timer va unlock neu can.
     public async Task<AdminBillingResult> TopUpMachineAsync(
         string machineId,
         long amountVnd,
@@ -252,6 +266,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             unlockWhenAvailable: true).ConfigureAwait(false);
     }
 
+    // Dong bo lai timer cho mot may neu may co billing session active.
     public async Task<AdminBillingResult?> SyncMachineAsync(
         string machineId,
         CancellationToken cancellationToken = default)
@@ -278,6 +293,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Quet tat ca billing session active va gui lai timer cho cac client.
     public async Task<IReadOnlyList<AdminBillingResult>> RefreshActiveSessionsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -299,6 +315,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return results;
     }
 
+    // Ham dung chung de mo billing session moi.
     private async Task<AdminBillingResult> OpenAsync(
         string targetMachineId,
         BillingRentalMode mode,
@@ -350,6 +367,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
             cancellationToken).ConfigureAwait(false);
     }
 
+    // Gui TimerPayload qua network, tu dong lock/unlock may khi trang thai billing yeu cau.
     private async Task<AdminBillingResult> PublishAsync(
         BillingSyncSession sync,
         string message,
@@ -392,6 +410,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return result;
     }
 
+    // Tao ket qua loi va phat event cho UI.
     private AdminBillingResult Error(string machineId, string errorCode, string message)
     {
         var result = AdminBillingResult.ControlledError(machineId, errorCode, message);
@@ -399,6 +418,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return result;
     }
 
+    // Chuyen BillingSyncSession thanh TimerPayload de gui qua network cho client.
     private async Task<TimerPayload> ToTimerPayloadAsync(
         BillingSyncSession sync,
         CancellationToken cancellationToken)
@@ -433,6 +453,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         };
     }
 
+    // Lay thong tin so du cua khach va tinh so giay su dung con lai theo so tien da nap.
     private async Task<BalanceSnapshot?> GetBalanceSnapshotAsync(
         BillingSessionRecord session,
         BillingCalculation calculation,
@@ -458,6 +479,7 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return new BalanceSnapshot(customer.AccountBalance, remainingBalance, remainingUsageSeconds);
     }
 
+    // Tach customerId tu userId co dang "customer-...".
     private static bool TryGetCustomerId(string userId, out string customerId)
     {
         customerId = string.Empty;
@@ -470,14 +492,18 @@ public sealed class NetworkAdminBillingService : IAdminBillingService
         return customerId.Length > 0;
     }
 
+    // Chuan hoa ma may: null thanh chuoi rong va cat khoang trang.
     private static string NormalizeMachineId(string? machineId)
         => machineId?.Trim() ?? string.Empty;
 
+    // Don gia <= 0 se quay ve don gia mac dinh.
     private static long NormalizeRatePerHour(long ratePerHour)
         => ratePerHour <= 0 ? DefaultRatePerHour : ratePerHour;
 
+    // PC00 la may server nen khong tinh tien nhu may client.
     private static bool IsServerMachine(string? machineId)
         => string.Equals(machineId?.Trim(), ServerMachineId, StringComparison.OrdinalIgnoreCase);
 
+    // Snapshot so du ngan gon dung khi tao TimerPayload.
     private sealed record BalanceSnapshot(long TotalBalanceVnd, long RemainingBalanceVnd, long RemainingUsageSeconds);
 }

@@ -7,14 +7,19 @@ using ServerApp.Database;
 using ServerApp.Database.Models;
 using ServerApp.Presentation;
 
+// Chuong trinh console smoke test cho auth/database/billing.
+// Neu mot assert that bai, test se nem exception va dung chuong trinh.
 Batteries_V2.Init();
 
+// Dinh dang ma may cu co dau gach ngang, dung de test migration ve PC01/PC02.
 const string LegacyMachineSeparator = "-";
 
+// Tao database tam va khoi tao runtime can test.
 var dbPath = PrepareScratchDatabasePath();
 DatabaseRuntime database = await DatabaseBootstrapper.CreateAsync(dbPath);
 AuthRuntime runtime = await AuthBootstrapper.CreateAsync(dbPath);
 
+// Chay lan luot cac test chinh cua auth, seed data, command guard va billing recovery.
 await AssertCanonicalSeedAsync(database, dbPath);
 await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
@@ -29,6 +34,7 @@ await AssertR4DistinctClientsAsync();
 await AssertBillingRecoverySnapshotAsync();
 await AssertAutoOpenEndedBillingAsync();
 
+// Neu chay den day nghia la tat ca assert da pass.
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
 Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01");

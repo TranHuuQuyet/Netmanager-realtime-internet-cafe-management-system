@@ -6,6 +6,8 @@ using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 
+// File nay hien dang chua handler command runtime cua ClientApp trong project ContractSmoke.
+// Comment duoc them de nguoi moi hoc C# biet day la luong nhan packet va phat event theo command.
 namespace ClientApp.Networking;
 
 public sealed class ClientRuntimeCommandHandler : IDisposable

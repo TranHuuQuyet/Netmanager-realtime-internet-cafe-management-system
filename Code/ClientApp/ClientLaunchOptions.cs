@@ -1,24 +1,32 @@
+// Namespace goc cua ung dung client.
 namespace ClientApp;
 
+// Cau hinh khoi dong client: ma may, dia chi server va cong server.
 public sealed record ClientLaunchOptions(string MachineId, string ServerHost, int ServerPort)
 {
+    // Gia tri mac dinh neu nguoi dung khong truyen tham so dong lenh.
     public const string DefaultMachineId = "PC-01";
     public const string DefaultServerHost = "127.0.0.1";
     public const int DefaultServerPort = 5000;
 
+    // Doi tuong options mac dinh.
     public static ClientLaunchOptions Default { get; } =
         new(DefaultMachineId, DefaultServerHost, DefaultServerPort);
 
+    // Doc tham so dong lenh thanh ClientLaunchOptions.
+    // Ho tro dang "--machine-id PC01" va "--machine-id=PC01".
     public static bool TryParse(string[] args, out ClientLaunchOptions options, out string error)
     {
         string machineId = Default.MachineId;
         string serverHost = Default.ServerHost;
         int serverPort = Default.ServerPort;
 
+        // Duyet tung tham so va lay gia tri tuong ung.
         for (int index = 0; index < args.Length; index++)
         {
             string argument = args[index];
 
+            // Neu tham so khong thuoc 3 option duoc ho tro thi bao loi.
             if (!TryGetValue(args, ref index, argument, "--machine-id", out string? value)
                 && !TryGetValue(args, ref index, argument, "--server-host", out value)
                 && !TryGetValue(args, ref index, argument, "--server-port", out value))
@@ -28,6 +36,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
                 return false;
             }
 
+            // Gan gia tri vao bien cau hinh tuong ung.
             if (MatchesOption(argument, "--machine-id"))
             {
                 machineId = value!;
@@ -44,6 +53,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
             }
         }
 
+        // Chuan hoa chuoi va validate cac gia tri bat buoc.
         machineId = machineId.Trim();
         serverHost = serverHost.Trim();
 
@@ -66,6 +76,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
         return true;
     }
 
+    // Lay gia tri cua mot option dong lenh.
     private static bool TryGetValue(
         string[] args,
         ref int index,
@@ -73,6 +84,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
         string optionName,
         out string? value)
     {
+        // Dang "--option value".
         if (string.Equals(argument, optionName, StringComparison.OrdinalIgnoreCase))
         {
             if (index + 1 >= args.Length
@@ -86,6 +98,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
             return true;
         }
 
+        // Dang "--option=value".
         string prefix = $"{optionName}=";
         if (argument.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -97,6 +110,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
         return false;
     }
 
+    // Kiem tra argument co phai option can xu ly khong.
     private static bool MatchesOption(string argument, string optionName) =>
         string.Equals(argument, optionName, StringComparison.OrdinalIgnoreCase)
         || argument.StartsWith($"{optionName}=", StringComparison.OrdinalIgnoreCase);

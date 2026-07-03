@@ -76,6 +76,7 @@ try
     await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
     await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages, commandResults);
     await AssertBillingTimerRoutingAsync(port, authRuntime, server);
+    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
     await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
@@ -584,6 +585,153 @@ static async Task AssertBillingTimerRoutingAsync(
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc01SessionId);
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc02SessionId);
     Console.WriteLine("PASS: billing TIMER route supports timed warning, open-ended, extend/close, expiry LOCK and STATUS resync");
+}
+
+static async Task AssertTopUpRequestFlowAsync(
+    int port,
+    AuthRuntime authRuntime,
+    TcpJsonLineServer server,
+    List<NetworkTraceEntry> traces)
+{
+    const string customerId = "topup-customer-01";
+    const string username = "topup01";
+    const string machineId = "PC01";
+    const long topUpAmount = 10_000;
+
+    await authRuntime.Customers.AddAsync(new CustomerRecord(
+        customerId,
+        "Top",
+        "Up",
+        "0900000001",
+        "ID-TOPUP-01",
+        "2000-01-01",
+        username,
+        "123",
+        AccountBalance: 0));
+
+    if (!ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, $"{machineId} yêu cầu nạp {topUpAmount:N0} VND", DateTimeOffset.Now),
+            out long parsedAmount)
+        || parsedAmount != topUpAmount)
+    {
+        throw new InvalidOperationException("Top-up parser did not accept the expected client request format.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage("PC00", "PC00", $"PC00 yêu cầu nạp {topUpAmount} VND", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore server machine PC00.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, $"PC02 yêu cầu nạp {topUpAmount} VND", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore requests whose message machine differs from sender.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, "Tin nhan chat binh thuong", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore normal chat messages.");
+    }
+
+    var billingService = new NetworkAdminBillingService(
+        authRuntime.Billing,
+        authRuntime.SessionRepository,
+        server,
+        authRuntime.Customers);
+
+    using var pc01Client = new TcpClient();
+    await pc01Client.ConnectAsync(IPAddress.Loopback, port);
+    await using NetworkStream pc01Stream = pc01Client.GetStream();
+    using var pc01Reader = new StreamReader(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    await using var pc01Writer = new StreamWriter(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+
+    Packet<LoginPayload> login = CreateClientLoginPacket(username, machineId, "123");
+    string sessionId = AssertClientLoginSuccess(
+        login,
+        await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, login),
+        username,
+        machineId);
+
+    AdminBillingResult opened = await billingService.StartOpenEndedAsync(machineId);
+    if (!opened.IsSuccess)
+    {
+        throw new InvalidOperationException($"Top-up billing setup failed: {opened.ErrorCode} {opened.Message}");
+    }
+
+    Packet<TimerPayload> emptyBalanceTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 empty-balance TIMER");
+    if (!emptyBalanceTimer.TypedPayload.ShouldLockNow
+        || emptyBalanceTimer.TypedPayload.RemainingBalanceVnd != 0)
+    {
+        throw new InvalidOperationException("Empty-balance TIMER did not request lock before top-up.");
+    }
+
+    Packet initialLock = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, initialLock, machineId, "Success", "Empty balance lock applied.");
+
+    using var mainForm = new ServerApp.MainForm(authRuntime.Machines, server, billingService, authRuntime.Customers);
+
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, 5_000, DialogResult.No);
+    Packet<TimerPayload> rejectedEmptyTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 rejected empty-balance TIMER");
+    if (!rejectedEmptyTimer.TypedPayload.ShouldLockNow
+        || rejectedEmptyTimer.TypedPayload.RemainingUsageSeconds != 0)
+    {
+        throw new InvalidOperationException("Rejected empty-balance top-up should keep billing countdown depleted.");
+    }
+
+    Packet rejectedEmptyLock = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, rejectedEmptyLock, machineId, "Success", "Rejected empty-balance lock applied.");
+
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, topUpAmount, DialogResult.Yes);
+
+    CustomerRecord updatedCustomer = await authRuntime.Customers.GetByIdAsync(customerId)
+        ?? throw new InvalidOperationException("Top-up customer was not found after confirm.");
+    if (updatedCustomer.AccountBalance != topUpAmount)
+    {
+        throw new InvalidOperationException(
+            $"Top-up confirm should add {topUpAmount}, got balance {updatedCustomer.AccountBalance}.");
+    }
+
+    Packet<TimerPayload> topUpTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 top-up TIMER");
+    if (topUpTimer.TypedPayload.ShouldLockNow
+        || topUpTimer.TypedPayload.TotalBalanceVnd != topUpAmount
+        || topUpTimer.TypedPayload.RemainingBalanceVnd is null
+        || topUpTimer.TypedPayload.RemainingBalanceVnd <= 0
+        || topUpTimer.TypedPayload.RemainingUsageSeconds is null
+        || topUpTimer.TypedPayload.RemainingUsageSeconds <= 0)
+    {
+        throw new InvalidOperationException("Top-up TIMER did not expose updated balance/time state.");
+    }
+
+    Packet unlockCommand = await AssertCommandReceivedAsync(pc01Reader, PacketType.UNLOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, unlockCommand, machineId, "Success", "Top-up unlock applied.");
+
+    int lockCountBeforePositiveReject = CountCommandTraces(traces, PacketType.LOCK, machineId);
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, 5_000, DialogResult.No);
+    Packet<TimerPayload> rejectedPositiveTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 rejected positive-balance TIMER");
+    if (rejectedPositiveTimer.TypedPayload.ShouldLockNow
+        || rejectedPositiveTimer.TypedPayload.RemainingUsageSeconds is null
+        || rejectedPositiveTimer.TypedPayload.RemainingUsageSeconds <= 0)
+    {
+        throw new InvalidOperationException("Rejected positive-balance top-up should keep money-based countdown available.");
+    }
+
+    await AssertCommandTraceCountUnchangedAsync(
+        traces,
+        PacketType.LOCK,
+        machineId,
+        lockCountBeforePositiveReject,
+        "Rejected positive-balance top-up must not send LOCK.");
+
+    TryShutdown(pc01Client);
+    Console.WriteLine("PASS: top-up request parser, confirm balance update/unlock and money-based reject lock flow");
 }
 
 static async Task<AdminBillingResult> OpenExpiredBillingAsync(AuthRuntime authRuntime, SessionRecord session)
@@ -1261,6 +1409,37 @@ static async Task WaitForCommandTraceAsync(List<NetworkTraceEntry> traces, Packe
     }
 
     throw new InvalidOperationException($"{commandType} command JSON trace for {machineId} was not emitted.");
+}
+
+static async Task AssertCommandTraceCountUnchangedAsync(
+    List<NetworkTraceEntry> traces,
+    PacketType commandType,
+    string machineId,
+    int expectedCount,
+    string failureMessage)
+{
+    await Task.Delay(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+    int actualCount = CountCommandTraces(traces, commandType, machineId);
+    if (actualCount != expectedCount)
+    {
+        throw new InvalidOperationException($"{failureMessage} Expected {expectedCount}, got {actualCount}.");
+    }
+}
+
+static int CountCommandTraces(List<NetworkTraceEntry> traces, PacketType commandType, string machineId)
+{
+    NetworkTraceEntry[] snapshot;
+    lock (traces)
+    {
+        snapshot = [.. traces];
+    }
+
+    string typeNeedle = $"\"type\":\"{commandType}\"";
+    string machineNeedle = $"\"machineId\":\"{machineId}\"";
+    return snapshot.Count(trace =>
+        string.Equals(trace.Direction, "OUT_COMMAND", StringComparison.Ordinal)
+        && trace.Message.Contains(typeNeedle, StringComparison.OrdinalIgnoreCase)
+        && trace.Message.Contains(machineNeedle, StringComparison.OrdinalIgnoreCase));
 }
 
 static async Task WaitForCommandAckTraceAsync(

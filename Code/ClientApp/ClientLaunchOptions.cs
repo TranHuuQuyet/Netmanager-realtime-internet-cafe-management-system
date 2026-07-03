@@ -1,11 +1,3 @@
-using System.Text.Json;
-using Shared.DTOs.Bidrectional;
-using Shared.DTOs.CommandPayloads;
-using Shared.DTOs.RequestPayloads;
-using Shared.Networking;
-using Shared.Packets;
-using Shared.Utilities.JsonHelper;
-
 namespace ClientApp;
 
 public sealed record ClientLaunchOptions(string MachineId, string ServerHost, int ServerPort)
@@ -17,7 +9,7 @@ public sealed record ClientLaunchOptions(string MachineId, string ServerHost, in
     public static ClientLaunchOptions Default { get; } =
         new(DefaultMachineId, DefaultServerHost, DefaultServerPort);
 
-     public static bool TryParse(string[] args, out ClientLaunchOptions options, out string error)
+    public static bool TryParse(string[] args, out ClientLaunchOptions options, out string error)
     {
         string machineId = Default.MachineId;
         string serverHost = Default.ServerHost;

@@ -12,6 +12,8 @@ namespace ClientApp.Forms;
 
 public partial class ConnectForm : Form
 {
+    private const string MachinePrefix = "PC";
+
     // Cấu hình khởi chạy chứa host/port server và MachineId mặc định từ Program.
     private readonly ClientLaunchOptions _launchOptions;
 
@@ -19,19 +21,23 @@ public partial class ConnectForm : Form
     // kết nối tạm được giữ trong biến local để dễ Dispose khi có lỗi.
     private TcpClientConnection? _connection;
 
-    // Dựng control từ Designer và điền sẵn mã máy theo tùy chọn khởi chạy.
+    // Dựng control từ Designer. Mã máy để trống để người dùng tự nhập đúng PC cần chạy.
     public ConnectForm(ClientLaunchOptions launchOptions)
     {
-        // Form không thể hoạt động nếu thiếu endpoint/mã máy đầu vào.
+        // Form không thể hoạt động nếu thiếu endpoint đầu vào.
         _launchOptions = launchOptions ?? throw new ArgumentNullException(nameof(launchOptions));
 
         InitializeComponent();
-        txtMachineId.Text = _launchOptions.MachineId;
-        txtMachineId.ReadOnly = true;
-        txtMachineId.TabStop = false;
-        txtMachineId.BackColor = SystemColors.Control;
-        Text = $"Client login - {_launchOptions.MachineId}";
-        lblTitle.Text = $"CLIENT LOGIN - {_launchOptions.MachineId}";
+        txtMachineId.Text = MachinePrefix;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
+        txtMachineId.TextChanged += TxtMachineId_TextChanged;
+        txtMachineId.Leave += TxtMachineId_Leave;
+        txtMachineId.ReadOnly = false;
+        txtMachineId.TabStop = true;
+        txtMachineId.BackColor = SystemColors.Window;
+        txtMachineId.PlaceholderText = "Nhap so may, VD: 01 -> PC01";
+        Text = "Client login";
+        lblTitle.Text = "CLIENT LOGIN";
     }
 
     // Kiểm tra dữ liệu đầu vào, mở TCP, gửi LOGIN và chỉ chuyển sang ClientMainForm
@@ -46,7 +52,9 @@ public partial class ConnectForm : Form
         // một phần hợp lệ của mật khẩu.
         string username = txtUsername.Text.Trim();
         string password = txtPassword.Text;
-        string machineId = txtMachineId.Text.Trim();
+        string machineId = NormalizeMachineId(txtMachineId.Text);
+        txtMachineId.Text = string.IsNullOrWhiteSpace(machineId) ? MachinePrefix : machineId;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
 
         // Dừng tại trường sai đầu tiên và đưa focus về đúng control để người dùng sửa.
         if (string.IsNullOrWhiteSpace(username))
@@ -63,7 +71,7 @@ public partial class ConnectForm : Form
 
         if (string.IsNullOrWhiteSpace(machineId))
         {
-            ShowValidationMessage("Vui lòng nhập mã máy.", txtMachineId);
+            ShowValidationMessage("Vui lòng nhập mã máy theo dạng số sau PC, ví dụ PC01.", txtMachineId);
             return;
         }
 
@@ -161,6 +169,83 @@ public partial class ConnectForm : Form
         focusTarget.Focus();
     }
 
+    // Giữ phần đầu "PC" cố định khi người dùng đang gõ, nhưng chưa padding số
+    // ngay lập tức để caret không bị nhảy khó chịu.
+    private void TxtMachineId_TextChanged(object? sender, EventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox != txtMachineId)
+        {
+            return;
+        }
+
+        int digitsBeforeCaret = textBox.Text
+            .Take(Math.Min(textBox.SelectionStart, textBox.TextLength))
+            .Count(char.IsDigit);
+
+        string sanitized = SanitizeMachineIdInput(textBox.Text);
+        if (string.Equals(textBox.Text, sanitized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        textBox.TextChanged -= TxtMachineId_TextChanged;
+        textBox.Text = sanitized;
+        textBox.SelectionStart = Math.Min(MachinePrefix.Length + digitsBeforeCaret, textBox.TextLength);
+        textBox.TextChanged += TxtMachineId_TextChanged;
+    }
+
+    private void TxtMachineId_Leave(object? sender, EventArgs e)
+    {
+        string normalized = NormalizeMachineId(txtMachineId.Text);
+        txtMachineId.Text = string.IsNullOrWhiteSpace(normalized) ? MachinePrefix : normalized;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
+    }
+
+    // Trong lúc nhập chỉ cho phép dạng PC + chữ số. Người dùng có thể gõ "1",
+    // "01", "PC1" hoặc paste "PC01"; control sẽ hiển thị phần hợp lệ.
+    private static string SanitizeMachineIdInput(string? rawMachineId)
+    {
+        if (string.IsNullOrWhiteSpace(rawMachineId))
+        {
+            return MachinePrefix;
+        }
+
+        string trimmed = rawMachineId.Trim();
+        string suffix = trimmed.StartsWith(MachinePrefix, StringComparison.OrdinalIgnoreCase)
+            ? trimmed[MachinePrefix.Length..]
+            : trimmed;
+
+        string digits = new(suffix.Where(char.IsDigit).ToArray());
+        return $"{MachinePrefix}{digits}";
+    }
+
+    // Chấp nhận input dạng "01", "1", "PC1" hoặc "PC01" và luôn trả ra "PC01".
+    private static string NormalizeMachineId(string? rawMachineId)
+    {
+        if (string.IsNullOrWhiteSpace(rawMachineId))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = rawMachineId.Trim();
+        string suffix = trimmed.StartsWith(MachinePrefix, StringComparison.OrdinalIgnoreCase)
+            ? trimmed[MachinePrefix.Length..]
+            : trimmed;
+
+        string digits = new string(suffix.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (!int.TryParse(digits, out int machineNumber))
+        {
+            return string.Empty;
+        }
+
+        return $"{MachinePrefix}{machineNumber:D2}";
+    }
+
     // Thực hiện một request/response LOGIN có correlation bằng RequestId. Handler tạm
     // chỉ nhận hai loại packet phản hồi LOGIN và được gỡ ngay khi request kết thúc.
     private async Task<ClientLoginAuthResult> SendLoginAsync(
@@ -253,7 +338,7 @@ public partial class ConnectForm : Form
         return authResult.ErrorCode switch
         {
             "INVALID_CREDENTIALS" => "Sai tài khoản hoặc mật khẩu.",
-            "INVALID_MACHINE_ID" => "Mã máy không hợp lệ hoặc máy chưa được đăng ký.",
+            "INVALID_MACHINE_ID" => "Mã máy không tồn tại trong hệ thống.",
             "ACCOUNT_MACHINE_MISMATCH" => "Tài khoản này không được gán cho máy đang chọn.",
             "ACCOUNT_DISABLED" => "Tài khoản hoặc máy trạm đã bị vô hiệu hóa.",
             "MACHINE_ALREADY_ACTIVE" => "Máy này đang có phiên đăng nhập khác.",

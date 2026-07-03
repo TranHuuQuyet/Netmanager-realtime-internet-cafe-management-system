@@ -7,10 +7,17 @@ public interface IAdminBillingService
     Task<AdminBillingResult> StartTimedAsync(
         string machineId,
         int durationMinutes,
+        long ratePerHour = 10_000,
         CancellationToken cancellationToken = default);
 
     Task<AdminBillingResult> StartOpenEndedAsync(
         string machineId,
+        long ratePerHour = 10_000,
+        CancellationToken cancellationToken = default);
+
+    Task<AdminBillingResult> EnsureOpenEndedAsync(
+        string machineId,
+        long ratePerHour = 10_000,
         CancellationToken cancellationToken = default);
 
     Task<AdminBillingResult> ExtendAsync(
@@ -20,6 +27,11 @@ public interface IAdminBillingService
 
     Task<AdminBillingResult> CloseAsync(
         string machineId,
+        CancellationToken cancellationToken = default);
+
+    Task<AdminBillingResult> TopUpMachineAsync(
+        string machineId,
+        long amountVnd,
         CancellationToken cancellationToken = default);
 
     Task<AdminBillingResult?> SyncMachineAsync(

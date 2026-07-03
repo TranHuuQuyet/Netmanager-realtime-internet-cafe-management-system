@@ -24,7 +24,11 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
 
     public event Action<Packet<UnlockPayload>>? UnlockRequested;
 
+    public event Action<Packet<ShutdownPayload>>? ShutdownRequested;
+
     public event Action<Packet<ChatPayload>>? ChatReceived;
+
+    public event Action<Packet<NotificationPayload>>? NotificationReceived;
 
     public event Action<Packet<TimerPayload>>? TimerReceived;
 
@@ -68,10 +72,32 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
                     }
 
                     break;
+                case Packet<ShutdownPayload> shutdownPacket:
+                    if (IsCommandForThisMachine(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target))
+                    {
+                        ShutdownRequested?.Invoke(shutdownPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            shutdownPacket,
+                            ResolveCommandMachineId(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target),
+                            "Ignored",
+                            "SHUTDOWN ignored because target machine does not match this client.");
+                    }
+
+                    break;
                 case Packet<ChatPayload> chatPacket:
                     if (IsChatForThisMachine(chatPacket.TypedPayload, chatPacket.Target))
                     {
                         ChatReceived?.Invoke(chatPacket);
+                    }
+
+                    break;
+                case Packet<NotificationPayload> notificationPacket:
+                    if (IsNotificationForThisMachine(notificationPacket.TypedPayload, notificationPacket.Target))
+                    {
+                        NotificationReceived?.Invoke(notificationPacket);
                     }
 
                     break;
@@ -110,6 +136,16 @@ public sealed class ClientRuntimeCommandHandler : IDisposable
 
         return string.Equals(receiver, _machineId, StringComparison.OrdinalIgnoreCase)
             || string.Equals(packetTarget?.Trim(), _machineId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsNotificationForThisMachine(NotificationPayload payload, string? packetTarget)
+    {
+        string target = packetTarget?.Trim() ?? string.Empty;
+        string scope = payload.Scope?.Trim() ?? string.Empty;
+
+        return string.Equals(target, _machineId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scope, "All", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scope, "Broadcast", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task SendCommandAckAsync(Packet commandPacket, string machineId, string status, string message)

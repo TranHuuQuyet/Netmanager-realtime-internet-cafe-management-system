@@ -1,199 +1,179 @@
 using System.Text.Json;
+using Shared.DTOs.Bidrectional;
 using Shared.DTOs.CommandPayloads;
 using Shared.DTOs.RequestPayloads;
-using Shared.DTOs.ResponsePayloads;
+using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 
-Run("G0-02 packet type serializes as API string", PacketTypeSerializesAsString);
-Run("G0-02 numeric packet type is rejected", NumericPacketTypeIsRejected);
-Run("G0-03 LOGIN request deserializes as request payload", LoginRequestDeserializesAsRequest);
-Run("G0-03 LOGIN request keeps response envelope fields unset", LoginRequestKeepsResponseFieldsUnset);
-Run("G0-03 LOGIN success deserializes as result payload", LoginSuccessDeserializesAsResult);
-Run("G0-04 LOGIN failure uses top-level error envelope", LoginFailureUsesErrorEnvelope);
-Run("G5-06 TIMER supports open-ended billing sync", TimerSupportsOpenEndedBillingSync);
+namespace ClientApp.Networking;
 
-Console.WriteLine("Contract smoke checks passed.");
-
-static void Run(string name, Action check)
+public sealed class ClientRuntimeCommandHandler : IDisposable
 {
-    check();
-    Console.WriteLine($"PASS {name}");
-}
+    private readonly TcpClientConnection _connection;
+    private readonly string _machineId;
 
-static void PacketTypeSerializesAsString()
-{
-    var packet = PacketFactory.CreateLogin(
-        "client01",
-        "server",
-        new LoginPayload
+    public ClientRuntimeCommandHandler(TcpClientConnection connection, string machineId)
+    {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _machineId = machineId?.Trim() ?? string.Empty;
+        _connection.MessageReceived += Connection_MessageReceived;
+    }
+
+    public event Action<Packet<LockPayload>>? LockRequested;
+
+    public event Action<Packet<UnlockPayload>>? UnlockRequested;
+
+    public event Action<Packet<ShutdownPayload>>? ShutdownRequested;
+
+    public event Action<Packet<ChatPayload>>? ChatReceived;
+
+    public event Action<Packet<NotificationPayload>>? NotificationReceived;
+
+    public event Action<Packet<TimerPayload>>? TimerReceived;
+
+    public event Action? InvalidPacketIgnored;
+
+    private void Connection_MessageReceived(string message)
+    {
+        try
         {
-            Username = "client01",
-            Password = "123",
-            Role = "Client",
-            MachineId = "PC-01"
-        },
-        "req-0001");
+            object packet = JsonHelper.DeserializePacket(message);
 
-    string json = JsonHelper.SerializeToJson(packet);
-    using var doc = JsonDocument.Parse(json);
+            switch (packet)
+            {
+                case Packet<LockPayload> lockPacket:
+                    if (IsCommandForThisMachine(lockPacket.TypedPayload.MachineId, lockPacket.Target))
+                    {
+                        LockRequested?.Invoke(lockPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            lockPacket,
+                            ResolveCommandMachineId(lockPacket.TypedPayload.MachineId, lockPacket.Target),
+                            "Ignored",
+                            "LOCK ignored because target machine does not match this client.");
+                    }
 
-    JsonElement type = doc.RootElement.GetProperty("type");
-    Assert(type.ValueKind == JsonValueKind.String, "Packet type must be serialized as a string.");
-    Assert(type.GetString() == "LOGIN", "Packet type must serialize to LOGIN.");
-}
+                    break;
+                case Packet<UnlockPayload> unlockPacket:
+                    if (IsCommandForThisMachine(unlockPacket.TypedPayload.MachineId, unlockPacket.Target))
+                    {
+                        UnlockRequested?.Invoke(unlockPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            unlockPacket,
+                            ResolveCommandMachineId(unlockPacket.TypedPayload.MachineId, unlockPacket.Target),
+                            "Ignored",
+                            "UNLOCK ignored because target machine does not match this client.");
+                    }
 
-static void NumericPacketTypeIsRejected()
-{
-    const string json = """
-        {
-          "type": 0,
-          "source": "client01",
-          "target": "server",
-          "requestId": "req-0001",
-          "timestamp": "2026-05-25T10:00:00Z",
-          "payload": {}
+                    break;
+                case Packet<ShutdownPayload> shutdownPacket:
+                    if (IsCommandForThisMachine(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target))
+                    {
+                        ShutdownRequested?.Invoke(shutdownPacket);
+                    }
+                    else
+                    {
+                        _ = SendCommandAckAsync(
+                            shutdownPacket,
+                            ResolveCommandMachineId(shutdownPacket.TypedPayload.MachineId, shutdownPacket.Target),
+                            "Ignored",
+                            "SHUTDOWN ignored because target machine does not match this client.");
+                    }
+
+                    break;
+                case Packet<ChatPayload> chatPacket:
+                    if (IsChatForThisMachine(chatPacket.TypedPayload, chatPacket.Target))
+                    {
+                        ChatReceived?.Invoke(chatPacket);
+                    }
+
+                    break;
+                case Packet<NotificationPayload> notificationPacket:
+                    if (IsNotificationForThisMachine(notificationPacket.TypedPayload, notificationPacket.Target))
+                    {
+                        NotificationReceived?.Invoke(notificationPacket);
+                    }
+
+                    break;
+                case Packet<TimerPayload> timerPacket:
+                    if (IsCommandForThisMachine(timerPacket.TypedPayload.MachineId, timerPacket.Target))
+                    {
+                        TimerReceived?.Invoke(timerPacket);
+                    }
+
+                    break;
+            }
         }
-        """;
-
-    AssertThrows(() => JsonHelper.DeserializePacket(json), "Numeric packet type should not deserialize.");
-}
-
-static void LoginRequestDeserializesAsRequest()
-{
-    string json = JsonHelper.SerializeToJson(PacketFactory.CreateLogin(
-        "client01",
-        "server",
-        new LoginPayload
+        catch (Exception ex) when (ex is InvalidDataException or FormatException or JsonException)
         {
-            Username = "client01",
-            Password = "123",
-            Role = "Client",
-            MachineId = "PC-01"
-        },
-        "req-0001"));
-
-    object packet = JsonHelper.DeserializePacket(json);
-
-    Assert(packet is Packet<LoginPayload>, "LOGIN request must deserialize as Packet<LoginPayload>.");
-}
-
-static void LoginRequestKeepsResponseFieldsUnset()
-{
-    string json = JsonHelper.SerializeToJson(PacketFactory.CreateLogin(
-        "client01",
-        "server",
-        new LoginPayload
-        {
-            Username = "client01",
-            Password = "123",
-            Role = "Client",
-            MachineId = "PC-01"
-        },
-        "req-0001"));
-
-    var packet = (Packet<LoginPayload>)JsonHelper.DeserializePacket(json);
-
-    Assert(packet.Success is null, "LOGIN request must not set success.");
-    Assert(packet.Message is null, "LOGIN request must not set message.");
-    Assert(packet.Error is null, "LOGIN request must not set error.");
-}
-
-static void LoginSuccessDeserializesAsResult()
-{
-    string json = JsonHelper.SerializeToJson(PacketFactory.CreateLoginSuccess(
-        "server",
-        "client01",
-        new LoginResultPayload
-        {
-            SessionId = "session-id",
-            Username = "client01",
-            Role = "Client",
-            MachineId = "PC-01"
-        },
-        "req-0001"));
-
-    object packet = JsonHelper.DeserializePacket(json);
-
-    Assert(packet is Packet<LoginResultPayload>, "LOGIN success must deserialize as Packet<LoginResultPayload>.");
-
-    var typedPacket = (Packet<LoginResultPayload>)packet;
-    Assert(typedPacket.Success == true, "LOGIN success response must set success true.");
-    Assert(typedPacket.TypedPayload.Username == "client01", "LOGIN success payload must include username.");
-}
-
-static void LoginFailureUsesErrorEnvelope()
-{
-    string json = JsonHelper.SerializeToJson(PacketFactory.CreateLoginFailed(
-        "server",
-        "client01",
-        "INVALID_CREDENTIALS",
-        "Username or password invalid",
-        "req-0001"));
-
-    object packet = JsonHelper.DeserializePacket(json);
-
-    Assert(packet is Packet<EmptyPayload>, "LOGIN failure must deserialize as Packet<EmptyPayload>.");
-
-    var typedPacket = (Packet<EmptyPayload>)packet;
-    Assert(typedPacket.Success == false, "LOGIN failure response must set success false.");
-    Assert(typedPacket.Error?.Code == "INVALID_CREDENTIALS", "LOGIN failure must use top-level error.code.");
-    Assert(typedPacket.Payload is EmptyPayload, "LOGIN failure payload must be empty.");
-}
-
-static void TimerSupportsOpenEndedBillingSync()
-{
-    var startedAt = DateTimeOffset.Parse("2026-06-26T01:02:03Z");
-    string json = JsonHelper.SerializeToJson(PacketFactory.CreateTimer(
-        "server",
-        "PC-01",
-        new TimerPayload
-        {
-            MachineId = "PC-01",
-            RentalMode = "OpenEnded",
-            RemainingSeconds = null,
-            StartedAt = startedAt,
-            ExpiresAt = null,
-            RatePerHour = 10_000,
-            ChargedMinutes = 2,
-            AmountVnd = 334,
-            IsWarning = false,
-            ShouldLockNow = false,
-            Status = "Active"
-        },
-        "timer-0001"));
-
-    using JsonDocument doc = JsonDocument.Parse(json);
-    JsonElement payload = doc.RootElement.GetProperty("payload");
-    Assert(payload.GetProperty("expiresAt").ValueKind == JsonValueKind.Null, "Open-ended TIMER expiresAt must be null.");
-    Assert(payload.GetProperty("remainingSeconds").ValueKind == JsonValueKind.Null, "Open-ended TIMER remainingSeconds must be null.");
-    Assert(payload.GetProperty("amountVnd").GetInt64() == 334, "TIMER must carry rounded billing amount.");
-
-    object packet = JsonHelper.DeserializePacket(json);
-    var timerPacket = packet as Packet<TimerPayload>
-        ?? throw new InvalidOperationException("TIMER must deserialize as Packet<TimerPayload>.");
-    Assert(timerPacket.TypedPayload.ExpiresAt is null, "Deserialized TIMER must preserve null expiresAt.");
-    Assert(timerPacket.TypedPayload.RentalMode == "OpenEnded", "Deserialized TIMER must preserve rental mode.");
-}
-
-static void Assert(bool condition, string message)
-{
-    if (!condition)
-    {
-        throw new InvalidOperationException(message);
-    }
-}
-
-static void AssertThrows(Action action, string message)
-{
-    try
-    {
-        action();
-    }
-    catch
-    {
-        return;
+            InvalidPacketIgnored?.Invoke();
+        }
     }
 
-    throw new InvalidOperationException(message);
+    private bool IsCommandForThisMachine(string? payloadMachineId, string? packetTarget)
+    {
+        string commandMachineId = ResolveCommandMachineId(payloadMachineId, packetTarget);
+
+        return string.Equals(commandMachineId, _machineId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveCommandMachineId(string? payloadMachineId, string? packetTarget)
+        => string.IsNullOrWhiteSpace(payloadMachineId)
+            ? packetTarget?.Trim() ?? string.Empty
+            : payloadMachineId.Trim();
+
+    private bool IsChatForThisMachine(ChatPayload payload, string? packetTarget)
+    {
+        string receiver = string.IsNullOrWhiteSpace(payload.Receiver)
+            ? packetTarget?.Trim() ?? string.Empty
+            : payload.Receiver.Trim();
+
+        return string.Equals(receiver, _machineId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(packetTarget?.Trim(), _machineId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsNotificationForThisMachine(NotificationPayload payload, string? packetTarget)
+    {
+        string target = packetTarget?.Trim() ?? string.Empty;
+        string scope = payload.Scope?.Trim() ?? string.Empty;
+
+        return string.Equals(target, _machineId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scope, "All", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(scope, "Broadcast", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task SendCommandAckAsync(Packet commandPacket, string machineId, string status, string message)
+    {
+        try
+        {
+            var ackPacket = PacketFactory.CreateAck(
+                source: _machineId,
+                target: NetworkProtocol.ServerSource,
+                payload: new AckPayload
+                {
+                    MachineId = string.IsNullOrWhiteSpace(machineId) ? _machineId : machineId,
+                    AckFor = commandPacket.Type.ToString(),
+                    Status = status,
+                    Message = message
+                },
+                requestId: commandPacket.RequestId);
+
+            await _connection.SendAsync(JsonHelper.SerializeToJson(ackPacket)).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            InvalidPacketIgnored?.Invoke();
+        }
+    }
+
+    public void Dispose()
+    {
+        _connection.MessageReceived -= Connection_MessageReceived;
+    }
 }

@@ -51,9 +51,22 @@ CREATE TABLE IF NOT EXISTS BillingSessions (
     FOREIGN KEY (UserId) REFERENCES AuthUsers(Id)
 );
 
+CREATE TABLE IF NOT EXISTS Customers (
+    CustomerId TEXT PRIMARY KEY,
+    FirstName TEXT NOT NULL,
+    LastName TEXT NOT NULL,
+    Phone TEXT NOT NULL,
+    IdentityNumber TEXT NOT NULL,
+    Birthday TEXT NOT NULL,
+    Username TEXT NOT NULL UNIQUE,
+    Password TEXT NOT NULL,
+    AccountBalance INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS IX_AuthUsers_Username ON AuthUsers (Username);
 CREATE INDEX IF NOT EXISTS IX_AuthUsers_MachineId ON AuthUsers (MachineId);
 CREATE INDEX IF NOT EXISTS IX_AuthSessions_UserId_State ON AuthSessions (UserId, State);
 CREATE INDEX IF NOT EXISTS IX_AuthSessions_MachineId_State ON AuthSessions (MachineId, State);
 CREATE INDEX IF NOT EXISTS IX_BillingSessions_MachineId_State ON BillingSessions (MachineId, State);
 CREATE INDEX IF NOT EXISTS IX_BillingSessions_AuthSessionId_State ON BillingSessions (AuthSessionId, State);
+CREATE INDEX IF NOT EXISTS IX_Customers_Username ON Customers (Username);

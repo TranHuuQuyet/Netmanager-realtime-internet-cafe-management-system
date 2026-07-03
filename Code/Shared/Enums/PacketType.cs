@@ -6,6 +6,7 @@ public enum PacketType
     STATUS,
     LOCK,
     UNLOCK,
+    SHUTDOWN,
     ACK,
     NOTIFICATION,
     TIMER,

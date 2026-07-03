@@ -25,3 +25,14 @@ public sealed record SessionRecord(
     SessionState State,
     DateTimeOffset StartedAtUtc,
     DateTimeOffset? EndedAtUtc);
+
+public sealed record CustomerRecord(
+    string CustomerId,
+    string FirstName,
+    string LastName,
+    string Phone,
+    string IdentityNumber,
+    string Birthday,
+    string Username,
+    string Password,
+    long AccountBalance);

@@ -5,6 +5,8 @@ namespace ServerApp;
 
 public partial class LoginForm : Form
 {
+    private const string MachinePrefix = "PC";
+
     // Dịch vụ xác thực được khởi tạo bất đồng bộ từ Program. Form giữ lại Task
     // thay vì chặn luồng giao diện, nhờ đó cửa sổ vẫn có thể được dựng ngay.
     private readonly Task<IAuthService> _authServiceTask;
@@ -19,6 +21,11 @@ public partial class LoginForm : Form
 
         // Tạo toàn bộ control được khai báo trong LoginForm.Designer.cs.
         InitializeComponent();
+        txtMachineId.Text = MachinePrefix;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
+        txtMachineId.TextChanged += TxtMachineId_TextChanged;
+        txtMachineId.Leave += TxtMachineId_Leave;
+        txtMachineId.PlaceholderText = "Nhap so may, VD: 00 -> PC00";
 
         // Nút đăng nhập không tự đóng form. Chỉ nhánh xác thực thành công bên dưới
         // mới gán DialogResult.OK và đóng cửa sổ.
@@ -69,7 +76,11 @@ public partial class LoginForm : Form
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(txtMachineId.Text))
+        string machineId = NormalizeMachineId(txtMachineId.Text);
+        txtMachineId.Text = string.IsNullOrWhiteSpace(machineId) ? MachinePrefix : machineId;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
+
+        if (string.IsNullOrWhiteSpace(machineId))
         {
             ShowValidationMessage(UiStrings.LoginMachineIdRequired, txtMachineId);
             return;
@@ -91,14 +102,14 @@ public partial class LoginForm : Form
                 new AuthRequest(
                     txtUsername.Text,
                     txtPassword.Text,
-                    txtMachineId.Text,
+                    machineId,
                     UserRole.Admin));
 
             // Dịch vụ trả về lỗi nghiệp vụ (sai tài khoản, sai mật khẩu...) dưới
             // dạng AuthResult, vì vậy chỉ hiển thị thông báo và giữ form mở.
             if (!result.IsSuccess)
             {
-                lblMessage.Text = result.Message;
+                lblMessage.Text = CreateLoginFailureMessage(result);
                 return;
             }
 
@@ -128,5 +139,90 @@ public partial class LoginForm : Form
     {
         lblMessage.Text = message;
         focusTarget.Focus();
+    }
+
+    private static string CreateLoginFailureMessage(AuthResult result)
+    {
+        return result.ErrorCode switch
+        {
+            "INVALID_MACHINE_ID" => "Mã máy không tồn tại trong hệ thống.",
+            "INVALID_CREDENTIALS" => "Sai tài khoản, mật khẩu hoặc quyền đăng nhập.",
+            "ACCOUNT_MACHINE_MISMATCH" => "Tài khoản này không được gán cho mã máy đang chọn.",
+            "ACCOUNT_DISABLED" => "Tài khoản hoặc máy đã bị vô hiệu hóa.",
+            "MACHINE_ALREADY_ACTIVE" => "Máy này đang có phiên đăng nhập khác.",
+            _ => result.Message
+        };
+    }
+
+    private void TxtMachineId_TextChanged(object? sender, EventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox != txtMachineId)
+        {
+            return;
+        }
+
+        int digitsBeforeCaret = textBox.Text
+            .Take(Math.Min(textBox.SelectionStart, textBox.TextLength))
+            .Count(char.IsDigit);
+
+        string sanitized = SanitizeMachineIdInput(textBox.Text);
+        if (string.Equals(textBox.Text, sanitized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        textBox.TextChanged -= TxtMachineId_TextChanged;
+        textBox.Text = sanitized;
+        textBox.SelectionStart = Math.Min(MachinePrefix.Length + digitsBeforeCaret, textBox.TextLength);
+        textBox.TextChanged += TxtMachineId_TextChanged;
+    }
+
+    private void TxtMachineId_Leave(object? sender, EventArgs e)
+    {
+        string normalized = NormalizeMachineId(txtMachineId.Text);
+        txtMachineId.Text = string.IsNullOrWhiteSpace(normalized) ? MachinePrefix : normalized;
+        txtMachineId.SelectionStart = txtMachineId.TextLength;
+    }
+
+    private static string SanitizeMachineIdInput(string? rawMachineId)
+    {
+        if (string.IsNullOrWhiteSpace(rawMachineId))
+        {
+            return MachinePrefix;
+        }
+
+        string trimmed = rawMachineId.Trim();
+        string suffix = trimmed.StartsWith(MachinePrefix, StringComparison.OrdinalIgnoreCase)
+            ? trimmed[MachinePrefix.Length..]
+            : trimmed;
+
+        string digits = new(suffix.Where(char.IsDigit).ToArray());
+        return $"{MachinePrefix}{digits}";
+    }
+
+    private static string NormalizeMachineId(string? rawMachineId)
+    {
+        if (string.IsNullOrWhiteSpace(rawMachineId))
+        {
+            return string.Empty;
+        }
+
+        string trimmed = rawMachineId.Trim();
+        string suffix = trimmed.StartsWith(MachinePrefix, StringComparison.OrdinalIgnoreCase)
+            ? trimmed[MachinePrefix.Length..]
+            : trimmed;
+
+        string digits = new(suffix.Where(char.IsDigit).ToArray());
+        if (digits.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        if (!int.TryParse(digits, out int machineNumber))
+        {
+            return string.Empty;
+        }
+
+        return $"{MachinePrefix}{machineNumber:D2}";
     }
 }

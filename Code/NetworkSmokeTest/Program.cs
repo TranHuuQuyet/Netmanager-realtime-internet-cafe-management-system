@@ -74,18 +74,19 @@ try
 
     await AssertLoginAndDisconnectEmitStatusAsync(port, authRuntime.SessionRepository, traces);
     await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
-    await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages);
+    await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages, commandResults);
     await AssertBillingTimerRoutingAsync(port, authRuntime, server);
+    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
     await AssertStatusRouteAcceptedAsync(port, authRuntime.SessionRepository);
     await AssertLoginSuccessAsync(port, authRuntime.SessionRepository);
     await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
-    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC-01", expectedErrorCode: "INVALID_CREDENTIALS");
-    await AssertLoginFailureAsync(port, password: "123", machineId: "PC-02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
+    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC01", expectedErrorCode: "INVALID_CREDENTIALS");
+    await AssertLoginFailureAsync(port, password: "123", machineId: "PC02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
     await AssertRejectedLineDoesNotStopServerAsync(port, authRuntime.SessionRepository, "{ invalid json", "invalid JSON");
     await AssertRejectedLineDoesNotStopServerAsync(
         port,
         authRuntime.SessionRepository,
-        """{"type":"UNKNOWN","source":"PC-01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
+        """{"type":"UNKNOWN","source":"PC01","target":"server","requestId":"unsupported-unknown","timestamp":"2026-06-02T00:00:00Z","payload":{}}""",
         "unknown packet type");
 
     Console.WriteLine("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
@@ -120,24 +121,24 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             AutoFlush = true
         };
 
-        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
         object response = await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
         Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
         sessionId = resultPacket.TypedPayload.SessionId;
 
-        await WaitForStatusTraceAsync(traces, "PC-01", "Online");
+        await WaitForStatusTraceAsync(traces, "PC01", "Online");
 
         using var mainForm = new ServerApp.MainForm(authRuntime.Machines, server);
         SynchronizationContext.SetSynchronizationContext(null);
-        mainForm.ApplyMachineStatusUpdate("PC-01", "Online");
+        mainForm.ApplyMachineStatusUpdate("PC01", "Online");
 
         ClickMachineActionButton(mainForm, "btnLockMachine");
-        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01").ConfigureAwait(false);
-        Packet lockCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01").ConfigureAwait(false);
+        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC01").ConfigureAwait(false);
+        Packet lockCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC01").ConfigureAwait(false);
         await SendCommandAckAsync(
             stream,
             lockCommand,
-            "PC-02",
+            "PC02",
             "Success",
             "Wrong machine ACK.").ConfigureAwait(false);
         await WaitForCommandAckErrorTraceAsync(traces, "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
@@ -145,7 +146,7 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             commandResults,
             lockCommand.RequestId!,
             CommandType.LOCK,
-            "PC-02",
+            "PC02",
             isError: true,
             expectedErrorCode: "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
 
@@ -153,7 +154,7 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
         await SendCommandAckAsync(
             stream,
             lockCommand,
-            "PC-01",
+            "PC01",
             "Success",
             "Unknown request ACK.",
             requestIdOverride: unknownRequestId).ConfigureAwait(false);
@@ -162,14 +163,14 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             commandResults,
             unknownRequestId,
             CommandType.LOCK,
-            "PC-01",
+            "PC01",
             isError: true,
             expectedErrorCode: "ACK_UNKNOWN_REQUEST").ConfigureAwait(false);
 
         await SendCommandAckAsync(
             stream,
             lockCommand,
-            "PC-01",
+            "PC01",
             "Success",
             "Wrong type ACK.",
             ackForOverride: PacketType.UNLOCK.ToString()).ConfigureAwait(false);
@@ -178,14 +179,14 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             commandResults,
             lockCommand.RequestId!,
             CommandType.LOCK,
-            "PC-01",
+            "PC01",
             isError: true,
             expectedErrorCode: "ACK_TYPE_MISMATCH").ConfigureAwait(false);
 
         await SendCommandAckAsync(
             stream,
             lockCommand,
-            "PC-01",
+            "PC01",
             "Maybe",
             "Invalid ACK status.").ConfigureAwait(false);
         await WaitForCommandAckErrorTraceAsync(traces, "INVALID_PACKET").ConfigureAwait(false);
@@ -193,28 +194,28 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             commandResults,
             lockCommand.RequestId!,
             CommandType.LOCK,
-            "PC-01",
+            "PC01",
             isError: true,
             expectedErrorCode: "INVALID_PACKET").ConfigureAwait(false);
 
-        await SendCommandAckAsync(stream, lockCommand, "PC-01", "Success", "Lock applied.").ConfigureAwait(false);
-        await WaitForCommandAckTraceAsync(traces, lockCommand, "PC-01", "Success").ConfigureAwait(false);
+        await SendCommandAckAsync(stream, lockCommand, "PC01", "Success", "Lock applied.").ConfigureAwait(false);
+        await WaitForCommandAckTraceAsync(traces, lockCommand, "PC01", "Success").ConfigureAwait(false);
         await WaitForCommandResultAsync(
             commandResults,
             lockCommand.RequestId!,
             CommandType.LOCK,
-            "PC-01",
+            "PC01",
             isError: false,
             expectedErrorCode: null).ConfigureAwait(false);
         Console.WriteLine("PASS: admin UI Lock action emits real LOCK JSON command packet and receives typed ACK");
 
         ClickMachineActionButton(mainForm, "btnUnlockMachine");
-        await WaitForCommandTraceAsync(traces, PacketType.UNLOCK, "PC-01").ConfigureAwait(false);
-        Packet unlockCommand = await AssertCommandReceivedAsync(reader, PacketType.UNLOCK, "PC-01").ConfigureAwait(false);
+        await WaitForCommandTraceAsync(traces, PacketType.UNLOCK, "PC01").ConfigureAwait(false);
+        Packet unlockCommand = await AssertCommandReceivedAsync(reader, PacketType.UNLOCK, "PC01").ConfigureAwait(false);
         await SendCommandAckAsync(
             stream,
             unlockCommand,
-            "PC-02",
+            "PC02",
             "Success",
             "Wrong machine unlock ACK.").ConfigureAwait(false);
         await WaitForCommandAckErrorTraceAsync(traces, "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
@@ -222,17 +223,17 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
             commandResults,
             unlockCommand.RequestId!,
             CommandType.UNLOCK,
-            "PC-02",
+            "PC02",
             isError: true,
             expectedErrorCode: "UNAUTHORIZED_COMMAND").ConfigureAwait(false);
 
-        await SendCommandAckAsync(stream, unlockCommand, "PC-01", "Success", "Unlock applied.").ConfigureAwait(false);
-        await WaitForCommandAckTraceAsync(traces, unlockCommand, "PC-01", "Success").ConfigureAwait(false);
+        await SendCommandAckAsync(stream, unlockCommand, "PC01", "Success", "Unlock applied.").ConfigureAwait(false);
+        await WaitForCommandAckTraceAsync(traces, unlockCommand, "PC01", "Success").ConfigureAwait(false);
         await WaitForCommandResultAsync(
             commandResults,
             unlockCommand.RequestId!,
             CommandType.UNLOCK,
-            "PC-01",
+            "PC01",
             isError: false,
             expectedErrorCode: null).ConfigureAwait(false);
         Console.WriteLine("PASS: admin UI Unlock action emits real UNLOCK JSON command packet and receives typed ACK");
@@ -245,14 +246,14 @@ static async Task AssertAdminUiLockUnlockCommandTraceAsync(
         }
 
         ClickMachineActionButton(mainForm, "btnLockMachine");
-        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC-01").ConfigureAwait(false);
-        Packet disconnectedCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC-01").ConfigureAwait(false);
+        await WaitForCommandTraceAsync(traces, PacketType.LOCK, "PC01").ConfigureAwait(false);
+        Packet disconnectedCommand = await AssertCommandReceivedAsync(reader, PacketType.LOCK, "PC01").ConfigureAwait(false);
         TryShutdown(tcpClient);
         await WaitForCommandResultAsync(
             commandResults,
             disconnectedCommand.RequestId!,
             CommandType.LOCK,
-            "PC-01",
+            "PC01",
             isError: true,
             expectedErrorCode: "COMMAND_CLIENT_DISCONNECTED").ConfigureAwait(false);
         Console.WriteLine("PASS: pending command emits typed COMMAND_CLIENT_DISCONNECTED on client disconnect");
@@ -267,7 +268,8 @@ static async Task AssertTwoClientChatRoutingAsync(
     int port,
     AuthRuntime authRuntime,
     TcpJsonLineServer server,
-    List<(string MachineId, ChatPayload Payload)> chatMessages)
+    List<(string MachineId, ChatPayload Payload)> chatMessages,
+    List<MachineCommandAckResult> commandResults)
 {
     string pc01SessionId;
     string pc02SessionId;
@@ -290,32 +292,59 @@ static async Task AssertTwoClientChatRoutingAsync(
         AutoFlush = true
     };
 
-    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC-01", "123");
-    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC-02", "123");
-    pc01SessionId = AssertClientLoginSuccess(pc01Login, await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, pc01Login), "client01", "PC-01");
-    pc02SessionId = AssertClientLoginSuccess(pc02Login, await SendLoginOnOpenStreamAsync(pc02Reader, pc02Writer, pc02Login), "client02", "PC-02");
+    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC01", "123");
+    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC02", "123");
+    pc01SessionId = AssertClientLoginSuccess(pc01Login, await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, pc01Login), "client01", "PC01");
+    pc02SessionId = AssertClientLoginSuccess(pc02Login, await SendLoginOnOpenStreamAsync(pc02Reader, pc02Writer, pc02Login), "client02", "PC02");
 
     MachineCommandSendResult pc02Command = await server.SendMachineCommandWithResultAsync(
-        "PC-02",
+        "PC02",
         lockMachine: true,
         issuedBy: "NetworkSmoke",
         reason: "Selected-client routing check").ConfigureAwait(false);
 
     if (!pc02Command.Sent)
     {
-        throw new InvalidOperationException($"PC-02 command route failed: {pc02Command.ErrorCode} {pc02Command.Message}");
+        throw new InvalidOperationException($"PC02 command route failed: {pc02Command.ErrorCode} {pc02Command.Message}");
     }
 
-    Packet pc02LockCommand = await AssertCommandReceivedAsync(pc02Reader, PacketType.LOCK, "PC-02").ConfigureAwait(false);
+    Packet pc02LockCommand = await AssertCommandReceivedAsync(pc02Reader, PacketType.LOCK, "PC02").ConfigureAwait(false);
     await SendCommandAckAsync(
         pc02Stream,
         pc02LockCommand,
-        "PC-02",
+        "PC02",
         "Success",
-        "PC-02 lock applied.").ConfigureAwait(false);
+        "PC02 lock applied.").ConfigureAwait(false);
+
+    MachineCommandSendResult pc02Shutdown = await server.SendMachineCommandWithResultAsync(
+        "PC02",
+        CommandType.SHUTDOWN,
+        issuedBy: "NetworkSmoke",
+        reason: "Selected-client shutdown check").ConfigureAwait(false);
+
+    if (!pc02Shutdown.Sent)
+    {
+        throw new InvalidOperationException($"PC02 shutdown route failed: {pc02Shutdown.ErrorCode} {pc02Shutdown.Message}");
+    }
+
+    Packet pc02ShutdownCommand = await AssertCommandReceivedAsync(pc02Reader, PacketType.SHUTDOWN, "PC02").ConfigureAwait(false);
+    await SendCommandAckAsync(
+        pc02Stream,
+        pc02ShutdownCommand,
+        "PC02",
+        "Success",
+        "PC02 shutdown accepted.").ConfigureAwait(false);
+
+    await WaitForCommandResultAsync(
+        commandResults,
+        pc02ShutdownCommand.RequestId ?? string.Empty,
+        CommandType.SHUTDOWN,
+        "PC02",
+        isError: false,
+        expectedErrorCode: null).ConfigureAwait(false);
 
     MachineChatSendResult sendResult = await server.SendChatAsync(
-        "PC-01",
+        "PC01",
         "Server",
         "Hello selected client.").ConfigureAwait(false);
 
@@ -324,21 +353,63 @@ static async Task AssertTwoClientChatRoutingAsync(
         throw new InvalidOperationException($"CHAT send failed: {sendResult.ErrorCode} {sendResult.Message}");
     }
 
-    Packet<ChatPayload> pc01Chat = await ReadChatPacketAsync(pc01Reader, "PC-01 admin CHAT").ConfigureAwait(false);
+    Packet<ChatPayload> pc01Chat = await ReadChatPacketAsync(pc01Reader, "PC01 admin CHAT").ConfigureAwait(false);
     if (pc01Chat.TypedPayload.Message != "Hello selected client."
-        || pc01Chat.Target != "PC-01")
+        || pc01Chat.Target != "PC01")
     {
         throw new InvalidOperationException("Selected client did not receive the expected admin CHAT.");
     }
 
-    await AssertNoLineWithinAsync(pc02Reader, TimeSpan.FromMilliseconds(300), "non-selected client CHAT").ConfigureAwait(false);
+    MachineNotificationSendResult notificationResult = await server.SendNotificationAsync(
+        "PC01",
+        "Maintenance starts in 5 minutes.",
+        "Warning").ConfigureAwait(false);
+
+    if (!notificationResult.Sent)
+    {
+        throw new InvalidOperationException(
+            $"NOTIFICATION send failed: {notificationResult.ErrorCode} {notificationResult.Message}");
+    }
+
+    Packet<NotificationPayload> pc01Notification =
+        await ReadNotificationPacketAsync(pc01Reader, "PC01 admin NOTIFICATION").ConfigureAwait(false);
+    if (pc01Notification.TypedPayload.Message != "Maintenance starts in 5 minutes."
+        || pc01Notification.TypedPayload.Severity != "Warning"
+        || pc01Notification.TypedPayload.Scope != "Direct"
+        || pc01Notification.Target != "PC01")
+    {
+        throw new InvalidOperationException("Selected client did not receive the expected admin NOTIFICATION.");
+    }
+
+    MachineNotificationBroadcastResult broadcastResult = await server.BroadcastNotificationAsync(
+        "Store closes in 15 minutes.",
+        "Info").ConfigureAwait(false);
+
+    if (!broadcastResult.Sent || broadcastResult.TargetCount != 2 || broadcastResult.SentCount != 2)
+    {
+        throw new InvalidOperationException(
+            $"NOTIFICATION broadcast failed: {broadcastResult.ErrorCode} {broadcastResult.Message}");
+    }
+
+    Packet<NotificationPayload> pc01Broadcast =
+        await ReadNotificationPacketAsync(pc01Reader, "PC01 broadcast NOTIFICATION").ConfigureAwait(false);
+    Packet<NotificationPayload> pc02Broadcast =
+        await ReadNotificationPacketAsync(pc02Reader, "PC02 broadcast NOTIFICATION").ConfigureAwait(false);
+
+    if (pc01Broadcast.TypedPayload.Message != "Store closes in 15 minutes."
+        || pc02Broadcast.TypedPayload.Message != "Store closes in 15 minutes."
+        || pc01Broadcast.TypedPayload.Scope != "Broadcast"
+        || pc02Broadcast.TypedPayload.Scope != "Broadcast")
+    {
+        throw new InvalidOperationException("Broadcast NOTIFICATION did not reach all selected active clients.");
+    }
 
     Packet<ChatPayload> reply = PacketFactory.CreateChat(
-        source: "PC-01",
+        source: "PC01",
         target: NetworkProtocol.ServerSource,
         payload: new ChatPayload
         {
-            Sender = "PC-01",
+            Sender = "PC01",
             Receiver = NetworkProtocol.ServerSource,
             Message = "Client reply."
         },
@@ -346,10 +417,10 @@ static async Task AssertTwoClientChatRoutingAsync(
     string replyLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(reply));
     Console.WriteLine($"CLIENT OUT: {replyLine}");
     await pc01Writer.WriteLineAsync(replyLine).ConfigureAwait(false);
-    await WaitForChatMessageAsync(chatMessages, "PC-01", "Client reply.").ConfigureAwait(false);
+    await WaitForChatMessageAsync(chatMessages, "PC01", "Client reply.").ConfigureAwait(false);
 
     MachineChatSendResult offlineResult = await server.SendChatAsync(
-        "PC-99",
+        "PC99",
         "Server",
         "Offline target").ConfigureAwait(false);
 
@@ -400,26 +471,26 @@ static async Task AssertBillingTimerRoutingAsync(
         AutoFlush = true
     };
 
-    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC-01", "123");
-    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC-02", "123");
+    Packet<LoginPayload> pc01Login = CreateClientLoginPacket("client01", "PC01", "123");
+    Packet<LoginPayload> pc02Login = CreateClientLoginPacket("client02", "PC02", "123");
     string pc01SessionId = AssertClientLoginSuccess(
         pc01Login,
         await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, pc01Login),
         "client01",
-        "PC-01");
+        "PC01");
     string pc02SessionId = AssertClientLoginSuccess(
         pc02Login,
         await SendLoginOnOpenStreamAsync(pc02Reader, pc02Writer, pc02Login),
         "client02",
-        "PC-02");
+        "PC02");
 
-    AdminBillingResult timed = await billingService.StartTimedAsync("PC-01", 4);
+    AdminBillingResult timed = await billingService.StartTimedAsync("PC01", 4);
     if (!timed.IsSuccess)
     {
         throw new InvalidOperationException($"Timed billing failed: {timed.ErrorCode} {timed.Message}");
     }
 
-    Packet<TimerPayload> timedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 timed billing TIMER");
+    Packet<TimerPayload> timedTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 timed billing TIMER");
     if (timedTimer.TypedPayload.RemainingSeconds is null
         || timedTimer.TypedPayload.RemainingSeconds > 300
         || !timedTimer.TypedPayload.IsWarning)
@@ -427,13 +498,13 @@ static async Task AssertBillingTimerRoutingAsync(
         throw new InvalidOperationException("Timed billing TIMER did not carry 5-minute warning state.");
     }
 
-    AdminBillingResult openEnded = await billingService.StartOpenEndedAsync("PC-02");
+    AdminBillingResult openEnded = await billingService.StartOpenEndedAsync("PC02");
     if (!openEnded.IsSuccess)
     {
         throw new InvalidOperationException($"Open-ended billing failed: {openEnded.ErrorCode} {openEnded.Message}");
     }
 
-    Packet<TimerPayload> openEndedTimer = await ReadTimerPacketAsync(pc02Reader, "PC-02 open-ended TIMER");
+    Packet<TimerPayload> openEndedTimer = await ReadTimerPacketAsync(pc02Reader, "PC02 open-ended TIMER");
     if (openEndedTimer.TypedPayload.ExpiresAt is not null
         || openEndedTimer.TypedPayload.RemainingSeconds is not null
         || openEndedTimer.TypedPayload.AmountVnd < 0)
@@ -441,32 +512,32 @@ static async Task AssertBillingTimerRoutingAsync(
         throw new InvalidOperationException("Open-ended TIMER did not carry nullable expiry/remaining billing state.");
     }
 
-    AdminBillingResult extended = await billingService.ExtendAsync("PC-01", 2);
+    AdminBillingResult extended = await billingService.ExtendAsync("PC01", 2);
     if (!extended.IsSuccess)
     {
         throw new InvalidOperationException($"Billing extend failed: {extended.ErrorCode} {extended.Message}");
     }
 
-    Packet<TimerPayload> extendedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 extended TIMER");
+    Packet<TimerPayload> extendedTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 extended TIMER");
     if (!string.Equals(extendedTimer.TypedPayload.RentalMode, BillingRentalMode.Extend.ToString(), StringComparison.Ordinal))
     {
         throw new InvalidOperationException("Extended TIMER did not mark rentalMode Extend.");
     }
 
-    AdminBillingResult closed = await billingService.CloseAsync("PC-01");
+    AdminBillingResult closed = await billingService.CloseAsync("PC01");
     if (!closed.IsSuccess)
     {
         throw new InvalidOperationException($"Billing close failed: {closed.ErrorCode} {closed.Message}");
     }
 
-    Packet<TimerPayload> closedTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 closed TIMER");
+    Packet<TimerPayload> closedTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 closed TIMER");
     if (!string.Equals(closedTimer.TypedPayload.Status, "Closed", StringComparison.Ordinal))
     {
         throw new InvalidOperationException("Closed billing TIMER did not mark status Closed.");
     }
 
-    SessionRecord pc01Session = await authRuntime.SessionRepository.GetActiveByMachineIdAsync("PC-01")
-        ?? throw new InvalidOperationException("Expected active PC-01 auth session for expired billing check.");
+    SessionRecord pc01Session = await authRuntime.SessionRepository.GetActiveByMachineIdAsync("PC01")
+        ?? throw new InvalidOperationException("Expected active PC01 auth session for expired billing check.");
     AdminBillingResult expiredOpen = await OpenExpiredBillingAsync(authRuntime, pc01Session);
     if (!expiredOpen.IsSuccess)
     {
@@ -474,24 +545,24 @@ static async Task AssertBillingTimerRoutingAsync(
     }
 
     await billingService.RefreshActiveSessionsAsync();
-    Packet<TimerPayload> expiredTimer = await ReadTimerPacketAsync(pc01Reader, "PC-01 expired TIMER");
+    Packet<TimerPayload> expiredTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 expired TIMER");
     if (!expiredTimer.TypedPayload.ShouldLockNow || expiredTimer.TypedPayload.RemainingSeconds != 0)
     {
         throw new InvalidOperationException("Expired billing TIMER did not request lock.");
     }
 
-    Packet lockCommand = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, "PC-01");
-    await SendCommandAckAsync(pc01Stream, lockCommand, "PC-01", "Success", "Billing expiry lock applied.");
+    Packet lockCommand = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, "PC01");
+    await SendCommandAckAsync(pc01Stream, lockCommand, "PC01", "Success", "Billing expiry lock applied.");
 
-    Packet<TimerPayload> pc02RefreshTimer = await ReadTimerPacketAsync(pc02Reader, "PC-02 refresh TIMER");
+    Packet<TimerPayload> pc02RefreshTimer = await ReadTimerPacketAsync(pc02Reader, "PC02 refresh TIMER");
     if (pc02RefreshTimer.TypedPayload.ExpiresAt is not null)
     {
-        throw new InvalidOperationException("Refresh TIMER did not preserve PC-02 open-ended session.");
+        throw new InvalidOperationException("Refresh TIMER did not preserve PC02 open-ended session.");
     }
 
-    await SendStatusAsync(pc02Writer, "PC-02", pc02SessionId);
-    object firstStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC-02 STATUS response");
-    object secondStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC-02 STATUS billing response");
+    await SendStatusAsync(pc02Writer, "PC02", pc02SessionId);
+    object firstStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC02 STATUS response");
+    object secondStatusResponse = await ReadAnyPacketAsync(pc02Reader, "PC02 STATUS billing response");
     if (firstStatusResponse is not Packet<AckPayload> && secondStatusResponse is not Packet<AckPayload>)
     {
         throw new InvalidOperationException("STATUS did not return ACK while resyncing billing.");
@@ -507,13 +578,160 @@ static async Task AssertBillingTimerRoutingAsync(
         throw new InvalidOperationException("STATUS-triggered billing resync did not preserve open-ended session.");
     }
 
-    await billingService.CloseAsync("PC-01");
-    await billingService.CloseAsync("PC-02");
+    await billingService.CloseAsync("PC01");
+    await billingService.CloseAsync("PC02");
     TryShutdown(pc01Client);
     TryShutdown(pc02Client);
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc01SessionId);
     await WaitForClosedSessionAsync(authRuntime.SessionRepository, pc02SessionId);
     Console.WriteLine("PASS: billing TIMER route supports timed warning, open-ended, extend/close, expiry LOCK and STATUS resync");
+}
+
+static async Task AssertTopUpRequestFlowAsync(
+    int port,
+    AuthRuntime authRuntime,
+    TcpJsonLineServer server,
+    List<NetworkTraceEntry> traces)
+{
+    const string customerId = "topup-customer-01";
+    const string username = "topup01";
+    const string machineId = "PC01";
+    const long topUpAmount = 10_000;
+
+    await authRuntime.Customers.AddAsync(new CustomerRecord(
+        customerId,
+        "Top",
+        "Up",
+        "0900000001",
+        "ID-TOPUP-01",
+        "2000-01-01",
+        username,
+        "123",
+        AccountBalance: 0));
+
+    if (!ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, $"{machineId} yêu cầu nạp {topUpAmount:N0} VND", DateTimeOffset.Now),
+            out long parsedAmount)
+        || parsedAmount != topUpAmount)
+    {
+        throw new InvalidOperationException("Top-up parser did not accept the expected client request format.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage("PC00", "PC00", $"PC00 yêu cầu nạp {topUpAmount} VND", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore server machine PC00.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, $"PC02 yêu cầu nạp {topUpAmount} VND", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore requests whose message machine differs from sender.");
+    }
+
+    if (ServerApp.MainForm.TryParseTopUpRequest(
+            new AdminChatMessage(machineId, machineId, "Tin nhan chat binh thuong", DateTimeOffset.Now),
+            out _))
+    {
+        throw new InvalidOperationException("Top-up parser must ignore normal chat messages.");
+    }
+
+    var billingService = new NetworkAdminBillingService(
+        authRuntime.Billing,
+        authRuntime.SessionRepository,
+        server,
+        authRuntime.Customers);
+
+    using var pc01Client = new TcpClient();
+    await pc01Client.ConnectAsync(IPAddress.Loopback, port);
+    await using NetworkStream pc01Stream = pc01Client.GetStream();
+    using var pc01Reader = new StreamReader(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+    await using var pc01Writer = new StreamWriter(pc01Stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+    {
+        AutoFlush = true
+    };
+
+    Packet<LoginPayload> login = CreateClientLoginPacket(username, machineId, "123");
+    string sessionId = AssertClientLoginSuccess(
+        login,
+        await SendLoginOnOpenStreamAsync(pc01Reader, pc01Writer, login),
+        username,
+        machineId);
+
+    AdminBillingResult opened = await billingService.StartOpenEndedAsync(machineId);
+    if (!opened.IsSuccess)
+    {
+        throw new InvalidOperationException($"Top-up billing setup failed: {opened.ErrorCode} {opened.Message}");
+    }
+
+    Packet<TimerPayload> emptyBalanceTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 empty-balance TIMER");
+    if (!emptyBalanceTimer.TypedPayload.ShouldLockNow
+        || emptyBalanceTimer.TypedPayload.RemainingBalanceVnd != 0)
+    {
+        throw new InvalidOperationException("Empty-balance TIMER did not request lock before top-up.");
+    }
+
+    Packet initialLock = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, initialLock, machineId, "Success", "Empty balance lock applied.");
+
+    using var mainForm = new ServerApp.MainForm(authRuntime.Machines, server, billingService, authRuntime.Customers);
+
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, 5_000, DialogResult.No);
+    Packet<TimerPayload> rejectedEmptyTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 rejected empty-balance TIMER");
+    if (!rejectedEmptyTimer.TypedPayload.ShouldLockNow
+        || rejectedEmptyTimer.TypedPayload.RemainingUsageSeconds != 0)
+    {
+        throw new InvalidOperationException("Rejected empty-balance top-up should keep billing countdown depleted.");
+    }
+
+    Packet rejectedEmptyLock = await AssertCommandReceivedAsync(pc01Reader, PacketType.LOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, rejectedEmptyLock, machineId, "Success", "Rejected empty-balance lock applied.");
+
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, topUpAmount, DialogResult.Yes);
+
+    CustomerRecord updatedCustomer = await authRuntime.Customers.GetByIdAsync(customerId)
+        ?? throw new InvalidOperationException("Top-up customer was not found after confirm.");
+    if (updatedCustomer.AccountBalance != topUpAmount)
+    {
+        throw new InvalidOperationException(
+            $"Top-up confirm should add {topUpAmount}, got balance {updatedCustomer.AccountBalance}.");
+    }
+
+    Packet<TimerPayload> topUpTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 top-up TIMER");
+    if (topUpTimer.TypedPayload.ShouldLockNow
+        || topUpTimer.TypedPayload.TotalBalanceVnd != topUpAmount
+        || topUpTimer.TypedPayload.RemainingBalanceVnd is null
+        || topUpTimer.TypedPayload.RemainingBalanceVnd <= 0
+        || topUpTimer.TypedPayload.RemainingUsageSeconds is null
+        || topUpTimer.TypedPayload.RemainingUsageSeconds <= 0)
+    {
+        throw new InvalidOperationException("Top-up TIMER did not expose updated balance/time state.");
+    }
+
+    Packet unlockCommand = await AssertCommandReceivedAsync(pc01Reader, PacketType.UNLOCK, machineId);
+    await SendCommandAckAsync(pc01Stream, unlockCommand, machineId, "Success", "Top-up unlock applied.");
+
+    int lockCountBeforePositiveReject = CountCommandTraces(traces, PacketType.LOCK, machineId);
+    await mainForm.HandleTopUpRequestDecisionAsync(machineId, 5_000, DialogResult.No);
+    Packet<TimerPayload> rejectedPositiveTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 rejected positive-balance TIMER");
+    if (rejectedPositiveTimer.TypedPayload.ShouldLockNow
+        || rejectedPositiveTimer.TypedPayload.RemainingUsageSeconds is null
+        || rejectedPositiveTimer.TypedPayload.RemainingUsageSeconds <= 0)
+    {
+        throw new InvalidOperationException("Rejected positive-balance top-up should keep money-based countdown available.");
+    }
+
+    await AssertCommandTraceCountUnchangedAsync(
+        traces,
+        PacketType.LOCK,
+        machineId,
+        lockCountBeforePositiveReject,
+        "Rejected positive-balance top-up must not send LOCK.");
+
+    TryShutdown(pc01Client);
+    Console.WriteLine("PASS: top-up request parser, confirm balance update/unlock and money-based reject lock flow");
 }
 
 static async Task<AdminBillingResult> OpenExpiredBillingAsync(AuthRuntime authRuntime, SessionRecord session)
@@ -601,6 +819,9 @@ static async Task<Packet<ChatPayload>> ReadChatPacketAsync(StreamReader reader, 
 static Task<Packet<TimerPayload>> ReadTimerPacketAsync(StreamReader reader, string description)
     => ReadPacketAsync<TimerPayload>(reader, description);
 
+static Task<Packet<NotificationPayload>> ReadNotificationPacketAsync(StreamReader reader, string description)
+    => ReadPacketAsync<NotificationPayload>(reader, description);
+
 static async Task<Packet<TPayload>> ReadPacketAsync<TPayload>(StreamReader reader, string description)
     where TPayload : class
 {
@@ -648,19 +869,6 @@ static async Task SendStatusAsync(StreamWriter writer, string machineId, string 
     await writer.WriteLineAsync(outboundLine).ConfigureAwait(false);
 }
 
-static async Task AssertNoLineWithinAsync(StreamReader reader, TimeSpan timeout, string description)
-{
-    Task<string?> readTask = reader.ReadLineAsync();
-    Task delayTask = Task.Delay(timeout);
-    Task completed = await Task.WhenAny(readTask, delayTask).ConfigureAwait(false);
-
-    if (completed == readTask)
-    {
-        string? line = await readTask.ConfigureAwait(false);
-        throw new InvalidOperationException($"{description} unexpectedly received line: {line}");
-    }
-}
-
 static async Task WaitForChatMessageAsync(
     List<(string MachineId, ChatPayload Payload)> chatMessages,
     string machineId,
@@ -700,19 +908,19 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
             AutoFlush = true
         };
 
-        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
         object response = await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
         Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
         sessionId = resultPacket.TypedPayload.SessionId;
 
         var statusPacket = PacketFactory.CreateStatus(
-            source: "PC-01",
+            source: "PC01",
             target: NetworkProtocol.ServerSource,
             payload: new StatusPayload
             {
-                MachineId = "PC-01",
+                MachineId = "PC01",
                 SessionId = sessionId,
-                MachineName = "PC-01",
+                MachineName = "PC01",
                 Status = "Online",
                 IpAddress = IPAddress.Loopback.ToString(),
                 LastSeen = DateTime.UtcNow
@@ -731,9 +939,9 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
 
         if (ackPacket.TypedPayload.AckFor != PacketType.STATUS.ToString()
             || ackPacket.TypedPayload.Status != "Accepted"
-            || !string.Equals(ackPacket.TypedPayload.MachineId, "PC-01", StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(ackPacket.TypedPayload.MachineId, "PC01", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("STATUS route did not return an Accepted ACK for PC-01.");
+            throw new InvalidOperationException("STATUS route did not return an Accepted ACK for PC01.");
         }
 
         AssertMatchingRequestId(statusPacket, ackPacket);
@@ -784,7 +992,7 @@ static void DeleteTempDatabase(string databasePath)
 
 static async Task AssertLoginSuccessAsync(int port, ISessionRepository sessions)
 {
-    Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+    Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
     object response = await SendLoginAsync(port, loginPacket);
     Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
 
@@ -803,7 +1011,7 @@ static Packet<LoginResultPayload> AssertLoginSuccessResponse(Packet<LoginPayload
     }
 
     if (resultPacket.TypedPayload.Username != "client01"
-        || resultPacket.TypedPayload.MachineId != "PC-01"
+        || resultPacket.TypedPayload.MachineId != "PC01"
         || string.IsNullOrWhiteSpace(resultPacket.TypedPayload.SessionId))
     {
         throw new InvalidOperationException("LOGIN success payload did not match the authenticated account.");
@@ -822,7 +1030,7 @@ static async Task AssertRepeatedLoginRejectedWhileActiveAsync(int port, ISession
         await tcpClient.ConnectAsync(IPAddress.Loopback, port);
         await using NetworkStream stream = tcpClient.GetStream();
 
-        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
         object response = await SendLoginOnStreamAsync(stream, loginPacket);
         Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
         sessionId = resultPacket.TypedPayload.SessionId;
@@ -830,7 +1038,7 @@ static async Task AssertRepeatedLoginRejectedWhileActiveAsync(int port, ISession
         await AssertLoginFailureAsync(
             port,
             password: "123",
-            machineId: "PC-01",
+            machineId: "PC01",
             expectedErrorCode: "MACHINE_ALREADY_ACTIVE");
     }
 
@@ -851,17 +1059,17 @@ static async Task AssertLoginAndDisconnectEmitStatusAsync(
         await tcpClient.ConnectAsync(IPAddress.Loopback, port);
         await using NetworkStream stream = tcpClient.GetStream();
 
-        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC-01");
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
         object response = await SendLoginOnStreamAsync(stream, loginPacket);
         Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
         sessionId = resultPacket.TypedPayload.SessionId;
 
-        await WaitForStatusTraceAsync(traces, "PC-01", "Online");
+        await WaitForStatusTraceAsync(traces, "PC01", "Online");
         Console.WriteLine("PASS: authenticated LOGIN emits STATUS Online");
     }
 
     await WaitForClosedSessionAsync(sessions, sessionId);
-    await WaitForStatusTraceAsync(traces, "PC-01", "Offline");
+    await WaitForStatusTraceAsync(traces, "PC01", "Offline");
     Console.WriteLine("PASS: authenticated disconnect emits STATUS Offline");
 }
 
@@ -895,7 +1103,7 @@ static async Task AssertLoginFailureAsync(
 static Packet<LoginPayload> CreateLoginPacket(string password, string machineId)
 {
     return PacketFactory.CreateLogin(
-        source: "PC-01",
+        source: "PC01",
         target: NetworkProtocol.ServerSource,
         payload: new LoginPayload
         {
@@ -1027,6 +1235,14 @@ static async Task<Packet> AssertCommandReceivedAsync(StreamReader reader, Packet
         return unlockPacket;
     }
 
+    if (commandType == PacketType.SHUTDOWN
+        && packet is Packet<ShutdownPayload> shutdownPacket
+        && shutdownPacket.Type == PacketType.SHUTDOWN
+        && string.Equals(shutdownPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+    {
+        return shutdownPacket;
+    }
+
     throw new InvalidOperationException($"Client did not receive expected {commandType} command for {machineId}.");
 }
 
@@ -1126,7 +1342,7 @@ static async Task AssertCommandErrorAsync(TcpJsonLineServer server, List<Network
     Console.WriteLine("PASS: invalid machine command returns deterministic INVALID_MACHINE_ID error");
 
     MachineCommandSendResult result = await server.SendMachineCommandWithResultAsync(
-        "PC-99",
+        "PC99",
         lockMachine: true,
         issuedBy: "NetworkSmokeTest",
         reason: "offline command test");
@@ -1136,7 +1352,7 @@ static async Task AssertCommandErrorAsync(TcpJsonLineServer server, List<Network
         throw new InvalidOperationException("Offline machine command did not return deterministic MACHINE_OFFLINE.");
     }
 
-    await WaitForCommandErrorTraceAsync(traces, "PC-99", "MACHINE_OFFLINE");
+    await WaitForCommandErrorTraceAsync(traces, "PC99", "MACHINE_OFFLINE");
     Console.WriteLine("PASS: offline command returns deterministic MACHINE_OFFLINE error");
 }
 
@@ -1178,12 +1394,52 @@ static async Task WaitForCommandTraceAsync(List<NetworkTraceEntry> traces, Packe
                 Console.WriteLine($"COMMAND JSON UNLOCK: {trace.Message}");
                 return;
             }
+
+            if (commandType == PacketType.SHUTDOWN
+                && packet is Packet<ShutdownPayload> shutdownPacket
+                && shutdownPacket.Type == PacketType.SHUTDOWN
+                && string.Equals(shutdownPacket.TypedPayload.MachineId, machineId, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"COMMAND JSON SHUTDOWN: {trace.Message}");
+                return;
+            }
         }
 
         await Task.Delay(TimeSpan.FromMilliseconds(25), timeoutTokenSource.Token);
     }
 
     throw new InvalidOperationException($"{commandType} command JSON trace for {machineId} was not emitted.");
+}
+
+static async Task AssertCommandTraceCountUnchangedAsync(
+    List<NetworkTraceEntry> traces,
+    PacketType commandType,
+    string machineId,
+    int expectedCount,
+    string failureMessage)
+{
+    await Task.Delay(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+    int actualCount = CountCommandTraces(traces, commandType, machineId);
+    if (actualCount != expectedCount)
+    {
+        throw new InvalidOperationException($"{failureMessage} Expected {expectedCount}, got {actualCount}.");
+    }
+}
+
+static int CountCommandTraces(List<NetworkTraceEntry> traces, PacketType commandType, string machineId)
+{
+    NetworkTraceEntry[] snapshot;
+    lock (traces)
+    {
+        snapshot = [.. traces];
+    }
+
+    string typeNeedle = $"\"type\":\"{commandType}\"";
+    string machineNeedle = $"\"machineId\":\"{machineId}\"";
+    return snapshot.Count(trace =>
+        string.Equals(trace.Direction, "OUT_COMMAND", StringComparison.Ordinal)
+        && trace.Message.Contains(typeNeedle, StringComparison.OrdinalIgnoreCase)
+        && trace.Message.Contains(machineNeedle, StringComparison.OrdinalIgnoreCase));
 }
 
 static async Task WaitForCommandAckTraceAsync(

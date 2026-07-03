@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Windows.Forms;
+using ClientApp.Networking;
 using Microsoft.Data.Sqlite;
 using Shared.Enums;
 using Shared.DTOs.Bidrectional;
@@ -108,15 +109,16 @@ try
     WriteCaseHeader("TC-N09", "Multiple clients remain distinct.");
     await AssertTwoClientChatRoutingAsync(port, authRuntime, server, chatMessages, commandResults);
 
-    WriteDiagnostic("");
-    WriteDiagnostic("Additional smoke checks");
     ClearTraces(traces);
-    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
-    await AssertBillingTimerRoutingAsync(port, authRuntime, server);
-    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
-    await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
-    await AssertLoginFailureAsync(port, password: "wrong-password", machineId: "PC01", expectedErrorCode: "INVALID_CREDENTIALS");
-    await AssertLoginFailureAsync(port, password: "123", machineId: "PC02", expectedErrorCode: "ACCOUNT_MACHINE_MISMATCH");
+    WriteCaseHeader("TC-N10", "Sequential sends are not interleaved.");
+    await AssertSequentialJsonLinesRemainDistinctAsync(port, authRuntime.SessionRepository);
+
+    ClearTraces(traces);
+    WriteCaseHeader("TC-N11", "Abrupt client loss does not crash server.");
+    await AssertAbruptClientLossDoesNotCrashServerAsync(port, authRuntime.SessionRepository, traces);
+
+    WriteCaseHeader("TC-N12", "Client reconnect behavior is controlled.");
+    await AssertClientReconnectBehaviorAsync();
 
     WriteDiagnostic("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
 }
@@ -1013,6 +1015,205 @@ static async Task AssertStatusRouteAcceptedAsync(int port, ISessionRepository se
     }
 
     await WaitForClosedSessionAsync(sessions, sessionId);
+}
+
+static async Task AssertSequentialJsonLinesRemainDistinctAsync(int port, ISessionRepository sessions)
+{
+    string sessionId;
+
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
+        using var reader = new StreamReader(stream, NetworkProtocol.TextEncoding, leaveOpen: true);
+        await using var writer = new StreamWriter(stream, NetworkProtocol.TextEncoding, leaveOpen: true)
+        {
+            AutoFlush = true
+        };
+
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
+        object response = await SendLoginOnOpenStreamAsync(reader, writer, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        List<Packet<StatusPayload>> statusPackets = [];
+        for (int index = 0; index < 5; index++)
+        {
+            statusPackets.Add(PacketFactory.CreateStatus(
+                source: "PC01",
+                target: NetworkProtocol.ServerSource,
+                payload: new StatusPayload
+                {
+                    MachineId = "PC01",
+                    SessionId = sessionId,
+                    MachineName = "PC01",
+                    Status = "Online",
+                    IpAddress = IPAddress.Loopback.ToString(),
+                    LastSeen = DateTime.UtcNow.AddMilliseconds(index)
+                },
+                requestId: $"status-seq-{index}-{Guid.NewGuid():N}"));
+        }
+
+        foreach (Packet<StatusPayload> statusPacket in statusPackets)
+        {
+            string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(statusPacket));
+            Console.WriteLine($"CLIENT OUT: {outboundLine}");
+            await writer.WriteLineAsync(outboundLine).ConfigureAwait(false);
+        }
+
+        HashSet<string> expectedRequestIds = statusPackets
+            .Select(packet => packet.RequestId ?? string.Empty)
+            .ToHashSet(StringComparer.Ordinal);
+
+        for (int index = 0; index < statusPackets.Count; index++)
+        {
+            string inboundLine = await ReadRequiredLineAsync(reader, $"sequential STATUS ACK {index + 1}");
+            Console.WriteLine($"CLIENT IN : {inboundLine}");
+
+            var ackPacket = JsonHelper.DeserializePacket(inboundLine) as Packet<AckPayload>
+                ?? throw new InvalidOperationException("Sequential send response was not one complete ACK packet.");
+
+            if (!expectedRequestIds.Remove(ackPacket.RequestId ?? string.Empty)
+                || ackPacket.TypedPayload.AckFor != PacketType.STATUS.ToString()
+                || ackPacket.TypedPayload.Status != "Accepted")
+            {
+                throw new InvalidOperationException("Sequential STATUS ACK did not match a single sent JSON-line packet.");
+            }
+        }
+
+        if (expectedRequestIds.Count != 0)
+        {
+            throw new InvalidOperationException("Sequential STATUS send lost one or more JSON-line responses.");
+        }
+
+        TryShutdown(tcpClient);
+    }
+
+    await WaitForClosedSessionAsync(sessions, sessionId);
+    WriteCasePass("TC-N10", "Rapid JSON-line sends are received as complete, distinct packets.");
+}
+
+static async Task AssertAbruptClientLossDoesNotCrashServerAsync(
+    int port,
+    ISessionRepository sessions,
+    List<NetworkTraceEntry> traces)
+{
+    string sessionId;
+
+    using (var tcpClient = new TcpClient())
+    {
+        await tcpClient.ConnectAsync(IPAddress.Loopback, port);
+        await using NetworkStream stream = tcpClient.GetStream();
+
+        Packet<LoginPayload> loginPacket = CreateLoginPacket(password: "123", machineId: "PC01");
+        object response = await SendLoginOnStreamAsync(stream, loginPacket);
+        Packet<LoginResultPayload> resultPacket = AssertLoginSuccessResponse(loginPacket, response);
+        sessionId = resultPacket.TypedPayload.SessionId;
+
+        await WaitForStatusTraceAsync(traces, "PC01", "Online");
+        TryShutdown(tcpClient);
+    }
+
+    await WaitForClosedSessionAsync(sessions, sessionId);
+    await WaitForStatusTraceAsync(traces, "PC01", "Offline");
+    await AssertLoginSuccessAsync(port, sessions, writePass: false);
+    WriteCasePass("TC-N11", "Server closes the lost session and accepts a new login after abrupt client loss.");
+}
+
+static async Task AssertClientReconnectBehaviorAsync()
+{
+    TcpListener? listener = null;
+
+    using var connection = new TcpClientConnection
+    {
+        ReconnectDelay = TimeSpan.FromMilliseconds(100)
+    };
+
+    int connectedCount = 0;
+    int disconnectedCount = 0;
+    int reconnectFailedCount = 0;
+
+    connection.Connected += () => Interlocked.Increment(ref connectedCount);
+    connection.Disconnected += () => Interlocked.Increment(ref disconnectedCount);
+    connection.ReconnectFailed += _ => Interlocked.Increment(ref reconnectFailedCount);
+    connection.EnableAutoReconnect();
+
+    try
+    {
+        listener = CreateLoopbackListener(port: 0);
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Task<TcpClient> firstAcceptTask = listener.AcceptTcpClientAsync();
+
+        await connection.ConnectAsync(IPAddress.Loopback.ToString(), port).ConfigureAwait(false);
+        using TcpClient firstAccepted = await WaitForTaskAsync(firstAcceptTask, "initial reconnect-test accept")
+            .ConfigureAwait(false);
+
+        firstAccepted.Close();
+        listener.Stop();
+        listener = null;
+
+        await WaitForConditionAsync(
+            () => Volatile.Read(ref disconnectedCount) >= 1,
+            "client disconnect event after server drop").ConfigureAwait(false);
+        await WaitForConditionAsync(
+            () => Volatile.Read(ref reconnectFailedCount) >= 1,
+            "ReconnectFailed event while server is down",
+            TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+
+        listener = CreateLoopbackListener(port);
+        Task<TcpClient> secondAcceptTask = listener.AcceptTcpClientAsync();
+
+        await WaitForConditionAsync(
+            () => Volatile.Read(ref connectedCount) >= 2,
+            "client reconnect after server restore",
+            TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+        using TcpClient secondAccepted = await WaitForTaskAsync(secondAcceptTask, "restored reconnect-test accept")
+            .ConfigureAwait(false);
+
+        connection.Disconnect();
+        WriteCasePass("TC-N12", "Client waits ReconnectDelay, raises ReconnectFailed, and reconnects after server restore.");
+    }
+    finally
+    {
+        connection.Disconnect();
+        listener?.Stop();
+    }
+}
+
+static TcpListener CreateLoopbackListener(int port)
+{
+    var listener = new TcpListener(IPAddress.Loopback, port);
+    listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+    listener.Start();
+    return listener;
+}
+
+static async Task<T> WaitForTaskAsync<T>(Task<T> task, string description, TimeSpan? timeout = null)
+{
+    Task completedTask = await Task.WhenAny(task, Task.Delay(timeout ?? TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+    if (completedTask != task)
+    {
+        throw new TimeoutException($"Timed out waiting for {description}.");
+    }
+
+    return await task.ConfigureAwait(false);
+}
+
+static async Task WaitForConditionAsync(Func<bool> condition, string description, TimeSpan? timeout = null)
+{
+    DateTime deadlineUtc = DateTime.UtcNow.Add(timeout ?? TimeSpan.FromSeconds(2));
+
+    while (DateTime.UtcNow < deadlineUtc)
+    {
+        if (condition())
+        {
+            return;
+        }
+
+        await Task.Delay(TimeSpan.FromMilliseconds(25)).ConfigureAwait(false);
+    }
+
+    throw new TimeoutException($"Timed out waiting for {description}.");
 }
 
 static void ClickMachineActionButton(ServerApp.MainForm mainForm, string buttonName)

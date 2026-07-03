@@ -228,7 +228,7 @@ public partial class MainForm : Form
 
         var billingTab = new TabPage
         {
-            Text = "Billing",
+            Text = "Tính tiền",
             Padding = new Padding(8)
         };
 
@@ -241,9 +241,9 @@ public partial class MainForm : Form
         var billingGroup = new GroupBox
         {
             Dock = DockStyle.Fill,
-            Text = string.Empty,
+            Text = "Quản lý phiên sử dụng",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Padding = new Padding(8)
+            Padding = new Padding(12, 8, 12, 12)
         };
 
         var billingLayout = new TableLayoutPanel
@@ -252,30 +252,31 @@ public partial class MainForm : Form
             ColumnCount = 1,
             RowCount = 2
         };
-        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 112F));
+        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 164F));
         billingLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         var controls = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 3,
-            Padding = new Padding(0, 2, 0, 2)
+            ColumnCount = 2,
+            RowCount = 4,
+            Padding = new Padding(0, 4, 0, 4)
         };
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 144F));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 152F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 22F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
+        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
+        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
 
         _billingModeComboBox = new ComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 2, 8, 2)
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            Margin = new Padding(0, 3, 0, 3)
         };
-        _billingModeComboBox.Items.AddRange(["Timed", "Open-ended"]);
+        _billingModeComboBox.Items.AddRange(["Theo thời gian", "Không giới hạn"]);
         _billingModeComboBox.SelectedIndex = 0;
 
         _billingMinutesInput = new NumericUpDown
@@ -284,7 +285,8 @@ public partial class MainForm : Form
             Maximum = 1_000_000,
             Value = 10,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 2, 8, 2)
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            Margin = new Padding(0, 3, 0, 3)
         };
 
         _billingRatePerHourInput = new NumericUpDown
@@ -295,32 +297,34 @@ public partial class MainForm : Form
             ThousandsSeparator = true,
             Value = 10_000,
             Dock = DockStyle.Fill,
-            Margin = new Padding(0, 2, 0, 2)
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            Margin = new Padding(0, 3, 0, 3)
         };
 
-        _btnStartBilling = BuildBillingButton("Start", BillingStart_Click);
-        _btnExtendBilling = BuildBillingButton("Extend", BillingExtend_Click);
-        _btnCloseBilling = BuildBillingButton("Close", BillingClose_Click);
+        _btnStartBilling = BuildBillingButton("Bắt đầu", BillingStart_Click);
+        _btnExtendBilling = BuildBillingButton("Gia hạn", BillingExtend_Click);
+        _btnCloseBilling = BuildBillingButton("Kết thúc", BillingClose_Click);
 
-        controls.Controls.Add(BuildBillingFieldLabel("Mode"), 0, 0);
-        controls.Controls.Add(BuildBillingFieldLabel("Minutes"), 1, 0);
-        controls.Controls.Add(BuildBillingFieldLabel("Rate (VND/hour)"), 2, 0);
-        controls.Controls.Add(_billingModeComboBox, 0, 1);
+        controls.Controls.Add(BuildBillingFieldLabel("Hình thức"), 0, 0);
+        controls.Controls.Add(BuildBillingFieldLabel("Số phút"), 0, 1);
+        controls.Controls.Add(BuildBillingFieldLabel("Giá/giờ"), 0, 2);
+        controls.Controls.Add(_billingModeComboBox, 1, 0);
         controls.Controls.Add(_billingMinutesInput, 1, 1);
-        controls.Controls.Add(_billingRatePerHourInput, 2, 1);
+        controls.Controls.Add(_billingRatePerHourInput, 1, 2);
 
         var buttonRow = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            Margin = new Padding(0, 4, 0, 0)
+            Margin = new Padding(0, 8, 0, 0),
+            Padding = Padding.Empty
         };
         buttonRow.Controls.Add(_btnStartBilling);
         buttonRow.Controls.Add(_btnExtendBilling);
         buttonRow.Controls.Add(_btnCloseBilling);
-        controls.Controls.Add(buttonRow, 0, 2);
-        controls.SetColumnSpan(buttonRow, 3);
+        controls.Controls.Add(buttonRow, 0, 3);
+        controls.SetColumnSpan(buttonRow, 2);
 
         _txtBillingMonitor = new TextBox
         {
@@ -329,7 +333,11 @@ public partial class MainForm : Form
             ReadOnly = true,
             TabStop = false,
             ScrollBars = ScrollBars.Vertical,
-            Text = "No billing session selected."
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = new Font("Consolas", 9.25F, FontStyle.Regular),
+            Margin = new Padding(0, 2, 0, 0),
+            Text = "Chưa chọn phiên tính tiền."
         };
 
         var billingMonitorLayout = new TableLayoutPanel
@@ -345,11 +353,11 @@ public partial class MainForm : Form
         _billingTopUpRequestPanel = new TableLayoutPanel
         {
             AutoSize = true,
-            BackColor = Color.White,
+            BackColor = Color.FromArgb(255, 252, 232),
             ColumnCount = 1,
             Dock = DockStyle.Fill,
             Margin = new Padding(0, 6, 0, 0),
-            Padding = new Padding(8, 6, 8, 6),
+            Padding = new Padding(10, 8, 10, 8),
             RowCount = 3,
             Visible = false
         };
@@ -397,6 +405,7 @@ public partial class MainForm : Form
         {
             AutoSize = true,
             Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+            ForeColor = Color.FromArgb(60, 90, 60),
             Margin = new Padding(0, 4, 0, 0),
             Visible = false
         };
@@ -429,9 +438,10 @@ public partial class MainForm : Form
         var button = new Button
         {
             Text = text,
-            Width = 84,
-            Height = 28,
-            Margin = new Padding(3, 2, 4, 2),
+            Width = 92,
+            Height = 30,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Margin = new Padding(0, 2, 8, 2),
             UseVisualStyleBackColor = true
         };
         button.Click += clickHandler;
@@ -444,7 +454,8 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             Text = text,
             Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-            TextAlign = ContentAlignment.BottomLeft,
+            ForeColor = Color.FromArgb(45, 45, 45),
+            TextAlign = ContentAlignment.MiddleLeft,
             Margin = new Padding(0, 0, 8, 0)
         };
 
@@ -1156,7 +1167,7 @@ public partial class MainForm : Form
         {
             if (_adminBilling is null)
             {
-                lblServerStatus.Text = "Billing service is unavailable.";
+                lblServerStatus.Text = "Dịch vụ tính tiền chưa sẵn sàng.";
                 return;
             }
 
@@ -1419,7 +1430,7 @@ public partial class MainForm : Form
         {
             if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
             {
-                _txtBillingMonitor.Text = "Server machine PC00 is not billed.";
+                _txtBillingMonitor.Text = "Máy chủ PC00 không cần tính tiền.";
             }
 
             return;
@@ -1432,7 +1443,7 @@ public partial class MainForm : Form
         }
         else if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
         {
-            _txtBillingMonitor.Text = "No active billing session.";
+            _txtBillingMonitor.Text = "Chưa có phiên tính tiền đang hoạt động.";
         }
     }
 
@@ -1447,7 +1458,7 @@ public partial class MainForm : Form
         {
             if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
             {
-                _txtBillingMonitor.Text = "Server machine PC00 is not billed.";
+                _txtBillingMonitor.Text = "Máy chủ PC00 không cần tính tiền.";
             }
 
             return;
@@ -1503,8 +1514,8 @@ public partial class MainForm : Form
         }
 
         lblServerStatus.Text = result.IsError
-            ? $"Billing {result.MachineId}: {result.ErrorCode ?? "Error"} - {result.Message}"
-            : $"Billing {result.MachineId}: {result.Message}";
+            ? $"Tính tiền {result.MachineId}: {result.ErrorCode ?? "Lỗi"} - {result.Message}"
+            : $"Tính tiền {result.MachineId}: {result.Message}";
 
         if (result.Timer is not null)
         {
@@ -1525,7 +1536,7 @@ public partial class MainForm : Form
     {
         string elapsed = FormatDuration(timer.ElapsedSeconds);
         string sessionRemaining = timer.RemainingSeconds is null
-            ? "open-ended"
+            ? "Không giới hạn"
             : FormatDuration(timer.RemainingSeconds.Value);
         string totalBalance = timer.TotalBalanceVnd is null
             ? "N/A"
@@ -1536,15 +1547,15 @@ public partial class MainForm : Form
         string balanceTimeRemaining = timer.RemainingUsageSeconds is null
             ? "N/A"
             : FormatDuration(timer.RemainingUsageSeconds.Value);
-        string warning = timer.IsWarning ? " / warning <=5m" : string.Empty;
+        string warning = timer.IsWarning ? " / sắp hết giờ <=5 phút" : string.Empty;
         return
             $"{timer.Status} {timer.RentalMode}{warning}{Environment.NewLine}" +
-            $"Rate: {FormatMoney(timer.RatePerHour)}/hour{Environment.NewLine}" +
-            $"Total topped up: {totalBalance}{Environment.NewLine}" +
-            $"Used cost: {FormatMoney(timer.AmountVnd)}{Environment.NewLine}" +
-            $"Remaining balance: {remainingBalance}{Environment.NewLine}" +
-            $"Used time: {elapsed} / charged {timer.ChargedMinutes} min{Environment.NewLine}" +
-            $"Remaining time: {sessionRemaining} / balance {balanceTimeRemaining}";
+            $"Giá giờ: {FormatMoney(timer.RatePerHour)}/giờ{Environment.NewLine}" +
+            $"Tổng đã nạp: {totalBalance}{Environment.NewLine}" +
+            $"Tiền đã dùng: {FormatMoney(timer.AmountVnd)}{Environment.NewLine}" +
+            $"Số dư còn lại: {remainingBalance}{Environment.NewLine}" +
+            $"Thời gian đã dùng: {elapsed} / tính {timer.ChargedMinutes} phút{Environment.NewLine}" +
+            $"Thời gian còn lại: {sessionRemaining} / theo số dư {balanceTimeRemaining}";
     }
 
     private long GetBillingRatePerHour()

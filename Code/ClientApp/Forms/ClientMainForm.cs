@@ -32,7 +32,7 @@ public sealed class ClientMainForm : Form
     // Form khóa chỉ tồn tại khi server đã khóa máy; null khi máy đang mở.
     private LockScreenForm? _lockScreen;
     private bool _isLockedByServer;
-    private TimeSpan _totalLockedTime = TimeSpan.Zero;
+    private bool _hasShownEmptyBalanceWarning;
     private DateTime? _lockStartedUtc;
 
     // Hai TextBox được tạo bằng code trong BuildInfoLayout nên được gán sau constructor.
@@ -40,10 +40,12 @@ public sealed class ClientMainForm : Form
     private TextBox _serverTextBox = null!;
     private TextBox _billingModeTextBox = null!;
     private TextBox _billingTimeTextBox = null!;
+    private TextBox _billingBalanceTextBox = null!;
     private TextBox _billingAmountTextBox = null!;
     private TextBox _chatHistoryTextBox = null!;
     private TextBox _chatMessageTextBox = null!;
     private Button _sendChatButton = null!;
+    private Button _topUpButton = null!;
 
     // Nhận thông tin phiên đã xác thực từ ConnectForm, dựng giao diện và đăng ký toàn
     // bộ sự kiện kết nối/lệnh cần thiết cho thời gian chạy của máy trạm.
@@ -66,7 +68,7 @@ public sealed class ClientMainForm : Form
 
         // Cấu hình cửa sổ cố định để màn hình phiên làm việc có kích thước nhất quán.
         Text = $"Client - {_machineId}";
-        ClientSize = new Size(560, 700);
+        ClientSize = new Size(600, 740);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
@@ -80,7 +82,7 @@ public sealed class ClientMainForm : Form
             RowCount = 4
         };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 54F));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 318F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 354F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
 
@@ -150,16 +152,16 @@ public sealed class ClientMainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 9,
+            RowCount = 10,
             Margin = new Padding(0, 8, 0, 8)
         };
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 128F));
         infoLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
         // Cac dong chia deu chieu cao cua vung thong tin.
-        for (var row = 0; row < 9; row++)
+        for (var row = 0; row < 10; row++)
         {
-            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / 9F));
+            infoLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 10F));
         }
 
         AddInfoRow(infoLayout, 0, "Machine ID", _machineId);
@@ -170,7 +172,8 @@ public sealed class ClientMainForm : Form
         AddInfoRow(infoLayout, 5, "Login time", FormatLoginTime(_loginTimeUtc));
         _billingModeTextBox = AddInfoRow(infoLayout, 6, "Billing", "No active billing");
         _billingTimeTextBox = AddInfoRow(infoLayout, 7, "Timer", "N/A");
-        _billingAmountTextBox = AddInfoRow(infoLayout, 8, "Used cost", "0 VND");
+        _billingBalanceTextBox = AddInfoRow(infoLayout, 8, "Balance", "N/A");
+        _billingAmountTextBox = AddInfoRow(infoLayout, 9, "Used cost", "0 VND");
         _serverTextBox = infoLayout.GetControlFromPosition(1, 4) as TextBox ?? _serverTextBox;
         return infoLayout;
     }
@@ -209,7 +212,9 @@ public sealed class ClientMainForm : Form
             Padding = new Padding(0, 10, 0, 0)
         };
 
+        _topUpButton = BuildButton("Nạp tiền", TopUp_Click);
         panel.Controls.Add(BuildButton("Giao tiếp", Communication_Click));
+        panel.Controls.Add(_topUpButton);
         panel.Controls.Add(BuildButton("Đăng xuất", Logout_Click));
         panel.Controls.Add(BuildButton("Đổi mật khẩu", ChangePassword_Click));
         return panel;
@@ -233,6 +238,11 @@ public sealed class ClientMainForm : Form
     private void ChangePassword_Click(object? sender, EventArgs e)
     {
         MessageBox.Show(this, "Chức năng đổi mật khẩu đang chờ tích hợp hệ thống xác thực.", "Mật khẩu", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void TopUp_Click(object? sender, EventArgs e)
+    {
+        ShowTopUpRequestDialog();
     }
 
     // Đăng xuất bằng cách đóng form chính; OnFormClosed sẽ giải phóng kết nối và handler.
@@ -334,18 +344,7 @@ public sealed class ClientMainForm : Form
         _sendChatButton.Enabled = false;
         try
         {
-            var chatPacket = PacketFactory.CreateChat(
-                source: _machineId,
-                target: NetworkProtocol.ServerSource,
-                payload: new ChatPayload
-                {
-                    Sender = _machineId,
-                    Receiver = NetworkProtocol.ServerSource,
-                    Message = message
-                },
-                requestId: Guid.NewGuid().ToString("N"));
-
-            await _connection.SendAsync(JsonHelper.SerializeToJson(chatPacket));
+            await SendClientChatMessageAsync(message);
             AppendClientChatLine(_machineId, message);
             _chatMessageTextBox.Clear();
         }
@@ -363,14 +362,27 @@ public sealed class ClientMainForm : Form
         }
     }
 
+    private async Task SendClientChatMessageAsync(string message)
+    {
+        var chatPacket = PacketFactory.CreateChat(
+            source: _machineId,
+            target: NetworkProtocol.ServerSource,
+            payload: new ChatPayload
+            {
+                Sender = _machineId,
+                Receiver = NetworkProtocol.ServerSource,
+                Message = message
+            },
+            requestId: Guid.NewGuid().ToString("N"));
+
+        await _connection.SendAsync(JsonHelper.SerializeToJson(chatPacket));
+    }
+
     // Tính thời gian đã dùng từ mốc UTC đăng nhập và hiển thị theo HH:mm:ss. TotalHours
     // được ép int để số giờ vẫn tăng qua 24 thay vì quay lại 00 như TimeSpan.Hours.
     private void UpdateUsedTime()
     {
-        TimeSpan currentLockedTime = _lockStartedUtc is null
-            ? TimeSpan.Zero
-            : DateTime.UtcNow - _lockStartedUtc.Value;
-        TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc - _totalLockedTime - currentLockedTime;
+        TimeSpan elapsed = DateTime.UtcNow - _loginTimeUtc;
 
         // Bảo vệ trường hợp đồng hồ máy bị lệch khiến loginTime nằm trong tương lai.
         if (elapsed < TimeSpan.Zero)
@@ -463,17 +475,152 @@ public sealed class ClientMainForm : Form
         string status = string.IsNullOrWhiteSpace(payload.Status) ? "Active" : payload.Status.Trim();
         string mode = string.IsNullOrWhiteSpace(payload.RentalMode) ? "Billing" : payload.RentalMode.Trim();
         string warning = payload.IsWarning ? " - warn <=5m" : string.Empty;
-        _billingModeTextBox.Text = $"{status} {mode}{warning}";
+        _billingModeTextBox.Text = $"{status} {mode}{warning} / {payload.RatePerHour:N0} VND/hour";
 
-        _billingTimeTextBox.Text = payload.RemainingSeconds is null
-            ? $"Open-ended since {payload.StartedAt.ToLocalTime():HH:mm:ss}"
-            : payload.ShouldLockNow
-                ? "Expired"
-                : $"{TimeSpan.FromSeconds(payload.RemainingSeconds.Value):hh\\:mm\\:ss}";
-        _billingAmountTextBox.Text = $"{payload.AmountVnd:N0} VND ({payload.ChargedMinutes} min)";
+        string elapsed = FormatDuration(payload.ElapsedSeconds);
+        long countdownSeconds = payload.RemainingUsageSeconds
+            ?? payload.RemainingSeconds
+            ?? 0;
+        _billingTimeTextBox.Text = $"Da dung: {elapsed} / Còn lại: {FormatDuration(countdownSeconds)}";
+
+        _billingBalanceTextBox.Text = payload.RemainingBalanceVnd is null
+            ? "N/A"
+            : $"Da nap: {payload.TotalBalanceVnd ?? 0:N0} VND / Con lai: {payload.RemainingBalanceVnd.Value:N0} VND / Thoi gian con lai: {FormatDuration(payload.RemainingUsageSeconds ?? 0)}";
+        _billingAmountTextBox.Text = $"Da dung: {payload.AmountVnd:N0} VND ({payload.ChargedMinutes} min)";
+
+        if (payload.RemainingBalanceVnd is > 0)
+        {
+            _hasShownEmptyBalanceWarning = false;
+        }
+        else if (payload.ShouldLockNow
+            && payload.RemainingBalanceVnd == 0
+            && !_hasShownEmptyBalanceWarning)
+        {
+            _hasShownEmptyBalanceWarning = true;
+            ShowTopUpRequestDialog();
+        }
+
         UpdateServerConnectionStatus(payload.ShouldLockNow
             ? "connected - billing expired"
             : "connected - billing synced");
+    }
+
+    private static string FormatDuration(long totalSeconds)
+    {
+        TimeSpan time = TimeSpan.FromSeconds(Math.Max(0, totalSeconds));
+        return $"{(long)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}";
+    }
+
+    private void ShowTopUpRequestDialog()
+    {
+        using var dialog = new Form
+        {
+            Text = "Cần nạp tiền",
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MinimizeBox = false,
+            MaximizeBox = false,
+            ClientSize = new Size(440, 218),
+            Padding = new Padding(14)
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 4
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 48F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 24F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40F));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+
+        layout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "!",
+            Font = new Font("Segoe UI", 22F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(210, 145, 0),
+            TextAlign = ContentAlignment.MiddleCenter
+        }, 0, 0);
+
+        layout.Controls.Add(new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "Tài khoản đã hết tiền. Vui lòng gửi yêu cầu nạp thêm tiền để tiếp tục sử dụng máy.",
+            TextAlign = ContentAlignment.MiddleLeft
+        }, 1, 0);
+
+        var amountInput = new NumericUpDown
+        {
+            Dock = DockStyle.Fill,
+            Minimum = 1_000,
+            Maximum = 1_000_000_000,
+            Increment = 1_000,
+            ThousandsSeparator = true,
+            Value = 10_000,
+            Margin = new Padding(0, 2, 0, 4)
+        };
+        var amountLabel = new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "Số tiền cần nạp (VND)",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 0, 0, 0)
+        };
+        layout.Controls.Add(amountLabel, 0, 1);
+        layout.SetColumnSpan(amountLabel, 2);
+        layout.Controls.Add(amountInput, 0, 2);
+        layout.SetColumnSpan(amountInput, 2);
+
+        var buttonRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+        var requestButton = new Button
+        {
+            Text = "Yêu cầu nạp tiền",
+            DialogResult = DialogResult.OK,
+            Width = 132
+        };
+        buttonRow.Controls.Add(requestButton);
+        layout.Controls.Add(buttonRow, 0, 3);
+        layout.SetColumnSpan(buttonRow, 2);
+
+        dialog.AcceptButton = requestButton;
+        dialog.Controls.Add(layout);
+
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _ = SendTopUpRequestAsync(decimal.ToInt64(amountInput.Value));
+        }
+    }
+
+    private async Task SendTopUpRequestAsync(long requestedAmount)
+    {
+        if (requestedAmount <= 0)
+        {
+            UpdateServerConnectionStatus("connected - invalid top-up amount");
+            return;
+        }
+
+        string message = $"{_machineId} yêu cầu nạp {requestedAmount} VND";
+
+        try
+        {
+            await SendClientChatMessageAsync(message);
+            AppendClientChatLine(_machineId, message);
+            UpdateServerConnectionStatus("connected - top-up request sent");
+        }
+        catch (Exception)
+        {
+            UpdateServerConnectionStatus("connected - top-up request pending");
+        }
     }
 
     private void AppendClientChatLine(string sender, string message)
@@ -606,11 +753,6 @@ public sealed class ClientMainForm : Form
         }
         else if (!locked && _isLockedByServer)
         {
-            if (_lockStartedUtc is not null)
-            {
-                _totalLockedTime += now - _lockStartedUtc.Value;
-            }
-
             _lockStartedUtc = null;
         }
 

@@ -96,6 +96,7 @@ public static class JsonHelper
             PacketType.STATUS => typeof(StatusPayload),
             PacketType.LOCK => typeof(LockPayload),
             PacketType.UNLOCK => typeof(UnlockPayload),
+            PacketType.SHUTDOWN => typeof(ShutdownPayload),
             PacketType.ACK => typeof(AckPayload),
             PacketType.NOTIFICATION => typeof(NotificationPayload),
             PacketType.TIMER => typeof(TimerPayload),

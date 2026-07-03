@@ -338,7 +338,7 @@ public partial class ConnectForm : Form
         return authResult.ErrorCode switch
         {
             "INVALID_CREDENTIALS" => "Sai tài khoản hoặc mật khẩu.",
-            "INVALID_MACHINE_ID" => "Mã máy không hợp lệ hoặc máy chưa được đăng ký.",
+            "INVALID_MACHINE_ID" => "Mã máy không tồn tại trong hệ thống.",
             "ACCOUNT_MACHINE_MISMATCH" => "Tài khoản này không được gán cho máy đang chọn.",
             "ACCOUNT_DISABLED" => "Tài khoản hoặc máy trạm đã bị vô hiệu hóa.",
             "MACHINE_ALREADY_ACTIVE" => "Máy này đang có phiên đăng nhập khác.",

@@ -283,13 +283,13 @@ public sealed class PacketDispatcher
 
         string ackFor = payload.AckFor?.Trim() ?? string.Empty;
         if (!Enum.TryParse(ackFor, ignoreCase: true, out PacketType ackForType)
-            || ackForType is not (PacketType.LOCK or PacketType.UNLOCK))
+            || ackForType is not (PacketType.LOCK or PacketType.UNLOCK or PacketType.SHUTDOWN))
         {
             return CreateCommandAckError(
                 machineId,
                 ParseCommandOrDefault(payload.AckFor),
                 "ACK_TYPE_MISMATCH",
-                "ACK must reference LOCK or UNLOCK.",
+                "ACK must reference LOCK, UNLOCK or SHUTDOWN.",
                 ackPacket.RequestId);
         }
 
@@ -370,9 +370,12 @@ public sealed class PacketDispatcher
             : CommandType.LOCK;
 
     private static CommandType ToCommandType(PacketType packetType)
-        => packetType == PacketType.UNLOCK
-            ? CommandType.UNLOCK
-            : CommandType.LOCK;
+        => packetType switch
+        {
+            PacketType.UNLOCK => CommandType.UNLOCK,
+            PacketType.SHUTDOWN => CommandType.SHUTDOWN,
+            _ => CommandType.LOCK
+        };
 
     private static string SerializeResponse(Packet response)
     {

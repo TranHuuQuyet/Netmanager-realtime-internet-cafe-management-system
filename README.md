@@ -2,15 +2,15 @@
 
 NetManager is a .NET 8 Windows Forms internet-cafe management project targeting server/client control over TCP with SQLite-backed authentication.
 
-## Current Reality - 2026-05-25
+## Current Reality - 2026-07-01
 
-The project is in recovery, not feature-complete delivery.
+The project is a local release candidate, but it is not yet a fully accepted final demo.
 
-- Docs, UI shells, shared packet artifacts, networking wrappers and auth/database code exist.
-- The current working tree does not build: `ServerApp/Forms/LoginForm.Designer.cs(7,29)` fails because the server login code-behind is missing locally.
-- No verified TCP JSON-line round-trip, integrated login/status flow, lock/unlock/ACK path or multi-client demo exists yet.
-- The audit found `0/33` passing legacy runtime tests and no passing demo checklist step.
-- Local client forms currently represent shell artifacts, not runtime integration proof.
+- The solution builds in Debug and Release with `0` warnings and `0` errors on the audited local machine.
+- `ContractSmoke`, `Auth_Test` and `NetworkSmokeTest` pass locally.
+- Local runtime evidence covers TCP JSON-line login/status, lock/unlock with typed ACK/error results, two distinct local clients, selected-client chat, billing TIMER sync, expiry LOCK and billing restore/resync smoke paths.
+- Required physical LAN rehearsal with two real client machines has not been executed in this workspace.
+- Manual WinForms release rehearsal and M1/M6 release approval remain required before the project can be called final.
 
 See [DOCS/RECOVERY_REPORT_2026-05-25.md](DOCS/RECOVERY_REPORT_2026-05-25.md) for the audit baseline and recovery decision.
 
@@ -18,7 +18,7 @@ See [DOCS/RECOVERY_REPORT_2026-05-25.md](DOCS/RECOVERY_REPORT_2026-05-25.md) for
 
 Deadline: `2026-07-05`.
 
-The required release path is a stable local multi-instance core demo:
+The required release path is a stable local multi-instance and physical LAN demo:
 
 - buildable solution;
 - TCP JSON-line local communication;
@@ -27,16 +27,19 @@ The required release path is a stable local multi-instance core demo:
 - lock/unlock command handling;
 - ACK/error visibility;
 - two distinct local clients;
+- selected-client 1-1 chat;
+- timed/open-ended billing with SQLite `BillingSessions` restore;
+- minimal restart/reconnect billing resync;
+- two physical LAN clients;
 - disconnect stability;
-- rehearsed local release build.
+- two rehearsed local release builds.
 
 Important product features are retained behind gates rather than removed:
 
-- direct notification;
-- timer display and later timer persistence;
-- 1-1 text chat;
-- Real LAN smoke validation;
-- notification broadcast and reconnect polish.
+- direct notification and notification broadcast have local smoke evidence;
+- reconnect polish remains retained/conditional.
+
+Timer display, 1-1 chat, Real LAN and billing persistence were promoted into the required demo scope on `2026-06-09`.
 
 Extension status is tracked in [DOCS/TASKS.md](DOCS/TASKS.md) and [DOCS/TEST_MATRIX.md](DOCS/TEST_MATRIX.md).
 
@@ -100,7 +103,15 @@ Approved build target command, from repository root:
 dotnet build Code/NetManager.sln
 ```
 
-This command is expected to pass on the current baseline. Any failure should be recorded in DOCS/BUGS.md and investigated before proceeding to later gates.
+The repository root contains `global.json` pinning the .NET SDK to `8.0.421`, matching the project target and the current run guide. Any build or smoke-test failure should be recorded in DOCS/BUGS.md and investigated before proceeding to later gates.
+
+Approved local verification command:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Verify-LocalRelease.ps1
+```
+
+This runs restore, Debug build, Release build, contract smoke, auth/billing smoke and network smoke from one release-check entry point.
 
 ## Active Documents
 

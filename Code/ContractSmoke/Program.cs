@@ -31,7 +31,7 @@ static void PacketTypeSerializesAsString()
             Username = "client01",
             Password = "123",
             Role = "Client",
-            MachineId = "PC-01"
+            MachineId = "PC01"
         },
         "req-0001");
 
@@ -69,7 +69,7 @@ static void LoginRequestDeserializesAsRequest()
             Username = "client01",
             Password = "123",
             Role = "Client",
-            MachineId = "PC-01"
+            MachineId = "PC01"
         },
         "req-0001"));
 
@@ -88,7 +88,7 @@ static void LoginRequestKeepsResponseFieldsUnset()
             Username = "client01",
             Password = "123",
             Role = "Client",
-            MachineId = "PC-01"
+            MachineId = "PC01"
         },
         "req-0001"));
 
@@ -109,7 +109,7 @@ static void LoginSuccessDeserializesAsResult()
             SessionId = "session-id",
             Username = "client01",
             Role = "Client",
-            MachineId = "PC-01"
+            MachineId = "PC01"
         },
         "req-0001"));
 
@@ -146,10 +146,10 @@ static void TimerSupportsOpenEndedBillingSync()
     var startedAt = DateTimeOffset.Parse("2026-06-26T01:02:03Z");
     string json = JsonHelper.SerializeToJson(PacketFactory.CreateTimer(
         "server",
-        "PC-01",
+        "PC01",
         new TimerPayload
         {
-            MachineId = "PC-01",
+            MachineId = "PC01",
             RentalMode = "OpenEnded",
             RemainingSeconds = null,
             StartedAt = startedAt,

@@ -21,7 +21,7 @@ namespace ServerApp.Networking;
 // - Lắng nghe client kết nối TCP.
 // - Nhận từng dòng JSON, đưa qua PacketDispatcher.
 // - Bind session/machine vào đúng TCP connection sau LOGIN/STATUS.
-// - Gửi LOCK/UNLOCK từ admin UI xuống đúng máy client.
+// - Gửi LOCK/UNLOCK/SHUTDOWN từ admin UI xuống đúng máy client.
 // - Theo dõi pending command và biến ACK thành typed result cho UI.
 //
 // Một command admin hoàn chỉnh đi qua flow:
@@ -202,11 +202,26 @@ public sealed class TcpJsonLineServer : IDisposable
         string reason,
         CancellationToken cancellationToken = default)
     {
+        return await SendMachineCommandWithResultAsync(
+            machineId,
+            lockMachine ? CommandType.LOCK : CommandType.UNLOCK,
+            issuedBy,
+            reason,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<MachineCommandSendResult> SendMachineCommandWithResultAsync(
+        string machineId,
+        CommandType commandType,
+        string issuedBy,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
         // Submit command flow:
         // - validate machineId
         // - tìm TCP client đang bind với machineId
         // - gọi authorization guard để chắc machine có active session hợp lệ
-        // - tạo packet LOCK/UNLOCK có requestId
+        // - tạo packet command có requestId
         // - gửi xuống socket
         // - lưu pending command để ACK sau này có thể đối chiếu
         string targetMachineId = machineId?.Trim() ?? string.Empty;
@@ -247,10 +262,17 @@ public sealed class TcpJsonLineServer : IDisposable
         }
 
         string requestId = Guid.NewGuid().ToString("N");
-        PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
-        CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
-        Packet packet = lockMachine
-            ? PacketFactory.CreateLock(
+        PacketType packetType = commandType switch
+        {
+            CommandType.LOCK => PacketType.LOCK,
+            CommandType.UNLOCK => PacketType.UNLOCK,
+            CommandType.SHUTDOWN => PacketType.SHUTDOWN,
+            _ => throw new ArgumentOutOfRangeException(nameof(commandType), commandType, "Unsupported machine command.")
+        };
+
+        Packet packet = commandType switch
+        {
+            CommandType.LOCK => PacketFactory.CreateLock(
                 source: NetworkProtocol.ServerSource,
                 target: targetMachineId,
                 payload: new LockPayload
@@ -259,8 +281,8 @@ public sealed class TcpJsonLineServer : IDisposable
                     IssuedBy = issuedBy,
                     Reason = reason
                 },
-                requestId: requestId)
-            : PacketFactory.CreateUnlock(
+                requestId: requestId),
+            CommandType.UNLOCK => PacketFactory.CreateUnlock(
                 source: NetworkProtocol.ServerSource,
                 target: targetMachineId,
                 payload: new UnlockPayload
@@ -269,7 +291,19 @@ public sealed class TcpJsonLineServer : IDisposable
                     IssuedBy = issuedBy,
                     Reason = reason
                 },
-                requestId: requestId);
+                requestId: requestId),
+            CommandType.SHUTDOWN => PacketFactory.CreateShutdown(
+                source: NetworkProtocol.ServerSource,
+                target: targetMachineId,
+                payload: new ShutdownPayload
+                {
+                    MachineId = targetMachineId,
+                    IssuedBy = issuedBy,
+                    Reason = reason
+                },
+                requestId: requestId),
+            _ => throw new ArgumentOutOfRangeException(nameof(commandType), commandType, "Unsupported machine command.")
+        };
 
         string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
         TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_COMMAND", clientId, message));
@@ -375,6 +409,165 @@ public sealed class TcpJsonLineServer : IDisposable
             TraceEmitted?.Invoke(new NetworkTraceEntry("CHAT_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
             return new MachineChatSendResult(false, "Error", ex.Message, errorCode, requestId);
         }
+    }
+
+    public async Task<MachineNotificationSendResult> SendNotificationAsync(
+        string machineId,
+        string message,
+        string severity = "Info",
+        string scope = "Direct",
+        CancellationToken cancellationToken = default)
+    {
+        string targetMachineId = machineId?.Trim() ?? string.Empty;
+        string notificationMessage = message?.Trim() ?? string.Empty;
+        string normalizedSeverity = string.IsNullOrWhiteSpace(severity) ? "Info" : severity.Trim();
+        string normalizedScope = string.IsNullOrWhiteSpace(scope) ? "Direct" : scope.Trim();
+
+        if (string.IsNullOrWhiteSpace(targetMachineId))
+        {
+            const string errorCode = "INVALID_MACHINE_ID";
+            const string errorMessage = "Machine ID is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        if (string.IsNullOrWhiteSpace(notificationMessage))
+        {
+            const string errorCode = "INVALID_NOTIFICATION_MESSAGE";
+            const string errorMessage = "NOTIFICATION message is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string clientId = string.Empty;
+        foreach (KeyValuePair<string, string> binding in _machineBindings)
+        {
+            if (string.Equals(binding.Value, targetMachineId, StringComparison.OrdinalIgnoreCase))
+            {
+                clientId = binding.Key;
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId)
+            || !_connections.TryGetValue(clientId, out ClientConnection? connection))
+        {
+            const string errorCode = "MACHINE_OFFLINE";
+            const string errorMessage = "Machine is offline or not connected.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        AuthResult authorization = await _sessions.AuthorizeCommandTargetAsync(targetMachineId, cancellationToken).ConfigureAwait(false);
+        if (!authorization.IsSuccess)
+        {
+            const string errorCode = "UNAUTHORIZED_NOTIFICATION";
+            string errorMessage = authorization.Message;
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", targetMachineId, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationSendResult(false, "Error", errorMessage, errorCode);
+        }
+
+        string requestId = Guid.NewGuid().ToString("N");
+        Packet<NotificationPayload> packet = PacketFactory.CreateNotification(
+            source: NetworkProtocol.ServerSource,
+            target: targetMachineId,
+            payload: new NotificationPayload
+            {
+                Message = notificationMessage,
+                Severity = normalizedSeverity,
+                Scope = normalizedScope
+            },
+            requestId: requestId);
+
+        string outboundLine = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
+        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_NOTIFICATION", clientId, outboundLine));
+
+        try
+        {
+            await connection.SendAsync(outboundLine, cancellationToken).ConfigureAwait(false);
+            return new MachineNotificationSendResult(true, "Sent", "NOTIFICATION sent to client.", RequestId: requestId);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException)
+        {
+            const string errorCode = "NOTIFICATION_SEND_FAILED";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", targetMachineId, $"{errorCode}: {ex.Message}"));
+            return new MachineNotificationSendResult(false, "Error", ex.Message, errorCode, requestId);
+        }
+    }
+
+    public async Task<MachineNotificationBroadcastResult> BroadcastNotificationAsync(
+        string message,
+        string severity = "Info",
+        CancellationToken cancellationToken = default)
+    {
+        string notificationMessage = message?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(notificationMessage))
+        {
+            const string errorCode = "INVALID_NOTIFICATION_MESSAGE";
+            const string errorMessage = "NOTIFICATION message is required.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationBroadcastResult(false, "Error", errorMessage, 0, 0, errorCode);
+        }
+
+        List<string> targetMachineIds = [];
+        foreach (KeyValuePair<string, string> binding in _machineBindings.ToArray())
+        {
+            if (!string.IsNullOrWhiteSpace(binding.Value))
+            {
+                targetMachineIds.Add(binding.Value);
+            }
+        }
+
+        if (targetMachineIds.Count == 0)
+        {
+            const string errorCode = "NO_ACTIVE_MACHINES";
+            const string errorMessage = "No active machines are connected.";
+            TraceEmitted?.Invoke(new NetworkTraceEntry("NOTIFICATION_ERROR", string.Empty, $"{errorCode}: {errorMessage}"));
+            return new MachineNotificationBroadcastResult(false, "Error", errorMessage, 0, 0, errorCode);
+        }
+
+        int sentCount = 0;
+        List<string> errorCodes = [];
+        foreach (string targetMachineId in targetMachineIds.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            MachineNotificationSendResult result = await SendNotificationAsync(
+                targetMachineId,
+                notificationMessage,
+                severity,
+                "Broadcast",
+                cancellationToken).ConfigureAwait(false);
+
+            if (result.Sent)
+            {
+                sentCount++;
+            }
+            else if (!string.IsNullOrWhiteSpace(result.ErrorCode))
+            {
+                errorCodes.Add(result.ErrorCode);
+            }
+        }
+
+        if (sentCount == 0)
+        {
+            string errorCode = errorCodes.Count == 0 ? "NOTIFICATION_BROADCAST_FAILED" : string.Join(",", errorCodes.Distinct());
+            return new MachineNotificationBroadcastResult(
+                false,
+                "Error",
+                "NOTIFICATION broadcast did not reach any client.",
+                targetMachineIds.Count,
+                sentCount,
+                errorCode);
+        }
+
+        string messageSummary = $"NOTIFICATION broadcast sent to {sentCount}/{targetMachineIds.Count} active clients.";
+        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_NOTIFICATION_BROADCAST", string.Empty, messageSummary));
+        return new MachineNotificationBroadcastResult(
+            sentCount == targetMachineIds.Count,
+            sentCount == targetMachineIds.Count ? "Sent" : "Partial",
+            messageSummary,
+            targetMachineIds.Count,
+            sentCount,
+            sentCount == targetMachineIds.Count ? null : "NOTIFICATION_BROADCAST_PARTIAL");
     }
 
     public async Task<MachineTimerSendResult> SendTimerAsync(
@@ -747,11 +940,21 @@ public sealed class TcpJsonLineServer : IDisposable
     }
 
     private static CommandType ParseAckCommand(string? ackFor)
+    {
         // ACK malformed vẫn cần command type để UI hiển thị.
         // Nếu không parse được thì fallback LOCK để giữ result không null.
-        => string.Equals(ackFor, PacketType.UNLOCK.ToString(), StringComparison.OrdinalIgnoreCase)
-            ? CommandType.UNLOCK
-            : CommandType.LOCK;
+        if (string.Equals(ackFor, PacketType.UNLOCK.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return CommandType.UNLOCK;
+        }
+
+        if (string.Equals(ackFor, PacketType.SHUTDOWN.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return CommandType.SHUTDOWN;
+        }
+
+        return CommandType.LOCK;
+    }
 
     private static string GetAckErrorCode(string status)
         // Status hợp lệ nhưng không thành công được map thành fixed error code.

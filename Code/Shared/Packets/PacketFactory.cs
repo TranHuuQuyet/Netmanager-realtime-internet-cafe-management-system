@@ -34,6 +34,12 @@ public static class PacketFactory
         return new Packet<UnlockPayload>(PacketType.UNLOCK, source, target, payload, requestId);
     }
 
+    public static Packet<ShutdownPayload> CreateShutdown(
+        string source, string target, ShutdownPayload payload, string? requestId = null)
+    {
+        return new Packet<ShutdownPayload>(PacketType.SHUTDOWN, source, target, payload, requestId);
+    }
+
     public static Packet<AckPayload> CreateAck(
         string source, string target, AckPayload payload, string? requestId = null)
     {

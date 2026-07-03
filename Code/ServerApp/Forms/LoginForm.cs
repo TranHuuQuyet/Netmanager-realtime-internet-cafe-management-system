@@ -109,7 +109,7 @@ public partial class LoginForm : Form
             // dạng AuthResult, vì vậy chỉ hiển thị thông báo và giữ form mở.
             if (!result.IsSuccess)
             {
-                lblMessage.Text = result.Message;
+                lblMessage.Text = CreateLoginFailureMessage(result);
                 return;
             }
 
@@ -139,6 +139,19 @@ public partial class LoginForm : Form
     {
         lblMessage.Text = message;
         focusTarget.Focus();
+    }
+
+    private static string CreateLoginFailureMessage(AuthResult result)
+    {
+        return result.ErrorCode switch
+        {
+            "INVALID_MACHINE_ID" => "Mã máy không tồn tại trong hệ thống.",
+            "INVALID_CREDENTIALS" => "Sai tài khoản, mật khẩu hoặc quyền đăng nhập.",
+            "ACCOUNT_MACHINE_MISMATCH" => "Tài khoản này không được gán cho mã máy đang chọn.",
+            "ACCOUNT_DISABLED" => "Tài khoản hoặc máy đã bị vô hiệu hóa.",
+            "MACHINE_ALREADY_ACTIVE" => "Máy này đang có phiên đăng nhập khác.",
+            _ => result.Message
+        };
     }
 
     private void TxtMachineId_TextChanged(object? sender, EventArgs e)

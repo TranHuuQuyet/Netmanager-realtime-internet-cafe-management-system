@@ -120,7 +120,22 @@ try
     WriteCaseHeader("TC-N12", "Client reconnect behavior is controlled.");
     await AssertClientReconnectBehaviorAsync();
 
-    WriteDiagnostic("PASS: Client -> ServerApp listener -> auth dispatcher -> controlled invalid/unsupported handling -> Client");
+    WriteCaseHeader("TC-N13", "Repeated login is rejected while the machine session is active.");
+    await AssertRepeatedLoginRejectedWhileActiveAsync(port, authRuntime.SessionRepository);
+
+    ClearTraces(traces);
+    WriteCaseHeader("TC-N14", "Admin UI LOCK/UNLOCK commands and typed ACK results are routed.");
+    await AssertAdminUiLockUnlockCommandTraceAsync(port, authRuntime, server, traces, commandResults);
+
+    WriteCaseHeader("TC-N15", "Billing TIMER, expiry LOCK and STATUS resync are routed.");
+    await AssertBillingTimerRoutingAsync(port, authRuntime, server);
+
+    ClearTraces(traces);
+    WriteCaseHeader("TC-N16", "Top-up request decisions update balance, TIMER and lock state.");
+    await AssertTopUpRequestFlowAsync(port, authRuntime, server, traces);
+
+    WriteDiagnostic(
+        "PASS: Client -> ServerApp listener -> auth/command/billing/top-up dispatcher -> controlled results -> Client");
 }
 finally
 {
@@ -742,6 +757,7 @@ static async Task AssertTopUpRequestFlowAsync(
     await SendCommandAckAsync(pc01Stream, initialLock, machineId, "Success", "Empty balance lock applied.");
 
     using var mainForm = new ServerApp.MainForm(authRuntime.Machines, server, billingService, authRuntime.Customers);
+    SynchronizationContext.SetSynchronizationContext(null);
 
     await mainForm.HandleTopUpRequestDecisionAsync(machineId, 5_000, DialogResult.No);
     Packet<TimerPayload> rejectedEmptyTimer = await ReadTimerPacketAsync(pc01Reader, "PC01 rejected empty-balance TIMER");
@@ -795,7 +811,8 @@ static async Task AssertTopUpRequestFlowAsync(
         lockCountBeforePositiveReject,
         "Rejected positive-balance top-up must not send LOCK.");
 
-    TryShutdown(pc01Client);
+    pc01Client.Client.Dispose();
+    await WaitForClosedSessionAsync(authRuntime.SessionRepository, sessionId);
     Console.WriteLine("PASS: top-up request parser, confirm balance update/unlock and money-based reject lock flow");
 }
 

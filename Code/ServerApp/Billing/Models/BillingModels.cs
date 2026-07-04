@@ -99,9 +99,12 @@ public static class BillingCalculator
             asOfUtc = startedAtUtc;
         }
 
-        // Tinh so giay da qua, doi sang phut tinh phi, roi tinh tien theo don gia/gio.
+        // Tinh so giay da qua, lam tron len phut tinh phi, roi tinh tien theo don gia/gio.
+        // Vi du: 61 giay duoc tinh la 2 phut, con 0 giay van la 0 phut.
         double elapsedSeconds = (asOfUtc - startedAtUtc).TotalSeconds;
-        long chargedMinutes = (long)Math.Floor(elapsedSeconds / 60.0);
+        long chargedMinutes = elapsedSeconds <= 0
+            ? 0
+            : (long)Math.Ceiling(elapsedSeconds / 60.0);
         long amountVnd = (long)Math.Ceiling(chargedMinutes * ratePerHour / 60.0);
 
         return new BillingCalculation(

@@ -1,14 +1,14 @@
 using System.Text.Json;
 using Shared.DTOs.RequestPayloads;
 using Shared.DTOs.ResponsePayloads;
+using Shared.Networking;
 using Shared.Packets;
 using Shared.Utilities.JsonHelper;
 
 // File nay hien dang chua handler command runtime cua ClientApp trong project ContractSmoke.
 // Comment duoc them de nguoi moi hoc C# biet day la luong nhan packet va phat event theo command.
-namespace ClientApp.Networking;
-
 Console.WriteLine("Contract smoke checks passed.");
+Run("TC-C06: outgoing message rejects embedded line breaks", OutgoingNetworkMessageRejectsEmbeddedLineBreaks);
 
 static void Run(string name, Action check)
 {
@@ -115,6 +115,25 @@ static void LoginFailureUsesErrorEnvelope()
     Assert(typedPacket.Payload is EmptyPayload, "LOGIN failure payload must be empty.");
 }
 
+static void OutgoingNetworkMessageRejectsEmbeddedLineBreaks()
+{
+    string json = """{"type":"PING","source":"client01","target":"server","requestId":"req-0001"}""";
+    string unchanged = NetworkProtocol.ValidateOutgoingMessage(json);
+
+    Assert(unchanged == json, "Valid single-line JSON must be preserved.");
+
+    AssertThrowsArgumentException(
+        () => NetworkProtocol.ValidateOutgoingMessage("""
+            {"type":"PING",
+            "source":"client01","target":"server","requestId":"req-0001"}
+            """),
+        "Embedded newline must be rejected.");
+
+    AssertThrowsArgumentException(
+        () => NetworkProtocol.ValidateOutgoingMessage("{\"type\":\"PING\"\r\n}"),
+        "Embedded carriage return must be rejected.");
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
@@ -132,6 +151,24 @@ static void AssertThrows(Action action, string message)
     catch
     {
         return;
+    }
+
+    throw new InvalidOperationException(message);
+}
+
+static void AssertThrowsArgumentException(Action action, string message)
+{
+    try
+    {
+        action();
+    }
+    catch (ArgumentException)
+    {
+        return;
+    }
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException(message, ex);
     }
 
     throw new InvalidOperationException(message);

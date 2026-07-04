@@ -8,6 +8,11 @@ using Shared.Utilities.JsonHelper;
 // File nay hien dang chua handler command runtime cua ClientApp trong project ContractSmoke.
 // Comment duoc them de nguoi moi hoc C# biet day la luong nhan packet va phat event theo command.
 Console.WriteLine("Contract smoke checks passed.");
+Run("TC-C01: packet type serializes as string", PacketTypeSerializesAsString);
+Run("TC-C02: numeric packet type is rejected", NumericPacketTypeIsRejected);
+Run("TC-C03: login request deserializes as request", LoginRequestDeserializesAsRequest);
+Run("TC-C04: login success deserializes as result", LoginSuccessDeserializesAsResult);
+Run("TC-C05: login failure uses error envelope", LoginFailureUsesErrorEnvelope);
 Run("TC-C06: outgoing message rejects embedded line breaks", OutgoingNetworkMessageRejectsEmbeddedLineBreaks);
 
 static void Run(string name, Action check)

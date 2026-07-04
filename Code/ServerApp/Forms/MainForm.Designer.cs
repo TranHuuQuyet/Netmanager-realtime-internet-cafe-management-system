@@ -41,7 +41,6 @@ partial class MainForm
         chatInputLayout = new TableLayoutPanel();
         txtChatMessage = new TextBox();
         btnSendChat = new Button();
-        btnSendNotification = new Button();
         btnBroadcastNotification = new Button();
         tabCustomers = new TabPage();
         customerLayout = new TableLayoutPanel();
@@ -333,15 +332,13 @@ partial class MainForm
         // 
         // chatInputLayout
         // 
-        chatInputLayout.ColumnCount = 4;
+        chatInputLayout.ColumnCount = 3;
         chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
         chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
         chatInputLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 56F));
         chatInputLayout.Controls.Add(txtChatMessage, 0, 0);
         chatInputLayout.Controls.Add(btnSendChat, 1, 0);
-        chatInputLayout.Controls.Add(btnSendNotification, 2, 0);
-        chatInputLayout.Controls.Add(btnBroadcastNotification, 3, 0);
+        chatInputLayout.Controls.Add(btnBroadcastNotification, 2, 0);
         chatInputLayout.Dock = DockStyle.Fill;
         chatInputLayout.Location = new Point(3, 78);
         chatInputLayout.Name = "chatInputLayout";
@@ -356,40 +353,28 @@ partial class MainForm
         txtChatMessage.Location = new Point(3, 3);
         txtChatMessage.Name = "txtChatMessage";
         txtChatMessage.PlaceholderText = "Nhập tin nhắn...";
-        txtChatMessage.Size = new Size(106, 23);
+        txtChatMessage.Size = new Size(162, 23);
         txtChatMessage.TabIndex = 0;
         txtChatMessage.KeyDown += TxtChatMessage_KeyDown;
         // 
         // btnSendChat
         // 
         btnSendChat.Dock = DockStyle.Fill;
-        btnSendChat.Location = new Point(115, 3);
+        btnSendChat.Location = new Point(171, 3);
         btnSendChat.Name = "btnSendChat";
         btnSendChat.Size = new Size(50, 28);
         btnSendChat.TabIndex = 1;
         btnSendChat.Text = "Gửi";
         btnSendChat.UseVisualStyleBackColor = true;
         btnSendChat.Click += BtnSendChat_Click;
-        //
-        // btnSendNotification
-        //
-        btnSendNotification.Dock = DockStyle.Fill;
-        btnSendNotification.Location = new Point(171, 3);
-        btnSendNotification.Name = "btnSendNotification";
-        btnSendNotification.Size = new Size(50, 28);
-        btnSendNotification.TabIndex = 2;
-        btnSendNotification.Text = "TB";
-        btnSendNotification.UseVisualStyleBackColor = true;
-        btnSendNotification.Click += BtnSendNotification_Click;
-        //
         // btnBroadcastNotification
         //
         btnBroadcastNotification.Dock = DockStyle.Fill;
         btnBroadcastNotification.Location = new Point(227, 3);
         btnBroadcastNotification.Name = "btnBroadcastNotification";
         btnBroadcastNotification.Size = new Size(50, 28);
-        btnBroadcastNotification.TabIndex = 3;
-        btnBroadcastNotification.Text = "All";
+        btnBroadcastNotification.TabIndex = 2;
+        btnBroadcastNotification.Text = "ALL";
         btnBroadcastNotification.UseVisualStyleBackColor = true;
         btnBroadcastNotification.Click += BtnBroadcastNotification_Click;
         //
@@ -893,7 +878,6 @@ partial class MainForm
     private TableLayoutPanel chatInputLayout;
     private TextBox txtChatMessage;
     private Button btnSendChat;
-    private Button btnSendNotification;
     private Button btnBroadcastNotification;
     private FlowLayoutPanel machineActions;
     private Button btnLockMachine;

@@ -213,10 +213,8 @@ public sealed class ClientMainForm : Form
         };
 
         _topUpButton = BuildButton("Nạp tiền", TopUp_Click);
-        panel.Controls.Add(BuildButton("Giao tiếp", Communication_Click));
         panel.Controls.Add(_topUpButton);
         panel.Controls.Add(BuildButton("Đăng xuất", Logout_Click));
-        panel.Controls.Add(BuildButton("Đổi mật khẩu", ChangePassword_Click));
         return panel;
     }
 
@@ -234,12 +232,6 @@ public sealed class ClientMainForm : Form
         return button;
     }
 
-    // Chức năng đổi mật khẩu chưa nối tới API xác thực nên hiện chỉ thông báo trạng thái.
-    private void ChangePassword_Click(object? sender, EventArgs e)
-    {
-        MessageBox.Show(this, "Chức năng đổi mật khẩu đang chờ tích hợp hệ thống xác thực.", "Mật khẩu", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
     private void TopUp_Click(object? sender, EventArgs e)
     {
         ShowTopUpRequestDialog();
@@ -249,11 +241,6 @@ public sealed class ClientMainForm : Form
     private void Logout_Click(object? sender, EventArgs e)
     {
         Close();
-    }
-
-    private void Communication_Click(object? sender, EventArgs e)
-    {
-        _chatMessageTextBox.Focus();
     }
 
     private Control BuildChatLayout()

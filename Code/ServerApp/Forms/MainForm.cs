@@ -55,12 +55,9 @@ public partial class MainForm : Form
 
     // Máy đang được admin thao tác; đồng thời là đích nhận lệnh và tin nhắn chat.
     private string? _selectedMachineName;
-    private ComboBox _billingModeComboBox = null!;
-    private NumericUpDown _billingMinutesInput = null!;
     private NumericUpDown _billingRatePerHourInput = null!;
-    private Button _btnStartBilling = null!;
-    private Button _btnExtendBilling = null!;
-    private Button _btnCloseBilling = null!;
+    private Button _btnSaveBillingRate = null!;
+    private Label _billingRateStatusLabel = null!;
     private TextBox _txtBillingMonitor = null!;
     private TableLayoutPanel _billingTopUpRequestPanel = null!;
     private Label _billingTopUpRequestLabel = null!;
@@ -226,9 +223,9 @@ public partial class MainForm : Form
             Alignment = TabAlignment.Top
         };
 
-        var billingTab = new TabPage
+        var notificationTab = new TabPage
         {
-            Text = "Tính tiền",
+            Text = "Thông báo",
             Padding = new Padding(8)
         };
 
@@ -238,93 +235,28 @@ public partial class MainForm : Form
             Padding = new Padding(8)
         };
 
-        var billingGroup = new GroupBox
+        var settingTab = new TabPage
+        {
+            Text = "Setting",
+            Padding = new Padding(8)
+        };
+
+        var notificationGroup = new GroupBox
         {
             Dock = DockStyle.Fill,
-            Text = "Quản lý phiên sử dụng",
+            Text = "Thông báo nạp tiền từ client",
             Font = new Font("Segoe UI", 9F, FontStyle.Bold),
             Padding = new Padding(12, 8, 12, 12)
         };
 
-        var billingLayout = new TableLayoutPanel
+        var notificationLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2
         };
-        billingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 164F));
-        billingLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-
-        var controls = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 4,
-            Padding = new Padding(0, 4, 0, 4)
-        };
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
-        controls.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 34F));
-        controls.RowStyles.Add(new RowStyle(SizeType.Absolute, 46F));
-
-        _billingModeComboBox = new ComboBox
-        {
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-            Margin = new Padding(0, 3, 0, 3)
-        };
-        _billingModeComboBox.Items.AddRange(["Theo thời gian", "Không giới hạn"]);
-        _billingModeComboBox.SelectedIndex = 0;
-
-        _billingMinutesInput = new NumericUpDown
-        {
-            Minimum = 1,
-            Maximum = 1_000_000,
-            Value = 10,
-            Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-            Margin = new Padding(0, 3, 0, 3)
-        };
-
-        _billingRatePerHourInput = new NumericUpDown
-        {
-            Minimum = 1_000,
-            Maximum = 1_000_000_000,
-            Increment = 1_000,
-            ThousandsSeparator = true,
-            Value = 10_000,
-            Dock = DockStyle.Fill,
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
-            Margin = new Padding(0, 3, 0, 3)
-        };
-
-        _btnStartBilling = BuildBillingButton("Bắt đầu", BillingStart_Click);
-        _btnExtendBilling = BuildBillingButton("Gia hạn", BillingExtend_Click);
-        _btnCloseBilling = BuildBillingButton("Kết thúc", BillingClose_Click);
-
-        controls.Controls.Add(BuildBillingFieldLabel("Hình thức"), 0, 0);
-        controls.Controls.Add(BuildBillingFieldLabel("Số phút"), 0, 1);
-        controls.Controls.Add(BuildBillingFieldLabel("Giá/giờ"), 0, 2);
-        controls.Controls.Add(_billingModeComboBox, 1, 0);
-        controls.Controls.Add(_billingMinutesInput, 1, 1);
-        controls.Controls.Add(_billingRatePerHourInput, 1, 2);
-
-        var buttonRow = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Margin = new Padding(0, 8, 0, 0),
-            Padding = Padding.Empty
-        };
-        buttonRow.Controls.Add(_btnStartBilling);
-        buttonRow.Controls.Add(_btnExtendBilling);
-        buttonRow.Controls.Add(_btnCloseBilling);
-        controls.Controls.Add(buttonRow, 0, 3);
-        controls.SetColumnSpan(buttonRow, 2);
+        notificationLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 72F));
+        notificationLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
 
         _txtBillingMonitor = new TextBox
         {
@@ -337,29 +269,18 @@ public partial class MainForm : Form
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Consolas", 9.25F, FontStyle.Regular),
             Margin = new Padding(0, 2, 0, 0),
-            Text = "Chưa chọn phiên tính tiền."
+            Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây."
         };
-
-        var billingMonitorLayout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Padding = Padding.Empty
-        };
-        billingMonitorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        billingMonitorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         _billingTopUpRequestPanel = new TableLayoutPanel
         {
-            AutoSize = true,
+            Dock = DockStyle.Fill,
             BackColor = Color.FromArgb(255, 252, 232),
             ColumnCount = 1,
-            Dock = DockStyle.Fill,
             Margin = new Padding(0, 6, 0, 0),
             Padding = new Padding(10, 8, 10, 8),
             RowCount = 3,
-            Visible = false
+            Visible = true
         };
         _billingTopUpRequestPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         _billingTopUpRequestPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -416,36 +337,81 @@ public partial class MainForm : Form
         _billingTopUpRequestPanel.Controls.Add(_billingTopUpButtonRow, 0, 1);
         _billingTopUpRequestPanel.Controls.Add(_billingTopUpStatusLabel, 0, 2);
 
-        billingMonitorLayout.Controls.Add(_txtBillingMonitor, 0, 0);
-        billingMonitorLayout.Controls.Add(_billingTopUpRequestPanel, 0, 1);
+        notificationLayout.Controls.Add(_txtBillingMonitor, 0, 0);
+        notificationLayout.Controls.Add(_billingTopUpRequestPanel, 0, 1);
+        notificationGroup.Controls.Add(notificationLayout);
 
-        billingLayout.Controls.Add(controls, 0, 0);
-        billingLayout.Controls.Add(billingMonitorLayout, 0, 1);
-        billingGroup.Controls.Add(billingLayout);
+        var settingGroup = new GroupBox
+        {
+            Dock = DockStyle.Fill,
+            Text = "Cài đặt giá tiền",
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Padding = new Padding(12, 8, 12, 12)
+        };
+
+        var settingLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+            RowCount = 3,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+        settingLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 126F));
+        settingLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        settingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 38F));
+        settingLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
+        settingLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+        _billingRatePerHourInput = new NumericUpDown
+        {
+            Minimum = 1_000,
+            Maximum = 1_000_000_000,
+            Increment = 1_000,
+            ThousandsSeparator = true,
+            Value = 10_000,
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            Margin = new Padding(0, 3, 0, 3)
+        };
+
+        _btnSaveBillingRate = new Button
+        {
+            Text = "Cập nhật",
+            Width = 104,
+            Height = 30,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+            Margin = new Padding(0, 4, 0, 4),
+            UseVisualStyleBackColor = true
+        };
+        _btnSaveBillingRate.Click += BillingRateSave_Click;
+
+        _billingRateStatusLabel = new Label
+        {
+            AutoSize = true,
+            Text = $"Giá hiện tại: {FormatMoney(GetBillingRatePerHour())}/giờ. Áp dụng cho phiên client mới.",
+            ForeColor = Color.FromArgb(55, 90, 55),
+            Margin = new Padding(0, 4, 0, 0)
+        };
+
+        settingLayout.Controls.Add(BuildBillingFieldLabel("Giá/giờ"), 0, 0);
+        settingLayout.Controls.Add(_billingRatePerHourInput, 1, 0);
+        settingLayout.Controls.Add(_btnSaveBillingRate, 1, 1);
+        settingLayout.Controls.Add(_billingRateStatusLabel, 0, 2);
+        settingLayout.SetColumnSpan(_billingRateStatusLabel, 2);
+        settingGroup.Controls.Add(settingLayout);
 
         machineSplit.Panel2.Controls.Remove(chatGroup);
         chatGroup.Text = string.Empty;
-        billingTab.Controls.Add(billingGroup);
+        notificationTab.Controls.Add(notificationGroup);
         chatTab.Controls.Add(chatGroup);
-        rightTabs.TabPages.Add(billingTab);
+        settingTab.Controls.Add(settingGroup);
+        rightTabs.TabPages.Add(notificationTab);
         rightTabs.TabPages.Add(chatTab);
+        rightTabs.TabPages.Add(settingTab);
         machineSplit.Panel2.Controls.Add(rightTabs);
+        RenderSelectedBillingTopUpRequest();
         SetBillingActionEnabled(false);
-    }
-
-    private static Button BuildBillingButton(string text, EventHandler clickHandler)
-    {
-        var button = new Button
-        {
-            Text = text,
-            Width = 92,
-            Height = 30,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-            Margin = new Padding(0, 2, 8, 2),
-            UseVisualStyleBackColor = true
-        };
-        button.Click += clickHandler;
-        return button;
     }
 
     private static Label BuildBillingFieldLabel(string text)
@@ -945,58 +911,6 @@ public partial class MainForm : Form
         }
     }
 
-    private async void BtnSendNotification_Click(object? sender, EventArgs e)
-    {
-        string message = txtChatMessage.Text.Trim();
-
-        if (message.Length == 0 || string.IsNullOrWhiteSpace(_selectedMachineName))
-        {
-            if (string.IsNullOrWhiteSpace(_selectedMachineName))
-            {
-                lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
-            }
-
-            return;
-        }
-
-        string targetMachineId = _selectedMachineName;
-        var request = new AdminNotificationRequest(targetMachineId, message, "Info", "Direct");
-
-        lblServerStatus.Text = $"Dang gui thong bao toi {targetMachineId}...";
-        SetChatActionEnabled(false);
-
-        try
-        {
-            AdminNotificationResult result = await _adminNotification.SendAsync(request);
-            lblServerStatus.Text = FormatNotificationResult(result);
-
-            if (!result.IsError)
-            {
-                AppendChatMessage(new AdminChatMessage(
-                    targetMachineId,
-                    "Thong bao",
-                    message,
-                    DateTimeOffset.Now));
-
-                txtChatMessage.Clear();
-                RenderSelectedChatHistory();
-            }
-        }
-        catch (Exception ex)
-        {
-            AdminNotificationResult error = AdminNotificationResult.ControlledError(
-                request,
-                "NOTIFICATION_SERVICE_ERROR",
-                ex.Message);
-            lblServerStatus.Text = FormatNotificationResult(error);
-        }
-        finally
-        {
-            SetChatActionEnabled(!string.IsNullOrWhiteSpace(_selectedMachineName));
-            txtChatMessage.Focus();
-        }
-    }
-
     private async void BtnBroadcastNotification_Click(object? sender, EventArgs e)
     {
         string message = txtChatMessage.Text.Trim();
@@ -1343,71 +1257,6 @@ public partial class MainForm : Form
     private void AdminChat_MessageReceived(AdminChatMessage message)
         => ApplyIncomingChatMessage(message);
 
-    private async void BillingStart_Click(object? sender, EventArgs e)
-    {
-        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
-        {
-            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
-            return;
-        }
-
-        SetBillingActionEnabled(false);
-        try
-        {
-            long ratePerHour = GetBillingRatePerHour();
-            AdminBillingResult result = _billingModeComboBox.SelectedIndex == 1
-                ? await _adminBilling.StartOpenEndedAsync(_selectedMachineName, ratePerHour)
-                : await _adminBilling.StartTimedAsync(_selectedMachineName, (int)_billingMinutesInput.Value, ratePerHour);
-            ApplyBillingUpdate(result);
-        }
-        finally
-        {
-            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
-        }
-    }
-
-    private async void BillingExtend_Click(object? sender, EventArgs e)
-    {
-        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
-        {
-            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
-            return;
-        }
-
-        SetBillingActionEnabled(false);
-        try
-        {
-            AdminBillingResult result = await _adminBilling.ExtendAsync(
-                _selectedMachineName,
-                (int)_billingMinutesInput.Value);
-            ApplyBillingUpdate(result);
-        }
-        finally
-        {
-            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
-        }
-    }
-
-    private async void BillingClose_Click(object? sender, EventArgs e)
-    {
-        if (_adminBilling is null || string.IsNullOrWhiteSpace(_selectedMachineName))
-        {
-            lblServerStatus.Text = UiStrings.MainNoMachineSelectedStatus;
-            return;
-        }
-
-        SetBillingActionEnabled(false);
-        try
-        {
-            AdminBillingResult result = await _adminBilling.CloseAsync(_selectedMachineName);
-            ApplyBillingUpdate(result);
-        }
-        finally
-        {
-            SetBillingActionEnabled(_adminBilling is not null && _isRuntimeMachineDataActive);
-        }
-    }
-
     private async void BillingRefreshTimer_Tick(object? sender, EventArgs e)
     {
         if (_adminBilling is not null)
@@ -1418,6 +1267,13 @@ public partial class MainForm : Form
 
     private void AdminBilling_BillingUpdated(AdminBillingResult result)
         => ApplyBillingUpdate(result);
+
+    private void BillingRateSave_Click(object? sender, EventArgs e)
+    {
+        _billingRateStatusLabel.Text =
+            $"Giá hiện tại: {FormatMoney(GetBillingRatePerHour())}/giờ. Áp dụng cho phiên client mới.";
+        lblServerStatus.Text = $"Đã cập nhật giá tiền/giờ: {FormatMoney(GetBillingRatePerHour())}/giờ.";
+    }
 
     public async Task SyncBillingForMachineAsync(string machineId)
     {
@@ -1430,7 +1286,7 @@ public partial class MainForm : Form
         {
             if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
             {
-                _txtBillingMonitor.Text = "Máy chủ PC00 không cần tính tiền.";
+                _txtBillingMonitor.Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây.";
             }
 
             return;
@@ -1443,7 +1299,7 @@ public partial class MainForm : Form
         }
         else if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
         {
-            _txtBillingMonitor.Text = "Chưa có phiên tính tiền đang hoạt động.";
+            _txtBillingMonitor.Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây.";
         }
     }
 
@@ -1458,7 +1314,7 @@ public partial class MainForm : Form
         {
             if (string.Equals(_selectedMachineName, machineId, StringComparison.OrdinalIgnoreCase))
             {
-                _txtBillingMonitor.Text = "Máy chủ PC00 không cần tính tiền.";
+                _txtBillingMonitor.Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây.";
             }
 
             return;
@@ -1514,8 +1370,8 @@ public partial class MainForm : Form
         }
 
         lblServerStatus.Text = result.IsError
-            ? $"Tính tiền {result.MachineId}: {result.ErrorCode ?? "Lỗi"} - {result.Message}"
-            : $"Tính tiền {result.MachineId}: {result.Message}";
+            ? $"Cập nhật sử dụng {result.MachineId}: {result.ErrorCode ?? "Lỗi"} - {result.Message}"
+            : $"Cập nhật sử dụng {result.MachineId}: {result.Message}";
 
         if (result.Timer is not null)
         {
@@ -1527,35 +1383,7 @@ public partial class MainForm : Form
             return;
         }
 
-        _txtBillingMonitor.Text = result.Timer is null
-            ? result.Message
-            : FormatBillingMonitor(result.Timer);
-    }
-
-    private static string FormatBillingMonitor(Shared.DTOs.CommandPayloads.TimerPayload timer)
-    {
-        string elapsed = FormatDuration(timer.ElapsedSeconds);
-        string sessionRemaining = timer.RemainingSeconds is null
-            ? "Không giới hạn"
-            : FormatDuration(timer.RemainingSeconds.Value);
-        string totalBalance = timer.TotalBalanceVnd is null
-            ? "N/A"
-            : FormatMoney(timer.TotalBalanceVnd.Value);
-        string remainingBalance = timer.RemainingBalanceVnd is null
-            ? "N/A"
-            : FormatMoney(timer.RemainingBalanceVnd.Value);
-        string balanceTimeRemaining = timer.RemainingUsageSeconds is null
-            ? "N/A"
-            : FormatDuration(timer.RemainingUsageSeconds.Value);
-        string warning = timer.IsWarning ? " / sắp hết giờ <=5 phút" : string.Empty;
-        return
-            $"{timer.Status} {timer.RentalMode}{warning}{Environment.NewLine}" +
-            $"Giá giờ: {FormatMoney(timer.RatePerHour)}/giờ{Environment.NewLine}" +
-            $"Tổng đã nạp: {totalBalance}{Environment.NewLine}" +
-            $"Tiền đã dùng: {FormatMoney(timer.AmountVnd)}{Environment.NewLine}" +
-            $"Số dư còn lại: {remainingBalance}{Environment.NewLine}" +
-            $"Thời gian đã dùng: {elapsed} / tính {timer.ChargedMinutes} phút{Environment.NewLine}" +
-            $"Thời gian còn lại: {sessionRemaining} / theo số dư {balanceTimeRemaining}";
+        _txtBillingMonitor.Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây.";
     }
 
     private long GetBillingRatePerHour()
@@ -2123,8 +1951,8 @@ public partial class MainForm : Form
             return;
         }
 
-        _billingTopUpRequestPanel.Visible = false;
-        _billingTopUpRequestLabel.Text = string.Empty;
+        _billingTopUpRequestPanel.Visible = true;
+        _billingTopUpRequestLabel.Text = "Bạn sẽ nhận thông báo nạp tiền từ client tại đây.";
         _billingTopUpStatusLabel.Text = string.Empty;
         _billingTopUpStatusLabel.Visible = false;
         _billingTopUpButtonRow.Visible = false;
@@ -2133,12 +1961,16 @@ public partial class MainForm : Form
 
         if (string.IsNullOrWhiteSpace(_selectedMachineName))
         {
+            _billingTopUpRequestLabel.Text = "Chọn một máy để xem thông báo nạp tiền từ client.";
+            UpdateBillingTopUpRequestLabelWidth();
             return;
         }
 
         TopUpChatAction? action = FindVisibleTopUpActionForMachine(_selectedMachineName);
         if (action is null)
         {
+            _billingTopUpRequestLabel.Text = $"Chưa có yêu cầu nạp tiền từ {_selectedMachineName}.";
+            UpdateBillingTopUpRequestLabelWidth();
             return;
         }
 
@@ -2270,21 +2102,14 @@ public partial class MainForm : Form
     {
         txtChatMessage.Enabled = enabled;
         btnSendChat.Enabled = enabled;
-        btnSendNotification.Enabled = enabled;
         btnBroadcastNotification.Enabled = enabled;
     }
 
     private void SetBillingActionEnabled(bool enabled)
     {
-        bool canUseBilling = enabled
-            && _adminBilling is not null
-            && !IsServerMachine(_selectedMachineName);
-        _billingModeComboBox.Enabled = canUseBilling;
-        _billingMinutesInput.Enabled = canUseBilling;
-        _billingRatePerHourInput.Enabled = canUseBilling;
-        _btnStartBilling.Enabled = canUseBilling;
-        _btnExtendBilling.Enabled = canUseBilling;
-        _btnCloseBilling.Enabled = canUseBilling;
+        bool canUseSettings = _adminBilling is not null;
+        _billingRatePerHourInput.Enabled = canUseSettings;
+        _btnSaveBillingRate.Enabled = canUseSettings;
     }
 
     /// <summary>

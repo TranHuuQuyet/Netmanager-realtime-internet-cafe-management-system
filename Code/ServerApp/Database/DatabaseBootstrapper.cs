@@ -118,7 +118,13 @@ public static class DatabaseBootstrapper
         new List<(string Legacy, string Canonical)>
         {
             new(CreateLegacyMachineId("01"), "PC01"),
-            new(CreateLegacyMachineId("02"), "PC02")
+            new(CreateLegacyMachineId("02"), "PC02"),
+            new(CreateLegacyMachineId("03"), "PC03"),
+            new(CreateLegacyMachineId("04"), "PC04"),
+            new(CreateLegacyMachineId("05"), "PC05"),
+            new(CreateLegacyMachineId("06"), "PC06"),
+            new(CreateLegacyMachineId("07"), "PC07"),
+            new(CreateLegacyMachineId("08"), "PC08")
         };
 
     // Dau phan cach trong ma may cu.
@@ -133,7 +139,13 @@ public static class DatabaseBootstrapper
         {
             new("admin", "123", "PC00", UserRole.Admin, true),
             new("client01", "123", "PC01", UserRole.Client, true),
-            new("client02", "123", "PC02", UserRole.Client, true)
+            new("client02", "123", "PC02", UserRole.Client, true),
+            new("client03", "123", "PC03", UserRole.Client, true),
+            new("client04", "123", "PC04", UserRole.Client, true),
+            new("client05", "123", "PC05", UserRole.Client, true),
+            new("client06", "123", "PC06", UserRole.Client, true),
+            new("client07", "123", "PC07", UserRole.Client, true),
+            new("client08", "123", "PC08", UserRole.Client, true)
         };
 
     // Chen hoac cap nhat user seed vao database.

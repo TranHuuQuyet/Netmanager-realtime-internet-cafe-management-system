@@ -19,7 +19,13 @@ public static class SeedData
     {
         CreateUser("admin", "Admin", "PC00"),
         CreateUser("client01", "Client", "PC01"),
-        CreateUser("client02", "Client", "PC02")
+        CreateUser("client02", "Client", "PC02"),
+        CreateUser("client03", "Client", "PC03"),
+        CreateUser("client04", "Client", "PC04"),
+        CreateUser("client05", "Client", "PC05"),
+        CreateUser("client06", "Client", "PC06"),
+        CreateUser("client07", "Client", "PC07"),
+        CreateUser("client08", "Client", "PC08")
     };
 
     // Danh sach may mau tuong ung voi cac may trong quan net.
@@ -27,7 +33,13 @@ public static class SeedData
     {
         CreateMachine("PC00", "Computer 00"),
         CreateMachine("PC01", "Computer 01"),
-        CreateMachine("PC02", "Computer 02")
+        CreateMachine("PC02", "Computer 02"),
+        CreateMachine("PC03", "Computer 03"),
+        CreateMachine("PC04", "Computer 04"),
+        CreateMachine("PC05", "Computer 05"),
+        CreateMachine("PC06", "Computer 06"),
+        CreateMachine("PC07", "Computer 07"),
+        CreateMachine("PC08", "Computer 08")
     };
 
     // Ham tao user mau de tranh lap code trong danh sach Users.

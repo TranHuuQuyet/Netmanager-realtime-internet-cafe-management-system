@@ -23,6 +23,7 @@ AuthRuntime runtime = await AuthBootstrapper.CreateAsync(dbPath);
 await AssertCanonicalSeedAsync(database, dbPath);
 await AssertAdminLoginAsync(runtime);
 await AssertClientLoginAsync(runtime);
+await AssertAdditionalClientSeedLoginAsync(runtime);
 await AssertWrongPasswordAsync(runtime);
 await AssertWrongMachineAsync(runtime);
 await AssertRoleMismatchAsync(runtime);
@@ -38,6 +39,7 @@ await AssertAutoOpenEndedBillingAsync();
 Console.WriteLine("PASS G0-05: canonical auth seed/database/admin rule match docs");
 Console.WriteLine("PASS G2-01: admin login succeeds with admin / 123 / PC00");
 Console.WriteLine("PASS G2-02: client login succeeds with client01 / 123 / PC01");
+Console.WriteLine("PASS G2-02b: additional seeded clients PC03-PC08 can authenticate");
 Console.WriteLine("PASS G2-03: wrong password is rejected visibly");
 Console.WriteLine("PASS G2-04: correct client credentials with wrong machineId are rejected");
 Console.WriteLine("PASS TC-A08: role mismatch returns INVALID_CREDENTIALS");
@@ -52,11 +54,15 @@ Console.WriteLine("PASS R5-B04: client online auto-starts open-ended billing and
 static async Task AssertCanonicalSeedAsync(DatabaseRuntime database, string dbPath)
 {
     await AssertUserAsync(database.Users, "admin", "PC00", UserRole.Admin);
-    await AssertUserAsync(database.Users, "client01", "PC01", UserRole.Client);
-    await AssertUserAsync(database.Users, "client02", "PC02", UserRole.Client);
     await AssertMachineAsync(database.Machines, "PC00");
-    await AssertMachineAsync(database.Machines, "PC01");
-    await AssertMachineAsync(database.Machines, "PC02");
+
+    for (int machineNumber = 1; machineNumber <= 8; machineNumber++)
+    {
+        string suffix = machineNumber.ToString("00");
+        await AssertUserAsync(database.Users, $"client{suffix}", $"PC{suffix}", UserRole.Client);
+        await AssertMachineAsync(database.Machines, $"PC{suffix}");
+    }
+
     await AssertSessionCountAsync(dbPath, 0);
 }
 
@@ -92,6 +98,25 @@ static async Task AssertClientLoginAsync(AuthRuntime runtime)
     {
         throw new InvalidOperationException("G2-02 session machine mismatch.");
     }
+}
+
+static async Task AssertAdditionalClientSeedLoginAsync(AuthRuntime runtime)
+{
+    var result = await runtime.Auth.AuthenticateAsync(
+        new AuthRequest("client08", "123", "PC08", UserRole.Client));
+
+    AssertSuccess(result, AuthStatus.Success, "client08");
+    if (result.Session is null)
+    {
+        throw new InvalidOperationException("G2-02b expected a session for client08 login.");
+    }
+
+    if (!string.Equals(result.Session.MachineId, "PC08", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException("G2-02b session machine mismatch.");
+    }
+
+    await runtime.SessionService.CloseSessionAsync(result.Session.Id);
 }
 
 static async Task AssertWrongPasswordAsync(AuthRuntime runtime)

@@ -1,0 +1,44 @@
+MEMBER 5 — DATABASE + BILLING
+Phạm vi PowerPoint: Slide 27–29
+Thời lượng: 2 phút
+Nhịp trình bày: khoảng 40 giây mỗi slide
+
+LƯU Ý VỀ DECK
+Hai trang 27 và 28 có tiêu đề Authentication/Session, nhưng phần trình bày này
+tập trung vào dữ liệu SQLite và repository đứng phía sau hai chức năng đó.
+
+============================================================
+SLIDE 27 — AUTHENTICATION DATA IN SQLITE
+============================================================
+
+KỊCH BẢN
+Phía sau machine validation là SQLite database internet_cafe.db. AuthUsers lưu Username, password salt/hash, Role, MachineId, IsActive và LastLoginAtUtc. Machines lưu MachineId, MachineName, IP, Status, LastSeen và IsActive. AuthService không viết SQL mà gọi IUserRepository và IMachineRepository. Repository dùng parameterized SQL, đọc row thành UserRecord hoặc MachineEntity rồi trả cho service quyết định login accepted hay rejected.
+
+LUỒNG
+AuthService → Repository interface → SQLite
+AuthService ← UserRecord / MachineEntity
+
+============================================================
+SLIDE 28 — SESSION DATA + PERSISTENCE
+============================================================
+
+KỊCH BẢN
+AuthSessions lưu Id, UserId, Username, Role, MachineId, State, StartedAtUtc và EndedAtUtc. ISessionRepository cung cấp các thao tác tạo, tìm active session, revoke và close. Nhờ session được lưu bền vững, BillingSessions có thể tham chiếu AuthSessionId và UserId thay vì chỉ giữ timer trong bộ nhớ. Repository pattern tách SQL khỏi Auth, Billing, Network và Form, giúp các tầng chỉ trao đổi typed record.
+
+QUAN HỆ
+AuthUsers 1 ── n AuthSessions 1 ── n BillingSessions
+Machines ← machineId → AuthSessions/BillingSessions
+
+============================================================
+SLIDE 29 — BILLING DATA, CALCULATION + RESTORE
+============================================================
+
+KỊCH BẢN
+BillingSessions lưu MachineId, RentalMode, State, RatePerHour, StartedAtUtc, ExpiresAtUtc, ChargedMinutes và AmountVnd. BillingService dùng IBillingSessionRepository để mở, gia hạn, đóng hoặc ListActive. Khi server restart, service đọc các phiên Active, tính lại thời gian và tiền theo UTC hiện tại, rồi gửi TIMER mới; nếu hết hạn thì gửi LOCK. Nhờ SQLite, quán không mất dữ liệu tính tiền khi ứng dụng khởi động lại. Đây cũng là phần kết thúc bài trình bày của nhóm. Cảm ơn thầy và các bạn đã lắng nghe.
+
+CÔNG THỨC
+chargedMinutes = ceil(elapsedSeconds / 60)
+amountVnd = ceil(chargedMinutes × ratePerHour / 60)
+
+CHECKPOINT THỜI GIAN
+- Kết thúc slide 29 tại phút 15:00 của toàn bài.

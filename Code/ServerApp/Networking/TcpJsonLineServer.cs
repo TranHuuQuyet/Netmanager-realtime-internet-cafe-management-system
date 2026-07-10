@@ -128,72 +128,72 @@ public sealed class TcpJsonLineServer : IDisposable
 
         return result.Sent;
     }
-// hàm gửi lệnh xuống máy client  trả về bool
-    [Obsolete("Legacy command path retained only for local reference; use SendMachineCommandWithResultAsync.")]
-    private async Task<bool> SendMachineCommandLegacyAsync(
-        string machineId,// id máy 
-        bool lockMachine,// lệnh khoá và mở khoá
-        string issuedBy,// người ra lệnh
-        string reason,// lý do ra lệnh
-        CancellationToken cancellationToken = default) // token huỷ bỏ
-    {//check id máy có tồn tại không
-        string targetMachineId = machineId.Trim();// Trim xoá khoang trắng đầu cuối của id máy
-        if (string.IsNullOrWhiteSpace(targetMachineId))
-        {// gửi thông báo về lỗi id máy không hợp lệ
-            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", string.Empty, "Machine ID is required."));
-            return false;
-        }
-// duyệt các _machineBindings 
-        string clientId = string.Empty;
-        foreach (KeyValuePair<string, string> binding in _machineBindings)
-        {
-            string boundClientId = binding.Key; // gán clientId bằng key của binding "tcp-0001"
-            string boundMachineId = binding.Value;// gán boundMachineId bằng value của binding "machine-123"
-// nếu boundMachineId trùng với targetMachineId thì gán clientId bằng boundClientId và thoát vòng lặp
-            if (string.Equals(boundMachineId, targetMachineId, StringComparison.OrdinalIgnoreCase))//so sánh nhanh theo số nhị phân
-            {
-                clientId = boundClientId;// gán clientId bằng boundClientId "tcp-0001"
-                break;
-            }
-        }
+    // hàm gửi lệnh xuống máy client  trả về bool
+    //    [Obsolete("Legacy command path retained only for local reference; use SendMachineCommandWithResultAsync.")]
+    //     private async Task<bool> SendMachineCommandLegacyAsync(
+    //         string machineId,// id máy 
+    //         bool lockMachine,// lệnh khoá và mở khoá
+    //         string issuedBy,// người ra lệnh
+    //         string reason,// lý do ra lệnh
+    //         CancellationToken cancellationToken = default) // token huỷ bỏ
+    //     {//check id máy có tồn tại không
+    //         string targetMachineId = machineId.Trim();// Trim xoá khoang trắng đầu cuối của id máy
+    //         if (string.IsNullOrWhiteSpace(targetMachineId))
+    //         {// gửi thông báo về lỗi id máy không hợp lệ
+    //             TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", string.Empty, "Machine ID is required."));
+    //             return false;
+    //         }
+    // // duyệt các _machineBindings 
+    //         string clientId = string.Empty;
+    //         foreach (KeyValuePair<string, string> binding in _machineBindings)
+    //         {
+    //             string boundClientId = binding.Key; // gán clientId bằng key của binding "tcp-0001"
+    //             string boundMachineId = binding.Value;// gán boundMachineId bằng value của binding "machine-123"
+    // // nếu boundMachineId trùng với targetMachineId thì gán clientId bằng boundClientId và thoát vòng lặp
+    //             if (string.Equals(boundMachineId, targetMachineId, StringComparison.OrdinalIgnoreCase))//so sánh nhanh theo số nhị phân
+    //             {
+    //                 clientId = boundClientId;// gán clientId bằng boundClientId "tcp-0001"
+    //                 break;
+    //             }
+    //         }
 
-        if (string.IsNullOrWhiteSpace(clientId)
-            || !_connections.TryGetValue(clientId, out ClientConnection? connection))
-        {
-            TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, "Machine is not connected."));
-            return false;
-        }
+    //         if (string.IsNullOrWhiteSpace(clientId)
+    //             || !_connections.TryGetValue(clientId, out ClientConnection? connection))
+    //         {
+    //             TraceEmitted?.Invoke(new NetworkTraceEntry("COMMAND_ERROR", targetMachineId, "Machine is not connected."));
+    //             return false;
+    //         }
 
-        string requestId = Guid.NewGuid().ToString("N");
-        PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
-        CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
-        Packet packet = lockMachine
-            ? PacketFactory.CreateLock(
-                source: NetworkProtocol.ServerSource,
-                target: targetMachineId,
-                payload: new LockPayload
-                {
-                    MachineId = targetMachineId,
-                    IssuedBy = issuedBy,
-                    Reason = reason
-                },
-                requestId: requestId)
-            : PacketFactory.CreateUnlock(
-                source: NetworkProtocol.ServerSource,
-                target: targetMachineId,
-                payload: new UnlockPayload
-                {
-                    MachineId = targetMachineId,
-                    IssuedBy = issuedBy,
-                    Reason = reason
-                },
-                requestId: requestId);
+    //         string requestId = Guid.NewGuid().ToString("N");
+    //         PacketType packetType = lockMachine ? PacketType.LOCK : PacketType.UNLOCK;
+    //         CommandType commandType = lockMachine ? CommandType.LOCK : CommandType.UNLOCK;
+    //         Packet packet = lockMachine
+    //             ? PacketFactory.CreateLock(
+    //                 source: NetworkProtocol.ServerSource,
+    //                 target: targetMachineId,
+    //                 payload: new LockPayload
+    //                 {
+    //                     MachineId = targetMachineId,
+    //                     IssuedBy = issuedBy,
+    //                     Reason = reason
+    //                 },
+    //                 requestId: requestId)
+    //             : PacketFactory.CreateUnlock(
+    //                 source: NetworkProtocol.ServerSource,
+    //                 target: targetMachineId,
+    //                 payload: new UnlockPayload
+    //                 {
+    //                     MachineId = targetMachineId,
+    //                     IssuedBy = issuedBy,
+    //                     Reason = reason
+    //                 },
+    //                 requestId: requestId);
 
-        string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
-        TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_COMMAND", clientId, message));
-        await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
-        return true;
-    }
+    //         string message = NetworkProtocol.ValidateOutgoingMessage(JsonHelper.SerializeToJson(packet));
+    //         TraceEmitted?.Invoke(new NetworkTraceEntry("OUT_COMMAND", clientId, message));
+    //         await connection.SendAsync(message, cancellationToken).ConfigureAwait(false);
+    //         return true;
+    //     }
 
     public async Task<MachineCommandSendResult> SendMachineCommandWithResultAsync(
         string machineId,

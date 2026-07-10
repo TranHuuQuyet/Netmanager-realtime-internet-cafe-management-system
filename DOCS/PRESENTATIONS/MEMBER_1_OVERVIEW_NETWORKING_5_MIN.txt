@@ -1,0 +1,105 @@
+MEMBER 1 — INTRODUCTION + NETWORKING
+Phạm vi PowerPoint: Slide 1–9
+Thời lượng: 5 phút
+Nhịp trình bày: khoảng 30–35 giây mỗi slide
+
+============================================================
+SLIDE 1 — NETMANAGER: FEATURE OVERVIEW & DEMO
+============================================================
+
+KỊCH BẢN
+Xin chào thầy và các bạn. Nhóm em xin trình bày NetManager, hệ thống quản lý phòng máy Internet thời gian thực được xây dựng bằng .NET 8, Windows Forms, TCP JSON-line và SQLite. Hệ thống gồm ServerApp dành cho quản trị viên, ClientApp chạy trên các máy khách, cùng database lưu tài khoản, session và billing. Sau phần giới thiệu, nhóm sẽ lần lượt trình bày Networking, Server UI, Client UI, Authentication, Database và Billing.
+
+Ý CHÍNH CẦN CHỈ
+- Server App ↔ TCP JSON ↔ Client PCs.
+- Database lưu Users và Billing.
+- Không cần đọc toàn bộ tên thành viên; chỉ giới thiệu nhóm ngắn gọn.
+
+============================================================
+SLIDE 2 — PROJECT OVERVIEW
+============================================================
+
+KỊCH BẢN
+NetManager có ba khối chính. ServerApp là trung tâm điều khiển của admin. ClientApp chạy trên từng máy PC-01, PC-02 và nhận lệnh từ server. SQLite lưu account, machine, session và billing. Các chức năng cốt lõi gồm login, trạng thái máy, lock/unlock, chat, tính tiền và khôi phục session. Điểm quan trọng không phải từng màn hình riêng lẻ, mà là dữ liệu đi xuyên suốt giữa ba khối.
+
+LUỒNG TÓM TẮT
+Client UI → Network → Server Service → Database
+Database/Service → Network → Client UI
+
+============================================================
+SLIDE 3 — NETWORKING FEATURE
+============================================================
+
+KỊCH BẢN
+Networking là cầu nối thời gian thực giữa ServerApp và nhiều ClientApp. Server giữ listener, connection registry và dispatcher. Client giữ một TCP connection tới server. Hai phía trao đổi các packet LOGIN, STATUS, LOCK, UNLOCK, ACK, CHAT và TIMER. Nhờ đó admin có thể điều khiển máy từ xa, còn client báo lại trạng thái và kết quả xử lý ngay lập tức.
+
+CODE LIÊN QUAN
+- Server: TcpJsonLineServer, ClientConnection, PacketDispatcher.
+- Client: TcpClientConnection, ClientRuntimeCommandHandler.
+- Shared: Packet<T>, DTOs, PacketFactory, JsonHelper.
+
+============================================================
+SLIDE 4 — WHY NETWORKING MATTERS
+============================================================
+
+KỊCH BẢN
+Nếu không có Networking, Server UI và Client UI chỉ là hai chương trình cục bộ không biết trạng thái của nhau. TCP connection biến chúng thành một hệ thống sống: server gửi command hoặc timer xuống client; client gửi login, status, ACK và chat lên server. Network layer chỉ vận chuyển và định tuyến; password do Auth xử lý, billing do BillingService tính và giao diện chỉ hiển thị kết quả.
+
+NHẤN MẠNH
+Networking = transport + routing, không chứa business rule.
+
+============================================================
+SLIDE 5 — PROTOCOL: TCP + JSON-LINE
+============================================================
+
+KỊCH BẢN
+Dự án dùng TCP vì dữ liệu được truyền tin cậy và đúng thứ tự. Tuy nhiên TCP là byte stream, không tự biết ranh giới message, nên hệ thống dùng JSON-line: mỗi packet là một JSON object trên đúng một dòng. WriteLineAsync thêm ký tự xuống dòng, ReadLineAsync đọc đến hết một packet. JSON dễ đọc, dễ log và dễ kiểm tra khi demo hoặc debug.
+
+VÍ DỤ MINH HỌA
+{"type":"LOCK","target":"PC-01","requestId":"cmd-102",...}\n
+
+============================================================
+SLIDE 6 — LOGIN AND STATUS FLOW
+============================================================
+
+KỊCH BẢN
+Đầu tiên Client ConnectForm gửi LOGIN gồm username, password, role và machineId. PacketDispatcher chuyển request tới AuthService. Khi thành công, server trả sessionId và bind connection với machineId. Sau đó ClientMainForm gửi STATUS. Dispatcher cập nhật MachineRepository rồi phát StatusEmitted để MainForm hiển thị Online. Khi connection mất, máy được cập nhật Offline. Vì vậy trạng thái trên server phản ánh runtime thật của client.
+
+LUỒNG
+ConnectForm → LOGIN → Dispatcher → AuthService → LOGIN response
+ClientMainForm → STATUS → MachineRepository → Server MainForm
+
+============================================================
+SLIDE 7 — COMMAND AND ACK FLOW
+============================================================
+
+KỊCH BẢN
+Khi admin chọn PC-01 và bấm LOCK hoặc UNLOCK, server tạo command packet có target và requestId, rồi route tới đúng connection. Client handler kiểm tra target, phát event cho ClientMainForm thực thi và gửi ACK trở lại. Server đối chiếu requestId, machineId và ackFor trước khi hiển thị Success, Failed hoặc Ignored. ACK chứng minh lệnh đã thật sự đến và được client xử lý.
+
+LUỒNG
+Server UI → LOCK/UNLOCK → PC-01 → Client UI
+Server UI ← command result ← ACK ← PC-01
+
+============================================================
+SLIDE 8 — MULTI-CLIENT ROUTING
+============================================================
+
+KỊCH BẢN
+Một server port có thể phục vụ nhiều client đồng thời. Mỗi socket được bọc trong một ClientConnection riêng. Sau LOGIN, registry biết connection nào thuộc PC-01, PC-02 hoặc PC-03. Command, chat và TIMER trực tiếp chỉ được gửi tới machineId đã chọn; các client khác không nhận. Chỉ notification dạng broadcast mới được gửi cho nhiều connection hợp lệ.
+
+SƠ ĐỒ
+                 ┌→ PC-01 connection
+Server :5000 ────┼→ PC-02 connection
+                 └→ PC-03 connection
+
+============================================================
+SLIDE 9 — WHAT NETWORKING CONNECTS
+============================================================
+
+KỊCH BẢN
+Tóm lại, Networking kết nối toàn bộ luồng Login, Status, Command, ACK, Chat, Billing Timer, Notification và multi-client control. Khi client disconnect, server dọn registry và cập nhật trạng thái. Khi reconnect, client phải xác thực hoặc bind lại và nhận TIMER snapshot để đồng bộ. Phần tiếp theo, Member 2 sẽ trình bày cách Server UI sử dụng các service và event này để quản trị phòng máy.
+
+CHECKPOINT THỜI GIAN
+- Kết thúc slide 9 đúng phút 05:00.
+- Không demo packet trực tiếp trong phần này nếu đã hết thời gian.
+

@@ -1,0 +1,45 @@
+MEMBER 4 — AUTHENTICATION
+Phạm vi PowerPoint: Slide 23–26
+Thời lượng: 3 phút
+Nhịp trình bày: khoảng 40–45 giây mỗi slide
+
+============================================================
+SLIDE 23 — AUTHENTICATION + MACHINE VALIDATION
+============================================================
+
+KỊCH BẢN
+AuthService nhận username, password, role và machineId từ LoginForm hoặc PacketDispatcher. Service tìm user qua IUserRepository, xác minh PBKDF2 password hash, kiểm tra IsActive và Role. Tiếp theo nó đọc Machines để bảo đảm machineId tồn tại, được bật và đúng với account. Seed hiện tại gồm admin trên PC00, client01 trên PC-01 và client02 trên PC-02. Sai máy bị ACCOUNT_MACHINE_MISMATCH, giúp tránh route command và billing nhầm máy.
+
+LUỒNG
+Form/LOGIN packet → AuthService
+→ UserRepository + MachineRepository
+→ AuthResult hoặc LOGIN response
+
+============================================================
+SLIDE 24 — SESSION MANAGEMENT + DUPLICATE CONTROL
+============================================================
+
+KỊCH BẢN
+Khi Auth thành công, SessionService không chỉ trả true. Nó thu hồi active session cũ của user, tạo AuthSession mới gồm sessionId, user, role, machineId và StartedAtUtc, rồi cập nhật Machine thành Online. Nếu máy đã Online, client login mới bị từ chối bằng MACHINE_ALREADY_ACTIVE. Quy tắc duplicate control giữ một trạng thái nhất quán cho status, command routing và billing. Khi logout hoặc disconnect, session và machine status được đóng hoặc cập nhật phù hợp.
+
+============================================================
+SLIDE 25 — BILLING RULES AFTER AUTHENTICATION
+============================================================
+
+KỊCH BẢN
+Billing chỉ được mở khi đã có AuthSession hợp lệ vì BillingSession tham chiếu AuthSessionId. Phiên Timed có ExpiresAtUtc; phiên OpenEnded chạy đến khi admin đóng. Đơn giá mặc định là 10.000 VND mỗi giờ. Hệ thống làm tròn lên theo phút: 61 giây được tính hai phút. AuthSession tạo identity cho phiên, còn BillingService dùng identity đó để gắn tiền và thời gian đúng user, đúng machine.
+
+CÔNG THỨC
+chargedMinutes = ceil(elapsedSeconds / 60)
+amountVnd = ceil(chargedMinutes × ratePerHour / 60)
+
+============================================================
+SLIDE 26 — AUTHENTICATION FLOW SUMMARY
+============================================================
+
+KỊCH BẢN
+Tóm lại, Authentication kiểm tra account, password, role và machine; SessionService theo dõi user nào đang dùng máy nào; duplicate control bảo vệ active state; và AuthSession trở thành đầu vào cho Billing. Auth không gửi TCP trực tiếp và không viết SQL: Network gọi Auth qua interface, Auth gọi repository, rồi kết quả quay về Form hoặc LOGIN response. Tiếp theo, Member 5 trình bày cách Database lưu AuthSession và BillingSession, đồng thời khôi phục chúng sau restart.
+
+CHECKPOINT THỜI GIAN
+- Kết thúc slide 26 tại phút 13:00 của toàn bài.
+

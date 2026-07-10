@@ -1,0 +1,50 @@
+MEMBER 3 — CLIENT UI
+Phạm vi PowerPoint: Slide 17–22
+Thời lượng: 2 phút
+Nhịp trình bày: khoảng 20 giây mỗi slide
+
+============================================================
+SLIDE 17 — CLIENT + DATA FOUNDATION
+============================================================
+
+KỊCH BẢN
+Phần Client trình bày chương trình chạy trên máy khách. ClientApp kết nối với ServerApp để login, gửi status, nhận command, chat và TIMER. Client UI không truy cập SQLite server trực tiếp; mọi dữ liệu nghiệp vụ đến qua packet và typed event.
+
+============================================================
+SLIDE 18 — CLIENT APPLICATION
+============================================================
+
+KỊCH BẢN
+ClientApp là customer-side runtime. ConnectForm tạo kết nối và đăng nhập; sau đó ClientMainForm giữ connection trong suốt phiên. Client lắng nghe server và phản ứng theo command, không tự tạo quy tắc lock, unlock hoặc billing riêng.
+
+============================================================
+SLIDE 19 — CLIENT LOGIN + STATUS
+============================================================
+
+KỊCH BẢN
+Người dùng nhập username, password và machineId trên ConnectForm. LOGIN thành công trả sessionId và mở ClientMainForm. Ví dụ client01 phải dùng PC-01. Sau đó client gửi STATUS gồm machineId, sessionId, IP và trạng thái để server cập nhật Online.
+
+============================================================
+SLIDE 20 — LOCK / UNLOCK + ACK
+============================================================
+
+KỊCH BẢN
+ClientRuntimeCommandHandler nhận LOCK hoặc UNLOCK và kiểm tra target. LOCK mở LockScreenForm; chỉ UNLOCK hợp lệ mới cho đóng màn hình khóa. Sau khi xử lý, client gửi ACK với cùng requestId để admin biết lệnh thành công, thất bại hay bị bỏ qua.
+
+============================================================
+SLIDE 21 — CLIENT CHAT + TIMER DISPLAY
+============================================================
+
+KỊCH BẢN
+CHAT packet được hiển thị trong vùng hỗ trợ và client có thể gửi reply. TIMER cập nhật elapsed time, remaining time, amount, balance và warning. Khi thời gian hết, client nhận shouldLockNow hoặc LOCK command để chuyển sang màn hình khóa.
+
+============================================================
+SLIDE 22 — CLIENT CLOSING MESSAGE
+============================================================
+
+KỊCH BẢN
+Tóm lại, ClientApp là giao diện runtime phía khách hàng: đăng nhập, báo status, hiển thị lock screen, chat và timer. TcpClientConnection lo transport, RuntimeCommandHandler lo packet, còn Form lo hiển thị. Tiếp theo, Member 4 trình bày Authentication phía server.
+
+CHECKPOINT THỜI GIAN
+- Kết thúc slide 22 tại phút 10:00 của toàn bài.
+

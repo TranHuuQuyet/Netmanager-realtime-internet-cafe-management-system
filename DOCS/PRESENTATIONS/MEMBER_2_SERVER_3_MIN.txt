@@ -1,0 +1,57 @@
+MEMBER 2 — SERVER UI
+Phạm vi PowerPoint: Slide 10–16
+Thời lượng: 3 phút
+Nhịp trình bày: khoảng 25 giây mỗi slide
+
+============================================================
+SLIDE 10 — SERVER / ADMIN APPLICATION
+============================================================
+
+KỊCH BẢN
+ServerApp là control center của hệ thống. Sau khi admin đăng nhập thành công, Program khởi động TCP server và mở MainForm. Từ một Windows Forms dashboard, admin theo dõi client, gửi command, chat, điều khiển billing và xem kết quả thời gian thực.
+
+============================================================
+SLIDE 11 — WHAT THE ADMIN CONTROLS
+============================================================
+
+KỊCH BẢN
+MainForm tập trung năm nhóm chức năng: hiển thị trạng thái máy; LOCK, UNLOCK hoặc SHUTDOWN máy được chọn; chat hỗ trợ; mở và theo dõi billing session; cuối cùng là hiển thị ACK success hoặc failure. Form gọi các interface Presentation, không tự parse packet hoặc viết SQL.
+
+============================================================
+SLIDE 12 — MACHINE STATUS DISPLAY
+============================================================
+
+KỊCH BẢN
+Trạng thái Online hoặc Offline đến từ runtime client. Client gửi STATUS sau login; PacketDispatcher cập nhật machine và TcpJsonLineServer phát StatusEmitted. Program chuyển event này vào MainForm.ApplyMachineStatusUpdate. Khi client disconnect, server cập nhật Offline. Vì vậy danh sách máy phản ánh connection thật.
+
+============================================================
+SLIDE 13 — SELECTED-CLIENT CONTROL
+============================================================
+
+KỊCH BẢN
+Admin chọn PC-01 rồi bấm LOCK hoặc UNLOCK. MainForm tạo AdminCommandRequest và gọi IAdminCommandService. Networking route packet theo machineId nên chỉ PC-01 thực thi. ACK quay lại được đổi thành AdminCommandResult để Form hiển thị kết quả, trong khi PC-02 không bị ảnh hưởng.
+
+============================================================
+SLIDE 14 — CHAT FEATURE
+============================================================
+
+KỊCH BẢN
+Chat cũng đi theo máy đang được chọn. MainForm gọi IAdminChatService, server tạo CHAT packet với receiver là machineId. Client hiển thị tin nhắn và có thể gửi reply. Server route reply trở lại event MessageReceived để MainForm thêm vào khung chat, giữ cuộc hỗ trợ riêng cho từng client.
+
+============================================================
+SLIDE 15 — BILLING CONTROL
+============================================================
+
+KỊCH BẢN
+Billing panel cho phép admin mở phiên Timed hoặc OpenEnded, gia hạn, đóng và theo dõi used time, remaining time, amount cùng status. MainForm gọi IAdminBillingService. Service lưu BillingSession xuống SQLite, phát BillingUpdated cho server UI và gửi TIMER tới client. Active session còn có thể restore sau restart.
+
+============================================================
+SLIDE 16 — CLEAN UI ARCHITECTURE
+============================================================
+
+KỊCH BẢN
+Server UI chỉ nhận model sạch và event có kiểu. Networking quản lý raw packet, Services xử lý business rule, Repository quản lý SQLite, còn MainForm chỉ xử lý button, table và kết quả nhìn thấy. Ranh giới này giúp code dễ kiểm thử và tránh block UI. Tiếp theo, Member 3 trình bày Client UI.
+
+CHECKPOINT THỜI GIAN
+- Kết thúc slide 16 tại phút 08:00 của toàn bài.
+
